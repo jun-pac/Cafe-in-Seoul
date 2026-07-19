@@ -261,6 +261,18 @@ input[type="checkbox"] { accent-color: #ffffff; width: 15px; height: 15px; }
 .reviewform__row { display: flex; align-items: center; gap: 8px; margin-top: 8px; }
 .filepick { position: relative; }
 
+/* chat */
+.chat { display: flex; flex-direction: column; gap: 10px; }
+.chat__msgs { max-height: 260px; overflow-y: auto; display: flex; flex-direction: column; gap: 10px; padding-right: 4px; }
+.chat__empty { padding: 8px 0; font-size: 12px; }
+.chat__msg { border-left: 2px solid var(--hair); padding-left: 10px; }
+.chat__meta { display: flex; gap: 8px; align-items: baseline; }
+.chat__who { font-weight: 700; font-size: 12px; }
+.chat__t { font-size: 10px; color: var(--mute); letter-spacing: 0.5px; }
+.chat__body { font-size: 13px; margin-top: 2px; line-height: 1.5; color: var(--ink-2); word-break: break-word; }
+.chat__input { display: grid; grid-template-columns: 1fr auto; gap: 8px; }
+.chat__err { color: var(--ink); font-size: 11px; opacity: .85; min-height: 12px; }
+
 /* ---------- Modal ---------- */
 .modal-back { position: fixed; inset: 0; background: rgba(0,0,0,.72); display: grid; place-items: start center; padding: 24px; overflow-y: auto; z-index: 1000; }
 .modal { background: var(--surface); border: 1px solid var(--hair); width: min(580px, 100%); border-radius: var(--r-md); padding: 22px; position: relative; }

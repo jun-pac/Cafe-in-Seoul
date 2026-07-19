@@ -71,8 +71,20 @@ CREATE TABLE IF NOT EXISTS reviews (
   FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE CASCADE
 );
 
+-- per-cafe chat; posting is gated on GPS proximity (<=1km) server-side
+CREATE TABLE IF NOT EXISTS messages (
+  id         TEXT PRIMARY KEY,
+  cafe_id    TEXT NOT NULL,
+  user_id    TEXT NOT NULL,
+  body       TEXT NOT NULL,
+  created_at TEXT NOT NULL DEFAULT (datetime('now')),
+  FOREIGN KEY (cafe_id) REFERENCES cafes(id) ON DELETE CASCADE,
+  FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE CASCADE
+);
+
 CREATE INDEX IF NOT EXISTS idx_votes_cafe    ON votes(cafe_id);
 CREATE INDEX IF NOT EXISTS idx_reviews_cafe  ON reviews(cafe_id);
+CREATE INDEX IF NOT EXISTS idx_messages_cafe ON messages(cafe_id, created_at);
 `);
 
 // --- lightweight migrations (add columns if an older DB is missing them) ---

@@ -1,5 +1,5 @@
 import {
-  SIZE_LABEL, OUTLET_LABEL, won, hoursText, isOpenNow, esc,
+  SIZE_LABEL, OUTLET_LABEL, won, hoursText, isOpenNow, esc, haversineKm,
 } from './util.js';
 
 const VOTE_CATS = [
@@ -145,6 +145,9 @@ export function renderDetail(el, cafe, { user, onVote, onAddReview, onClose }) {
       <h3 class="detail__h3">후기 <small class="muted" id="revCount"></small></h3>
       <div class="reviews"></div>
       <div class="reviewform"></div>
+
+      <h3 class="detail__h3">동네 토크 <small>📍 GPS 1KM 이내만 참여</small></h3>
+      <div class="chat" id="chatBox"></div>
     </div>`;
 
   el.querySelector('.detail__close').onclick = onClose;
@@ -207,6 +210,97 @@ export function renderDetail(el, cafe, { user, onVote, onAddReview, onClose }) {
   } else {
     formEl.innerHTML = `<p class="muted">후기를 남기려면 로그인하세요.</p>`;
   }
+}
+
+// ---- GPS-gated per-cafe chat ----------------------------------------------
+// Anyone reads; to post you must verify you're within 1km via Geolocation.
+// Returns a cleanup fn that stops polling (call before re-init / on close).
+export function initChat(root, cafe, { user, api }) {
+  let verified = null;   // { lat, lng } once confirmed within 1km
+  let stopped = false;
+
+  root.innerHTML = `
+    <div class="chat__msgs" id="chatMsgs"><div class="muted">불러오는 중…</div></div>
+    <div class="chat__gate" id="chatGate"></div>`;
+  const msgsEl = root.querySelector('#chatMsgs');
+  const gateEl = root.querySelector('#chatGate');
+
+  function renderMsgs(list) {
+    if (!list.length) {
+      msgsEl.innerHTML = '<div class="muted chat__empty">아직 대화가 없어요. 이 근처라면 첫 메시지를 남겨보세요.</div>';
+      return;
+    }
+    const atBottom = msgsEl.scrollHeight - msgsEl.scrollTop - msgsEl.clientHeight < 40;
+    msgsEl.innerHTML = list.map((m) => `
+      <div class="chat__msg">
+        <div class="chat__meta"><span class="chat__who">${esc(m.user_name)}</span>
+          <span class="chat__t">${esc((m.created_at || '').slice(11, 16))}</span></div>
+        <div class="chat__body">${esc(m.body)}</div>
+      </div>`).join('');
+    if (atBottom) msgsEl.scrollTop = msgsEl.scrollHeight;
+  }
+
+  async function load() {
+    try {
+      const { messages } = await api.getMessages(cafe.id);
+      if (!stopped) renderMsgs(messages);
+    } catch { /* keep last */ }
+  }
+
+  function renderGate() {
+    if (!user) { gateEl.innerHTML = '<div class="muted">참여하려면 로그인하세요.</div>'; return; }
+    if (verified) {
+      gateEl.innerHTML = `
+        <div class="chat__input">
+          <input class="input" id="chatInput" placeholder="메시지 입력 (📍 1km 인증됨)" maxlength="500">
+          <button class="btn btn--primary pill sm" id="chatSend">전송</button>
+        </div>
+        <div class="chat__err" id="chatErr"></div>`;
+      const input = gateEl.querySelector('#chatInput');
+      const errEl = gateEl.querySelector('#chatErr');
+      const send = async () => {
+        const body = input.value.trim();
+        if (!body) return;
+        errEl.textContent = '';
+        try {
+          await api.postMessage(cafe.id, { body, lat: verified.lat, lng: verified.lng });
+          input.value = '';
+          await load();
+        } catch (e) {
+          errEl.textContent = e.message;
+          if (/떨어져/.test(e.message)) { verified = null; renderGate(); }
+        }
+      };
+      gateEl.querySelector('#chatSend').onclick = send;
+      input.addEventListener('keydown', (e) => { if (e.key === 'Enter') { e.preventDefault(); send(); } });
+    } else {
+      gateEl.innerHTML = `
+        <button class="btn btn--ghost pill sm" id="chatVerify">📍 1km 이내 인증하고 참여</button>
+        <div class="chat__err" id="chatErr"></div>`;
+      gateEl.querySelector('#chatVerify').onclick = verify;
+    }
+  }
+
+  function verify() {
+    const errEl = gateEl.querySelector('#chatErr');
+    if (!navigator.geolocation) { errEl.textContent = '이 기기는 위치 정보를 지원하지 않아요.'; return; }
+    errEl.textContent = '위치 확인 중…';
+    navigator.geolocation.getCurrentPosition(
+      (pos) => {
+        const { latitude: lat, longitude: lng } = pos.coords;
+        const km = haversineKm(lat, lng, cafe.lat, cafe.lng);
+        if (km <= 1.0) { verified = { lat, lng }; renderGate(); }
+        else errEl.textContent = `카페에서 ${km.toFixed(1)}km 떨어져 있어요. 1km 이내에서 참여할 수 있어요.`;
+      },
+      () => { errEl.textContent = '위치 권한이 필요해요.'; },
+      { enableHighAccuracy: true, timeout: 8000 }
+    );
+  }
+
+  renderGate();
+  load();
+  const timer = setInterval(load, 5000);
+  return () => { stopped = true; clearInterval(timer); };
 }
 
 export function renderReviews(revEl, reviews) {

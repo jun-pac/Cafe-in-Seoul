@@ -10,6 +10,7 @@ const auth = require('./auth');
 const cafesRouter = require('./routes/cafes');
 const votesRouter = require('./routes/votes');
 const reviewsRouter = require('./routes/reviews');
+const chatRouter = require('./routes/chat');
 const adminRouter = require('./routes/admin');
 
 const app = express();
@@ -43,6 +44,7 @@ app.use('/api/auth', auth.router);
 app.use('/api/cafes', cafesRouter);   // list / detail / create
 app.use('/api/cafes', votesRouter);   // /:id/vote
 app.use('/api/cafes', reviewsRouter); // /:id/reviews
+app.use('/api/cafes', chatRouter);    // /:id/messages
 app.use('/api/admin', adminRouter);   // kakao search + AI prefill
 
 app.get('/api/health', (req, res) => res.json({ ok: true }));

@@ -57,4 +57,11 @@ export const api = {
 
   addReview: (id, formData) =>
     fetch(`/api/cafes/${id}/reviews`, { method: 'POST', body: formData }).then(json),
+
+  getMessages: (id) => fetch(`/api/cafes/${id}/messages`).then(json),
+  postMessage: (id, payload) =>
+    fetch(`/api/cafes/${id}/messages`, {
+      method: 'POST', headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(payload), // { body, lat, lng }
+    }).then(json),
 };

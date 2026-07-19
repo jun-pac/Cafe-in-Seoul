@@ -1,6 +1,6 @@
 import { api } from './api.js';
 import { initMap } from './map.js';
-import { renderAuth, renderDetail, openAddCafeModal, renderPendingQueue } from './ui.js';
+import { renderAuth, renderDetail, openAddCafeModal, renderPendingQueue, initChat } from './ui.js';
 import { passesFilters } from './util.js';
 
 const $ = (sel) => document.querySelector(sel);
@@ -102,6 +102,9 @@ async function openDetail(id) {
     onAddReview: (fd) => handleAddReview(id, fd),
     onClose: closeDetail,
   });
+  // (re)mount the GPS-gated chat for this cafe
+  state.chatCleanup?.();
+  state.chatCleanup = initChat(document.getElementById('chatBox'), cafe, { user: state.me.user, api });
   document.body.classList.add('detail-open');
   map.setSelected(id);
   map.flyTo(cafe);
@@ -109,6 +112,8 @@ async function openDetail(id) {
 
 function closeDetail() {
   state.openCafeId = null;
+  state.chatCleanup?.();
+  state.chatCleanup = null;
   document.body.classList.remove('detail-open');
   map.setSelected(null);
 }
