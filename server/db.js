@@ -168,4 +168,21 @@ if (!userCols.has('is_admin')) {
   db.exec(`ALTER TABLE users ADD COLUMN is_admin INTEGER NOT NULL DEFAULT 0`);
 }
 
+// --- safety net: timestamped DB backup on startup (keep last 20) ---
+// So no operation is ever irreversible: if data is lost, restore from data/backups/.
+try {
+  const backupsDir = path.join(DATA_DIR, 'backups');
+  if (!fs.existsSync(backupsDir)) fs.mkdirSync(backupsDir, { recursive: true });
+  const rows = db.prepare('SELECT (SELECT COUNT(*) FROM cafes) + (SELECT COUNT(*) FROM users) + (SELECT COUNT(*) FROM viewspots) AS n').get().n;
+  if (rows > 0) {
+    db.pragma('wal_checkpoint(TRUNCATE)'); // flush WAL into the main file first
+    const stamp = new Date().toISOString().replace(/[:.]/g, '-').slice(0, 19);
+    fs.copyFileSync(path.join(DATA_DIR, 'app.db'), path.join(backupsDir, `app-${stamp}.db`));
+    const files = fs.readdirSync(backupsDir).filter((f) => /^app-.*\.db$/.test(f)).sort();
+    for (const f of files.slice(0, -20)) fs.unlinkSync(path.join(backupsDir, f)); // prune to 20
+  }
+} catch (e) {
+  console.error('DB backup skipped:', e.message);
+}
+
 module.exports = db;
