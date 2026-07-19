@@ -14,6 +14,7 @@
   --ink: #0a0a0a;
   --ink-2: #3a3a42;
   --mute: #8a8a94;
+  --view: #1f9e73; /* view-spot accent — the one non-B&W hue, for differentiation */
 
   --r-xs: 4px; --r-sm: 8px; --r-md: 16px; --pill: 999px;
   --shadow-soft: 0 6px 22px rgba(20, 20, 40, .10);
@@ -99,6 +100,9 @@ body.detail-open #app { grid-template-columns: var(--side-w) 1fr var(--detail-w)
 .btn--ghost { border-color: var(--hair-strong); color: var(--ink-2); }
 .btn--ghost:hover { border-color: var(--ink); background: var(--cool); }
 .btn--add { width: 100%; }
+.addbtns { display: flex; flex-direction: column; gap: 8px; }
+.btn--view { width: 100%; border-color: var(--view); color: var(--view); }
+.btn--view:hover { background: rgba(31,158,115,.09); border-color: var(--view); }
 .btn:disabled { opacity: .5; cursor: default; }
 .linkbtn { background: none; border: 0; color: var(--ink-2); cursor: pointer; font-size: 11px;
   text-transform: uppercase; letter-spacing: 1px; text-decoration: underline; text-underline-offset: 3px; }
@@ -181,6 +185,16 @@ input[type="checkbox"] { accent-color: #0a0a0a; width: 16px; height: 16px; }
 .cafe-card.is-pending .cafe-card__photo { border-style: dashed; border-color: var(--mute); }
 
 .pick-pin { width: 16px; height: 16px; border-radius: 50% 50% 50% 0; background: var(--ink); transform: rotate(-45deg); border: 2px solid #fff; box-shadow: var(--shadow-soft); }
+
+/* view-spot cards (distinct accent) */
+.cafe-card--view .cafe-card__photo { border-color: var(--view); }
+.cafe-card--view .cafe-card__tip { border-top-color: var(--view); }
+.cafe-card--view.is-selected .cafe-card__photo { border-color: var(--view); box-shadow: 0 0 0 2px var(--view); }
+.cafe-card__tag { position: absolute; top: 6px; left: 6px; background: var(--view); color: #fff; font-family: var(--font-display); font-size: 10px; font-weight: 800; letter-spacing: 1px; padding: 2px 7px; border-radius: var(--pill); }
+.pilltog--view input:checked + span { background: var(--view); color: #fff; border-color: var(--view); }
+.detail__hero--view::after { display: none; }
+.detail__viewtag { position: absolute; left: 16px; bottom: 14px; z-index: 2; background: var(--view); color: #fff; font-family: var(--font-display); font-size: 12px; font-weight: 800; letter-spacing: 1.5px; padding: 6px 12px; border-radius: var(--r-sm); display: inline-flex; align-items: center; gap: 5px; }
+.commentform { display: flex; flex-direction: column; gap: 8px; margin-bottom: 10px; }
 
 /* pending queue */
 .pending-queue { display: flex; flex-direction: column; gap: 10px; }

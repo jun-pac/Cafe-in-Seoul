@@ -102,6 +102,36 @@ CREATE TABLE IF NOT EXISTS messages (
   FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE CASCADE
 );
 
+-- scenic "view" spots: a separate, lighter place type (name + photos + comments)
+CREATE TABLE IF NOT EXISTS viewspots (
+  id         TEXT PRIMARY KEY,
+  name       TEXT NOT NULL,
+  lat        REAL NOT NULL,
+  lng        REAL NOT NULL,
+  photo_url  TEXT,
+  created_by TEXT,
+  created_at TEXT NOT NULL DEFAULT (datetime('now')),
+  FOREIGN KEY (created_by) REFERENCES users(id) ON DELETE SET NULL
+);
+CREATE TABLE IF NOT EXISTS viewspot_photos (
+  id          TEXT PRIMARY KEY,
+  viewspot_id TEXT NOT NULL,
+  url         TEXT NOT NULL,
+  ord         INTEGER NOT NULL DEFAULT 0,
+  FOREIGN KEY (viewspot_id) REFERENCES viewspots(id) ON DELETE CASCADE
+);
+CREATE TABLE IF NOT EXISTS viewspot_comments (
+  id          TEXT PRIMARY KEY,
+  viewspot_id TEXT NOT NULL,
+  user_id     TEXT NOT NULL,
+  body        TEXT NOT NULL,
+  created_at  TEXT NOT NULL DEFAULT (datetime('now')),
+  FOREIGN KEY (viewspot_id) REFERENCES viewspots(id) ON DELETE CASCADE,
+  FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE CASCADE
+);
+CREATE INDEX IF NOT EXISTS idx_vsphotos ON viewspot_photos(viewspot_id, ord);
+CREATE INDEX IF NOT EXISTS idx_vscomments ON viewspot_comments(viewspot_id, created_at);
+
 CREATE INDEX IF NOT EXISTS idx_votes_cafe    ON votes(cafe_id);
 CREATE INDEX IF NOT EXISTS idx_reviews_cafe  ON reviews(cafe_id);
 CREATE INDEX IF NOT EXISTS idx_messages_cafe ON messages(cafe_id, created_at);

@@ -41,55 +41,52 @@ export function initMap(containerId, { onCardClick }) {
   let pickMarker = null;
   let onPick = null;
 
-  function buildCard(cafe) {
+  function buildCard(item, kind) {
     const el = document.createElement('div');
-    el.className = 'cafe-card';
+    el.className = 'cafe-card' + (kind === 'view' ? ' cafe-card--view' : '');
+    const scoreHtml = kind === 'view'
+      ? '<span class="cafe-card__tag">VIEW</span>'
+      : `<span class="cafe-card__score" title="카공 종합점수 (0–100): 다층·콘센트·면적·뷰·영업시간 + 집단지성 투표">${item.score}</span>`;
     el.innerHTML = `
-      <div class="cafe-card__photo" style="background-image:url('${esc(img(cafe.photo_url))}')">
-        <span class="cafe-card__score" title="카공 종합점수 (0–100): 다층·콘센트·면적·뷰·영업시간 + 집단지성 투표">${cafe.score}</span>
+      <div class="cafe-card__photo" style="background-image:url('${esc(img(item.photo_url))}')">
+        ${scoreHtml}
         <span class="cafe-card__badge" hidden></span>
         <span class="cafe-card__pending">심사중</span>
       </div>
-      <div class="cafe-card__name">${esc(cafe.name)}</div>
+      <div class="cafe-card__name">${esc(item.name)}</div>
       <div class="cafe-card__tip"></div>`;
-    el.classList.toggle('is-pending', cafe.status === 'pending');
+    if (kind === 'cafe') el.classList.toggle('is-pending', item.status === 'pending');
     el.addEventListener('click', (e) => {
       e.stopPropagation();
-      onCardClick?.(cafe);
+      onCardClick?.(item, kind);
     });
     return el;
   }
 
-  function setCafes(cafes) {
-    // remove markers no longer present
-    const incoming = new Set(cafes.map((c) => c.id));
+  // upsert markers of a given kind; removes stale ones of the same kind only
+  function setItems(items, kind) {
+    const incoming = new Set(items.map((c) => c.id));
     for (const [id, ent] of entries) {
-      if (!incoming.has(id)) {
-        ent.marker.remove();
-        entries.delete(id);
-      }
+      if (ent.kind === kind && !incoming.has(id)) { ent.marker.remove(); entries.delete(id); }
     }
-    for (const cafe of cafes) {
-      const existing = entries.get(cafe.id);
+    for (const item of items) {
+      const existing = entries.get(item.id);
       if (existing) {
-        existing.cafe = cafe;
-        existing.el.querySelector('.cafe-card__score').textContent = cafe.score;
-        existing.el.classList.toggle('is-pending', cafe.status === 'pending');
+        existing.item = item;
+        const sc = existing.el.querySelector('.cafe-card__score');
+        if (sc) sc.textContent = item.score;
+        if (kind === 'cafe') existing.el.classList.toggle('is-pending', item.status === 'pending');
         continue;
       }
-      const el = buildCard(cafe);
+      const el = buildCard(item, kind);
       const marker = new maplibregl.Marker({ element: el, anchor: 'bottom' })
-        .setLngLat([cafe.lng, cafe.lat])
-        .addTo(map);
-      entries.set(cafe.id, {
-        cafe,
-        marker,
-        el,
-        badgeEl: el.querySelector('.cafe-card__badge'),
-      });
+        .setLngLat([item.lng, item.lat]).addTo(map);
+      entries.set(item.id, { item, kind, marker, el, badgeEl: el.querySelector('.cafe-card__badge') });
     }
     scheduleRefresh();
   }
+  const setCafes = (cafes) => setItems(cafes, 'cafe');
+  const setViewspots = (spots) => setItems(spots.map((s) => ({ ...s, score: s.score ?? 55 })), 'view');
 
   function setFiltered(ids) {
     visibleSet = ids; // Set or null
@@ -110,8 +107,8 @@ export function initMap(containerId, { onCardClick }) {
         ent.el.style.display = 'none';
         continue;
       }
-      const p = map.project([ent.cafe.lng, ent.cafe.lat]);
-      items.push({ id, score: ent.cafe.score, x: p.x, y: p.y });
+      const p = map.project([ent.item.lng, ent.item.lat]);
+      items.push({ id, score: ent.item.score, x: p.x, y: p.y });
     }
     const decision = declutter(items, { width: size.width, height: size.height }, CARD_W * cardScale, CARD_H * cardScale);
     for (const [id, ent] of entries) {
@@ -185,5 +182,5 @@ export function initMap(containerId, { onCardClick }) {
     onPick?.({ lng, lat });
   });
 
-  return { map, setCafes, setFiltered, setSelected, refresh, flyTo, enablePick, disablePick, setCardScale };
+  return { map, setCafes, setViewspots, setFiltered, setSelected, refresh, flyTo, enablePick, disablePick, setCardScale };
 }

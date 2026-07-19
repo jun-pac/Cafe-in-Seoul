@@ -459,6 +459,117 @@ export function renderStories(el, reviews) {
     : `<p class="muted">아직 이야기가 없어요. 첫 이야기를 남겨보세요!</p>`;
 }
 
+// ---- View-spot detail (lighter: name + photos + comments) -----------------
+export function renderViewDetail(el, spot, { user, onAddComment, onEdit, onDelete, onClose }) {
+  const gallery = (spot.photos && spot.photos.length) ? spot.photos : [spot.photo_url].filter(Boolean);
+  el.innerHTML = `
+    <button class="detail__close" title="닫기">${icon('x', 16)}</button>
+    <div class="detail__scroll">
+      <div class="detail__hero detail__hero--view">
+        <div class="carousel__img" id="carImg" role="button" title="크게 보기"></div>
+        ${gallery.length > 1 ? `<div class="carousel__count">${icon('camera', 12)} ${gallery.length}</div>` : ''}
+        <div class="detail__viewtag">${icon('view', 13)} VIEW</div>
+      </div>
+      <div class="detail__body">
+        <h2 class="detail__name">${esc(spot.name)}</h2>
+        ${spot.canEdit ? `<div class="detail__adminrow"><button class="btn btn--ghost sm" id="vEdit">${icon('edit', 14)} 수정</button><button class="btn btn--ghost sm" id="vDel">삭제</button></div>` : ''}
+        ${gallery.length > 1 ? `<h3 class="detail__h3">사진 <small class="muted">${gallery.length}</small></h3><div class="photo-grid" id="photoGrid"></div>` : ''}
+        <h3 class="detail__h3">댓글 <small class="muted" id="cCount"></small></h3>
+        <div class="commentform" id="commentform"></div>
+        <div class="comments"></div>
+      </div>
+    </div>`;
+  el.querySelector('.detail__close').onclick = onClose;
+  el.querySelector('#vEdit')?.addEventListener('click', onEdit);
+  el.querySelector('#vDel')?.addEventListener('click', onDelete);
+
+  const carImg = el.querySelector('#carImg');
+  carImg.style.backgroundImage = `url('${esc(img(gallery[0] || ''))}')`;
+  carImg.addEventListener('click', () => openLightbox(gallery, 0));
+  const grid = el.querySelector('#photoGrid');
+  if (grid) {
+    grid.innerHTML = gallery.map((u, i) => `<button type="button" class="pg-item" data-i="${i}" style="background-image:url('${esc(img(u))}')"></button>`).join('');
+    grid.querySelectorAll('.pg-item').forEach((b) => (b.onclick = () => openLightbox(gallery, +b.dataset.i)));
+  }
+
+  const comments = spot.comments || [];
+  el.querySelector('#cCount').textContent = comments.length ? `${comments.length}` : '';
+  el.querySelector('.comments').innerHTML = comments.length
+    ? comments.map((c) => `<div class="story"><div class="story__head"><b>${esc(c.user_name)}</b><span class="muted">${esc((c.created_at || '').slice(0, 10))}</span></div><div class="story__body">${esc(c.body)}</div></div>`).join('')
+    : '<p class="muted">아직 댓글이 없어요.</p>';
+  const cf = el.querySelector('#commentform');
+  if (user) {
+    cf.innerHTML = `<textarea class="input" id="cBody" rows="2" placeholder="이 곳에 대한 이야기를 남겨보세요..."></textarea>
+      <div class="storyform__row"><button class="btn btn--primary sm" id="cSubmit">등록</button></div>`;
+    cf.querySelector('#cSubmit').onclick = async () => {
+      const b = cf.querySelector('#cBody').value.trim();
+      if (!b) return;
+      await onAddComment(b);
+    };
+  } else {
+    cf.innerHTML = `<p class="muted">댓글을 남기려면 로그인하세요.</p>`;
+  }
+}
+
+// ---- View-spot create/edit modal ------------------------------------------
+export function openViewModal({ mode = 'create', spot, onPickLocation, onCancelPick, onSubmit }) {
+  const back = document.createElement('div');
+  back.className = 'modal-back';
+  back.innerHTML = `
+    <div class="modal" role="dialog" aria-modal="true">
+      <div class="modal__head"><h2>${mode === 'edit' ? '뷰 맛집 수정' : '뷰 맛집 등록'}</h2>
+        <button class="detail__close" id="vClose">${icon('x', 16)}</button></div>
+      <p class="muted">뷰가 좋은 곳을 지도에 남겨보세요. 이름 + 위치 + 사진이면 충분합니다.</p>
+      <form class="cafeform" id="viewForm">
+        <label class="field"><span>장소 이름 *</span>
+          <input class="input" name="name" value="${esc(spot?.name || '')}"></label>
+        <div class="field"><span>위치 * <small class="muted">(지도 클릭)</small></span>
+          <div class="loc-row">
+            <input class="input" name="lat" placeholder="위도" readonly value="${spot ? esc(spot.lat) : ''}">
+            <input class="input" name="lng" placeholder="경도" readonly value="${spot ? esc(spot.lng) : ''}">
+            <button type="button" class="btn btn--ghost" id="vPick">지도에서 선택</button>
+          </div><small class="muted" id="vHint"></small></div>
+        <div class="field"><span>사진 * <small class="muted">(첫 번째가 대표 · 드래그로 순서)</small></span>
+          <div class="photo-picker" id="vPicker"></div></div>
+        <div class="modal__foot"><span class="err" id="vErr"></span>
+          <button type="submit" class="btn btn--primary">${mode === 'edit' ? '저장' : '등록'}</button></div>
+      </form>
+    </div>`;
+  document.body.appendChild(back);
+  const form = back.querySelector('#viewForm');
+  const hint = back.querySelector('#vHint');
+  const errEl = back.querySelector('#vErr');
+  const picker = createPhotoPicker(back.querySelector('#vPicker'), {});
+  if (spot?.photos?.length) picker.addUrls(spot.photos);
+  const close = () => { onCancelPick?.(); back.remove(); };
+  back.querySelector('#vClose').onclick = close;
+  back.addEventListener('mousedown', (e) => { if (e.target === back) close(); });
+  back.querySelector('#vPick').onclick = () => {
+    hint.textContent = '지도를 클릭해 위치를 지정하세요...';
+    onPickLocation((lng, lat) => {
+      form.elements.lat.value = lat.toFixed(6);
+      form.elements.lng.value = lng.toFixed(6);
+      hint.textContent = `선택됨: ${lat.toFixed(5)}, ${lng.toFixed(5)}`;
+    });
+  };
+  form.onsubmit = async (e) => {
+    e.preventDefault();
+    errEl.textContent = '';
+    if (!form.elements.name.value.trim()) { errEl.textContent = '장소 이름을 입력하세요.'; return; }
+    if (!form.elements.lat.value || !form.elements.lng.value) { errEl.textContent = '위치를 지정하세요.'; return; }
+    const { manifest, files, count } = picker.getManifest();
+    if (!count) { errEl.textContent = '사진을 한 장 이상 올려주세요.'; return; }
+    const fd = new FormData();
+    fd.set('name', form.elements.name.value);
+    fd.set('lat', form.elements.lat.value);
+    fd.set('lng', form.elements.lng.value);
+    fd.set('photo_manifest', JSON.stringify(manifest));
+    files.forEach((f) => fd.append('photos', f));
+    try { await onSubmit(fd); close(); } catch (err) { errEl.textContent = err.message || '실패'; }
+  };
+  return { close };
+}
+
 // ---- Reusable photo picker (reorderable; first = cover/representative) -----
 export function createPhotoPicker(container, { onChange } = {}) {
   let items = []; // { kind:'file'|'url', file?, url?, obj? }

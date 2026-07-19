@@ -11,6 +11,7 @@ const cafesRouter = require('./routes/cafes');
 const votesRouter = require('./routes/votes');
 const reviewsRouter = require('./routes/reviews');
 const chatRouter = require('./routes/chat');
+const viewspotsRouter = require('./routes/viewspots');
 const imgRouter = require('./routes/img');
 const adminRouter = require('./routes/admin');
 
@@ -46,6 +47,7 @@ app.use('/api/cafes', cafesRouter);   // list / detail / create
 app.use('/api/cafes', votesRouter);   // /:id/vote
 app.use('/api/cafes', reviewsRouter); // /:id/reviews
 app.use('/api/cafes', chatRouter);    // /:id/messages
+app.use('/api/viewspots', viewspotsRouter); // scenic view spots
 app.use('/api/img', imgRouter);       // Kakao/Naver photo proxy
 app.use('/api/admin', adminRouter);   // kakao search + AI prefill
 

@@ -31,7 +31,10 @@
 
       <div id="auth" class="section"></div>
 
-      <button id="addCafeBtn" class="btn btn--add">카페 등록</button>
+      <div class="addbtns">
+        <button id="addCafeBtn" class="btn btn--add">카페 등록</button>
+        <button id="addViewBtn" class="btn btn--view">뷰 맛집 등록</button>
+      </div>
 
       <div id="pendingQueue" class="section pending-queue" hidden></div>
 
@@ -39,6 +42,14 @@
         <div class="filters__head">
           <h2>필터</h2>
           <button id="f-reset" class="linkbtn">초기화</button>
+        </div>
+
+        <div class="fgroup fgroup--row">
+          <div class="fgroup__label">표시</div>
+          <div class="pilltogs">
+            <label class="pilltog"><input type="checkbox" id="show-cafes" checked><span>카페</span></label>
+            <label class="pilltog pilltog--view"><input type="checkbox" id="show-views" checked><span>뷰 맛집</span></label>
+          </div>
         </div>
 
         <label class="check"><input type="checkbox" id="f-opennow" checked> <b>지금 영업중만</b> <span class="hint">(실시간)</span></label>

@@ -1,6 +1,7 @@
 import { api } from './api.js';
 import { initMap } from './map.js';
-import { renderAuth, renderDetail, openAddCafeModal, openEditCafeModal, renderPendingQueue, initChat } from './ui.js';
+import { renderAuth, renderDetail, openAddCafeModal, openEditCafeModal, renderPendingQueue, initChat,
+  renderViewDetail, openViewModal } from './ui.js';
 import { passesFilters } from './util.js';
 import { icon } from './icons.js';
 
@@ -10,11 +11,15 @@ const state = {
   me: { user: null, googleClientId: null },
   capabilities: { kakao: false, ai: false },
   cafes: [],
+  viewspots: [],
   openCafeId: null,
+  openViewId: null,
 };
 
 const detailEl = $('#detail');
-const map = initMap('map', { onCardClick: (cafe) => openDetail(cafe.id) });
+const map = initMap('map', {
+  onCardClick: (item, kind) => (kind === 'view' ? openViewDetail(item.id) : openDetail(item.id)),
+});
 
 // ---------- filters ----------
 function readFilters() {
@@ -35,7 +40,7 @@ function readFilters() {
   };
 }
 
-const FILTER_IDS = ['f-multifloor', 'f-view', 'f-opennow', 'f-openlate',
+const FILTER_IDS = ['show-cafes', 'show-views', 'f-multifloor', 'f-view', 'f-opennow', 'f-openlate',
   'f-size-small', 'f-size-medium', 'f-size-large', 'f-outlet',
   'f-price', 'f-quiet', 'f-coffee', 'f-restroom'];
 
@@ -56,15 +61,19 @@ function loadFilters() {
 
 function applyFilters() {
   const f = readFilters();
+  const showCafes = $('#show-cafes').checked;
+  const showViews = $('#show-views').checked;
   const ids = new Set();
-  for (const c of state.cafes) if (passesFilters(c, f)) ids.add(c.id);
+  let cafeCount = 0;
+  if (showCafes) for (const c of state.cafes) if (passesFilters(c, f)) { ids.add(c.id); cafeCount++; }
+  if (showViews) for (const v of state.viewspots) ids.add(v.id);
   map.setFiltered(ids);
-  $('#result-count').textContent = `${ids.size} / ${state.cafes.length}곳`;
+  $('#result-count').textContent = `카페 ${cafeCount} · 뷰 ${showViews ? state.viewspots.length : 0}`;
   saveFilters();
 }
 
 function wireFilters() {
-  const ids = ['f-multifloor', 'f-view', 'f-opennow', 'f-openlate',
+  const ids = ['show-cafes', 'show-views', 'f-multifloor', 'f-view', 'f-opennow', 'f-openlate',
     'f-size-small', 'f-size-medium', 'f-size-large', 'f-outlet'];
   ids.forEach((id) => $(`#${id}`).addEventListener('change', applyFilters));
 
@@ -94,8 +103,11 @@ function wireFilters() {
 
 // ---------- data ----------
 async function loadCafes() {
-  state.cafes = await api.listCafes();
-  map.setCafes(state.cafes);
+  const [cafes, views] = await Promise.all([api.listCafes(), api.listViewspots()]);
+  state.cafes = cafes;
+  state.viewspots = views;
+  map.setCafes(cafes);
+  map.setViewspots(views);
   applyFilters();
   await refreshPendingQueue();
 }
@@ -134,10 +146,59 @@ async function openDetail(id) {
 
 function closeDetail() {
   state.openCafeId = null;
+  state.openViewId = null;
   state.chatCleanup?.();
   state.chatCleanup = null;
   document.body.classList.remove('detail-open');
   map.setSelected(null);
+}
+
+// ---- view-spots ----
+async function openViewDetail(id) {
+  const spot = await api.getViewspot(id);
+  state.openViewId = id;
+  state.openCafeId = null;
+  state.chatCleanup?.();
+  state.chatCleanup = null;
+  renderViewDetail(detailEl, spot, {
+    user: state.me.user,
+    onAddComment: (body) => handleViewComment(id, body),
+    onEdit: () => handleViewEdit(id, spot),
+    onDelete: () => handleViewDelete(id),
+    onClose: closeDetail,
+  });
+  document.body.classList.add('detail-open');
+  map.setSelected(id);
+  map.flyTo(spot);
+}
+async function handleViewComment(id, body) {
+  await api.addViewComment(id, body);
+  await openViewDetail(id);
+}
+function handleViewEdit(id, spot) {
+  openViewModal({
+    mode: 'edit', spot,
+    onPickLocation: (cb) => map.enablePick(({ lng, lat }) => cb(lng, lat)),
+    onCancelPick: () => map.disablePick(),
+    onSubmit: async (fd) => { await api.updateViewspot(id, fd); map.disablePick(); await loadCafes(); await openViewDetail(id); },
+  });
+}
+async function handleViewDelete(id) {
+  if (!confirm('이 뷰 맛집을 삭제할까요?')) return;
+  try { await api.deleteViewspot(id); closeDetail(); await loadCafes(); }
+  catch (e) { alert(e.message); }
+}
+function wireAddView() {
+  $('#addViewBtn').innerHTML = `${icon('view', 15)} 뷰 맛집 등록`;
+  $('#addViewBtn').addEventListener('click', () => {
+    if (!state.me.user) { alert('뷰 맛집을 등록하려면 로그인이 필요합니다.'); return; }
+    openViewModal({
+      mode: 'create',
+      onPickLocation: (cb) => map.enablePick(({ lng, lat }) => cb(lng, lat)),
+      onCancelPick: () => map.disablePick(),
+      onSubmit: async (fd) => { const created = await api.createViewspot(fd); map.disablePick(); await loadCafes(); openViewDetail(created.id); },
+    });
+  });
 }
 
 // returns the new aggregate so the vote row updates IN PLACE (no panel reload).
@@ -241,6 +302,7 @@ async function boot() {
   loadFilters();     // restore saved filter toggles before first apply
   wireCardZoom();
   wireAddCafe();
+  wireAddView();
   await refreshMe();
   await loadCafes();
 }

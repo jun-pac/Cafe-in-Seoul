@@ -65,6 +65,17 @@ export const api = {
   addReview: (id, formData) =>
     fetch(`/api/cafes/${id}/reviews`, { method: 'POST', body: formData }).then(json),
 
+  listViewspots: () => fetch('/api/viewspots').then(json),
+  getViewspot: (id) => fetch(`/api/viewspots/${id}`).then(json),
+  createViewspot: (formData) => fetch('/api/viewspots', { method: 'POST', body: formData }).then(json),
+  updateViewspot: (id, formData) => fetch(`/api/viewspots/${id}`, { method: 'PATCH', body: formData }).then(json),
+  deleteViewspot: (id) => fetch(`/api/viewspots/${id}`, { method: 'DELETE' }).then(json),
+  addViewComment: (id, body) =>
+    fetch(`/api/viewspots/${id}/comments`, {
+      method: 'POST', headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ body }),
+    }).then(json),
+
   getMessages: (id) => fetch(`/api/cafes/${id}/messages`).then(json),
   postMessage: (id, payload) =>
     fetch(`/api/cafes/${id}/messages`, {
