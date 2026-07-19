@@ -1,16 +1,17 @@
 import {
-  SIZE_LABEL, OUTLET_LABEL, DEFS, won, hoursText, isOpenNow, weeklyHours, esc, img, haversineKm,
+  sizeLabel, outletLabel, def, won, hoursText, isOpenNow, weeklyHours, esc, img, haversineKm,
 } from './util.js';
 import { icon } from './icons.js';
+import { t } from './i18n.js';
 
 const VOTE_CATS = [
-  { key: 'coffee', label: '커피맛', icon: 'coffee', def: DEFS.coffee },
-  { key: 'quiet', label: '조용함', icon: 'quiet', def: DEFS.quiet },
-  { key: 'restroom', label: '화장실 청결', icon: 'clean', def: DEFS.restroom },
+  { key: 'coffee', icon: 'coffee' },
+  { key: 'quiet', icon: 'quiet' },
+  { key: 'restroom', icon: 'clean' },
 ];
 
 function stars(avg) {
-  if (avg == null) return '<span class="muted">평가 없음</span>';
+  if (avg == null) return `<span class="muted">${t('vote.none')}</span>`;
   return `<b>${avg.toFixed(1)}</b> / 5`;
 }
 
@@ -20,9 +21,9 @@ export function renderAuth(el, me, { onLogout, onGoogleCredential, onLocalLogin,
   if (me.user) {
     const wrap = document.createElement('div');
     wrap.className = 'authbar';
-    const badge = me.user.isAdmin ? '<span class="admin-badge">관리자</span>' : '';
-    wrap.innerHTML = `<span class="authbar__who">${icon('user', 15)} <span class="authbar__name" id="editNameBtn" title="닉네임 변경">${esc(me.user.name)}</span> ${badge}</span>
-      <button class="btn btn--ghost" id="logoutBtn" title="로그아웃">${icon('logout', 15)}</button>`;
+    const badge = me.user.isAdmin ? `<span class="admin-badge">${t('auth.admin')}</span>` : '';
+    wrap.innerHTML = `<span class="authbar__who">${icon('user', 15)} <span class="authbar__name" id="editNameBtn" title="${t('auth.editName')}">${esc(me.user.name)}</span> ${badge}</span>
+      <button class="btn btn--ghost" id="logoutBtn" title="${t('auth.logout')}">${icon('logout', 15)}</button>`;
     wrap.querySelector('#logoutBtn').onclick = onLogout;
     wrap.querySelector('#editNameBtn').onclick = onEditName;
     el.appendChild(wrap);
@@ -51,18 +52,18 @@ export function renderAuth(el, me, { onLogout, onGoogleCredential, onLocalLogin,
     }
     const or = document.createElement('div');
     or.className = 'login-or';
-    or.textContent = '또는 아이디로 로그인';
+    or.textContent = t('auth.or');
     box.appendChild(or);
   }
 
   const form = document.createElement('form');
   form.className = 'loginform';
   form.innerHTML = `
-    <input class="input" name="username" placeholder="아이디" autocomplete="username">
-    <input class="input" name="password" type="password" placeholder="비밀번호" autocomplete="current-password">
+    <input class="input" name="username" placeholder="${t('auth.id')}" autocomplete="username">
+    <input class="input" name="password" type="password" placeholder="${t('auth.pw')}" autocomplete="current-password">
     <div class="loginform__row">
-      <button type="submit" class="btn btn--primary" id="loginBtn">로그인</button>
-      <button type="button" class="btn btn--ghost" id="registerBtn">회원가입</button>
+      <button type="submit" class="btn btn--primary" id="loginBtn">${t('auth.login')}</button>
+      <button type="button" class="btn btn--ghost" id="registerBtn">${t('auth.register')}</button>
     </div>
     <div class="err" id="loginErr"></div>`;
   const errEl = form.querySelector('#loginErr');
@@ -71,13 +72,13 @@ export function renderAuth(el, me, { onLogout, onGoogleCredential, onLocalLogin,
     e.preventDefault();
     errEl.textContent = '';
     const { u, p } = creds();
-    if (!u || !p) { errEl.textContent = '아이디와 비밀번호를 입력하세요.'; return; }
+    if (!u || !p) { errEl.textContent = t('auth.needId'); return; }
     try { await onLocalLogin(u, p); } catch (err) { errEl.textContent = err.message; }
   };
   form.querySelector('#registerBtn').onclick = async () => {
     errEl.textContent = '';
     const { u, p } = creds();
-    if (!u || !p) { errEl.textContent = '가입할 아이디와 비밀번호(4자+)를 입력하세요.'; return; }
+    if (!u || !p) { errEl.textContent = t('auth.needReg'); return; }
     try { await onRegister(u, p); } catch (err) { errEl.textContent = err.message; }
   };
   box.appendChild(form);
@@ -88,16 +89,16 @@ export function renderAuth(el, me, { onLogout, onGoogleCredential, onLocalLogin,
 export function renderPendingQueue(el, cafes, { onApprove, onReject, onOpen }) {
   if (!cafes.length) { el.hidden = true; el.innerHTML = ''; return; }
   el.hidden = false;
-  el.innerHTML = `<div class="pending-queue__title">${icon('shield', 14)} 심사 대기 <b>${cafes.length}</b></div>`;
+  el.innerHTML = `<div class="pending-queue__title">${icon('shield', 14)} ${t('pending.title')} <b>${cafes.length}</b></div>`;
   for (const c of cafes) {
     const row = document.createElement('div');
     row.className = 'pending-item';
     row.innerHTML = `
-      <button type="button" class="pending-item__name" title="상세 보기">${esc(c.name)}</button>
-      <div class="pending-item__reason">${esc(c.moderation_reason || '사유 미기재')}</div>
+      <button type="button" class="pending-item__name">${esc(c.name)}</button>
+      <div class="pending-item__reason">${esc(c.moderation_reason || t('pending.noReason'))}</div>
       <div class="pending-item__actions">
-        <button class="btn btn--primary pill sm" data-a="ok">승인</button>
-        <button class="btn btn--ghost pill sm" data-a="no">거절</button>
+        <button class="btn btn--primary pill sm" data-a="ok">${t('pending.approve')}</button>
+        <button class="btn btn--ghost pill sm" data-a="no">${t('pending.reject')}</button>
       </div>`;
     row.querySelector('.pending-item__name').onclick = () => onOpen(c.id);
     row.querySelector('[data-a="ok"]').onclick = () => onApprove(c.id);
@@ -140,8 +141,8 @@ export function openLightbox(photos, start = 0) {
 // ---- Detail panel ---------------------------------------------------------
 export function renderDetail(el, cafe, { user, onVote, onAddReview, onClose, onEdit }) {
   const openNow = isOpenNow(cafe);
-  const floorTxt = cafe.multi_floor ? `${cafe.floors}층 (다층)` : '단층';
-  const viewTxt = cafe.has_view ? (cafe.view_note ? `뷰 좋음 · ${esc(cafe.view_note)}` : '뷰 좋음') : '뷰 별로';
+  const floorTxt = cafe.multi_floor ? `${cafe.floors}${t('unit.floor')} · ${t('detail.multiFloor')}` : t('detail.singleFloor');
+  const viewTxt = cafe.has_view ? (cafe.view_note ? `${t('detail.viewGood')} · ${esc(cafe.view_note)}` : t('detail.viewGood')) : t('detail.viewMeh');
 
   const gallery = (cafe.gallery && cafe.gallery.length) ? cafe.gallery : [cafe.photo_url].filter(Boolean);
 
@@ -149,49 +150,49 @@ export function renderDetail(el, cafe, { user, onVote, onAddReview, onClose, onE
     <button class="detail__close" title="닫기">${icon('x', 16)}</button>
     <div class="detail__scroll">
       <div class="detail__hero">
-        <div class="carousel__img" id="carImg" role="button" title="크게 보기"></div>
+        <div class="carousel__img" id="carImg" role="button" title="${t('detail.zoom')}"></div>
         ${gallery.length > 1 ? `<div class="carousel__count">${icon('camera', 12)} ${gallery.length}</div>` : ''}
-        <div class="detail__scorebig" title="카공 종합점수 (0–100)">${cafe.score}<small>SCORE</small></div>
+        <div class="detail__scorebig" title="${esc(t('score.tip'))}">${cafe.score}<small>SCORE</small></div>
       </div>
       <div class="detail__body">
         <h2 class="detail__name">${esc(cafe.name)}</h2>
         <div class="detail__addr">${esc(cafe.address || '')}</div>
-        ${cafe.status === 'pending' ? `<div class="detail__pending">${icon('shield', 14)} 심사 대기중 <span class="muted">— ${esc(cafe.moderation_reason || '관리자 확인 필요')}</span></div>` : ''}
-        ${user?.isAdmin ? `<div class="detail__adminrow"><button class="btn btn--ghost sm" id="editCafeBtn">${icon('edit', 14)} 수정</button>${cafe.status === 'pending' ? '<button class="btn btn--primary sm" id="approveCafeBtn">승인</button>' : ''}</div>` : ''}
+        ${cafe.status === 'pending' ? `<div class="detail__pending">${icon('shield', 14)} ${t('detail.pending')} <span class="muted">${cafe.moderation_reason ? '— ' + esc(cafe.moderation_reason) : ''}</span></div>` : ''}
+        ${user?.isAdmin ? `<div class="detail__adminrow"><button class="btn btn--ghost sm" id="editCafeBtn">${icon('edit', 14)} ${t('detail.edit')}</button>${cafe.status === 'pending' ? `<button class="btn btn--primary sm" id="approveCafeBtn">${t('detail.approve')}</button>` : ''}</div>` : ''}
 
         <div class="detail__hoursrow">
           <button class="detail__hours ${openNow ? 'is-open' : 'is-closed'}" id="hoursToggle" ${weeklyHours(cafe) ? '' : 'disabled'}>
-            <span class="dot"></span>${openNow ? 'OPEN NOW' : 'CLOSED'} · ${esc(hoursText(cafe))}${weeklyHours(cafe) ? ` ${icon('chevronDown', 12)}` : ''}
+            <span class="dot"></span>${openNow ? t('detail.open') : t('detail.closed')} · ${esc(hoursText(cafe))}${weeklyHours(cafe) ? ` ${icon('chevronDown', 12)}` : ''}
           </button>
           ${weeklyHours(cafe) ? `<div class="weekhours" id="weekHours" hidden>${weeklyHours(cafe).map((d) => `<div class="weekhours__row ${d.isToday ? 'is-today' : ''}"><span>${d.label}</span><span>${esc(d.text)}</span></div>`).join('')}</div>` : ''}
         </div>
 
         <div class="chips">
-          <span class="chip" title="${esc(DEFS.floors)}">${icon('floors', 14)} ${esc(floorTxt)}</span>
-          <span class="chip" title="${esc(DEFS.size)}">${icon('size', 14)} ${SIZE_LABEL[cafe.size] || cafe.size}</span>
-          <span class="chip" title="${esc(DEFS.outlets)}">${icon('outlet', 14)} 콘센트 ${OUTLET_LABEL[cafe.outlets] || cafe.outlets}</span>
-          <span class="chip" title="${esc(DEFS.view)}">${icon('view', 14)} ${esc(viewTxt)}</span>
-          <span class="chip" title="${esc(DEFS.price)}">${icon('price', 14)} 아메리카노 ${won(cafe.iced_americano_price)}</span>
+          <span class="chip" title="${esc(def('floors'))}">${icon('floors', 14)} ${esc(floorTxt)}</span>
+          <span class="chip" title="${esc(def('size'))}">${icon('size', 14)} ${esc(sizeLabel(cafe.size))}</span>
+          <span class="chip" title="${esc(def('outlets'))}">${icon('outlet', 14)} ${t('f.outlet')} ${esc(outletLabel(cafe.outlets))}</span>
+          <span class="chip" title="${esc(def('view'))}">${icon('view', 14)} ${esc(viewTxt)}</span>
+          <span class="chip" title="${esc(def('price'))}">${icon('price', 14)} ${t('detail.americano')} ${won(cafe.iced_americano_price)}</span>
         </div>
 
         <div class="detail__links">
-          ${cafe.naver_url ? `<a class="btn btn--map naver" href="${esc(cafe.naver_url)}" target="_blank" rel="noopener">네이버 지도</a>` : ''}
-          ${cafe.kakao_url ? `<a class="btn btn--map kakao" href="${esc(cafe.kakao_url)}" target="_blank" rel="noopener">카카오 지도</a>` : ''}
+          ${cafe.naver_url ? `<a class="btn btn--map naver" href="${esc(cafe.naver_url)}" target="_blank" rel="noopener">${t('detail.naver')}</a>` : ''}
+          ${cafe.kakao_url ? `<a class="btn btn--map kakao" href="${esc(cafe.kakao_url)}" target="_blank" rel="noopener">${t('detail.kakao')}</a>` : ''}
         </div>
 
-        ${cafe.review_summary ? `<div class="detail__aisum"><div class="detail__aisum-h">${icon('ai', 15)} <b>리뷰 요약</b></div><p>${esc(cafe.review_summary)}</p></div>` : ''}
+        ${cafe.review_summary ? `<div class="detail__aisum"><div class="detail__aisum-h">${icon('ai', 15)} <b>${t('detail.reviewSummary')}</b></div><p>${esc(cafe.review_summary)}</p></div>` : ''}
 
-        ${gallery.length > 1 ? `<h3 class="detail__h3">사진 <small class="muted">${gallery.length}</small></h3>
+        ${gallery.length > 1 ? `<h3 class="detail__h3">${t('detail.photos')} <small class="muted">${gallery.length}</small></h3>
         <div class="photo-grid" id="photoGrid"></div>` : ''}
 
-        <h3 class="detail__h3">집단지성 평가 <small>1–5</small></h3>
+        <h3 class="detail__h3">${t('detail.rating')} <small>1–5</small></h3>
         <div class="votes"></div>
 
-        <h3 class="detail__h3">이야기 <small class="muted" id="revCount"></small></h3>
+        <h3 class="detail__h3">${t('detail.stories')} <small class="muted" id="revCount"></small></h3>
         <div class="storyform" id="storyform"></div>
         <div class="stories"></div>
 
-        <h3 class="detail__h3">동네 토크 <small>${icon('gps', 12)} GPS 1KM 이내만 참여</small></h3>
+        <h3 class="detail__h3">${t('detail.chat')} <small>${icon('gps', 12)} ${t('detail.chat.hint')}</small></h3>
         <div class="chat" id="chatBox"></div>
       </div>
     </div>`;
@@ -225,17 +226,17 @@ export function renderDetail(el, cafe, { user, onVote, onAddReview, onClose, onE
       const mine = cafe.myVotes?.[cat.key] || 0;
       row.innerHTML = `
         <div class="vote__head">
-          <span class="vote__label">${icon(cat.icon)} ${cat.label}
-            <span class="info" title="${esc(cat.def)}">${icon('info', 13)}</span></span>
+          <span class="vote__label">${icon(cat.icon)} ${t(`vote.${cat.key}`)}
+            <span class="info" title="${esc(def(cat.key))}">${icon('info', 13)}</span></span>
           <span class="vote__avg">${stars(avg)} <span class="muted">(${n})</span></span>
         </div>
-        <div class="vote__stars" role="group" aria-label="${cat.label} 투표">
+        <div class="vote__stars" role="group" aria-label="${t(`vote.${cat.key}`)}">
           ${[1, 2, 3, 4, 5].map((v) =>
-            `<button class="star ${mine >= v ? 'on' : ''}" data-v="${v}" aria-label="${v}점">${icon('star', 22)}</button>`).join('')}
+            `<button class="star ${mine >= v ? 'on' : ''}" data-v="${v}" aria-label="${v}">${icon('star', 22)}</button>`).join('')}
         </div>`;
       row.querySelectorAll('.star').forEach((b) => {
         b.onclick = async () => {
-          if (!user) return alert('투표하려면 로그인이 필요합니다.');
+          if (!user) return alert(t('vote.loginNeeded'));
           try {
             const v = Number(b.dataset.v);
             const agg = await onVote(cat.key, v);      // { averages, counts }
@@ -259,25 +260,25 @@ export function renderDetail(el, cafe, { user, onVote, onAddReview, onClose, onE
   const formEl = el.querySelector('#storyform');
   if (user) {
     formEl.innerHTML = `
-      <textarea class="input" id="stBody" rows="3" placeholder="이 카페에 얽힌 이야기를 자유롭게 남겨보세요. 사진도 여러 장 올릴 수 있어요."></textarea>
+      <textarea class="input" id="stBody" rows="3" placeholder="${esc(t('story.placeholder'))}"></textarea>
       <div class="photo-picker" id="stPicker"></div>
       <div class="storyform__row">
-        <button class="btn btn--primary sm" id="stSubmit">올리기</button>
+        <button class="btn btn--primary sm" id="stSubmit">${t('story.post')}</button>
       </div>`;
     const stPicker = createPhotoPicker(formEl.querySelector('#stPicker'), {});
     formEl.querySelector('#stSubmit').onclick = async () => {
       const body = formEl.querySelector('#stBody').value.trim();
       const { files, count } = stPicker.getManifest();
-      if (!body && !count) return alert('이야기나 사진을 올려주세요.');
+      if (!body && !count) return alert(t('story.need'));
       const fd = new FormData();
       fd.append('body', body);
       files.forEach((f) => fd.append('photos', f));
       const btn = formEl.querySelector('#stSubmit');
-      btn.disabled = true; btn.textContent = '올리는 중…';
-      try { await onAddReview(fd); } finally { btn.disabled = false; btn.textContent = '올리기'; }
+      btn.disabled = true; btn.textContent = t('story.posting');
+      try { await onAddReview(fd); } finally { btn.disabled = false; btn.textContent = t('story.post'); }
     };
   } else {
-    formEl.innerHTML = `<p class="muted">이야기를 남기려면 로그인하세요.</p>`;
+    formEl.innerHTML = `<p class="muted">${t('story.loginNeeded')}</p>`;
   }
 }
 
@@ -288,35 +289,35 @@ export function openEditCafeModal(cafe, { onSave }) {
   const sel = (v, o) => (v === o ? 'selected' : '');
   back.innerHTML = `
     <div class="modal" role="dialog" aria-modal="true">
-      <div class="modal__head"><h2>카페 수정</h2><button class="detail__close" id="eClose">${icon('x', 16)}</button></div>
+      <div class="modal__head"><h2>${t('modal.editCafe')}</h2><button class="detail__close" id="eClose">${icon('x', 16)}</button></div>
       <form class="cafeform" id="editForm">
-        <label class="field"><span>이름</span><input class="input" name="name" value="${esc(cafe.name)}"></label>
-        <label class="field"><span>주소</span><input class="input" name="address" value="${esc(cafe.address || '')}"></label>
-        <div class="field"><span>사진 <small class="muted">(드래그로 순서 변경 · 첫 번째가 대표사진)</small></span>
+        <label class="field"><span>${t('modal.name')}</span><input class="input" name="name" value="${esc(cafe.name)}"></label>
+        <label class="field"><span>${t('modal.address')}</span><input class="input" name="address" value="${esc(cafe.address || '')}"></label>
+        <div class="field"><span>${t('modal.photo')} <small class="muted">${t('modal.photoHint')}</small></span>
           <div class="photo-picker" id="editPhotoPicker"></div></div>
         <div class="grid2">
-          <label class="field"><span>층수 (다층이면 2+) <span class="info" title="${esc(DEFS.floors)}">${icon('info', 12)}</span></span><input class="input" type="number" min="1" name="floors" value="${esc(cafe.floors)}"></label>
-          <label class="field"><span>면적 <span class="info" title="${esc(DEFS.size)}">${icon('info', 12)}</span></span><select class="input" name="size">
-            <option value="small" ${sel(cafe.size, 'small')}>소형 (5개 이하)</option>
-            <option value="medium" ${sel(cafe.size, 'medium')}>중형 (6–15)</option>
-            <option value="large" ${sel(cafe.size, 'large')}>대형 (16+)</option></select></label>
-          <label class="field"><span>콘센트 <span class="info" title="${esc(DEFS.outlets)}">${icon('info', 12)}</span></span><select class="input" name="outlets">
-            <option value="many" ${sel(cafe.outlets, 'many')}>대부분 있음</option>
-            <option value="some" ${sel(cafe.outlets, 'some')}>일부 있음</option>
-            <option value="few" ${sel(cafe.outlets, 'few')}>드물게 있음</option>
-            <option value="none" ${sel(cafe.outlets, 'none')}>없음</option></select></label>
-          <label class="field"><span>아이스아메리카노(원)</span><input class="input" type="number" min="0" step="100" name="iced_americano_price" value="${esc(cafe.iced_americano_price)}"></label>
-          <label class="field"><span>오픈</span><input class="input" type="time" name="open_time" value="${esc(cafe.open_time)}"></label>
-          <label class="field"><span>마감</span><input class="input" type="time" name="close_time" value="${esc(cafe.close_time === '00:00' ? '00:00' : cafe.close_time)}"></label>
+          <label class="field"><span>${t('modal.floors')} <span class="info" title="${esc(def('floors'))}">${icon('info', 12)}</span></span><input class="input" type="number" min="1" name="floors" value="${esc(cafe.floors)}"></label>
+          <label class="field"><span>${t('modal.area')} <span class="info" title="${esc(def('size'))}">${icon('info', 12)}</span></span><select class="input" name="size">
+            <option value="small" ${sel(cafe.size, 'small')}>${t('size.small')}</option>
+            <option value="medium" ${sel(cafe.size, 'medium')}>${t('size.medium')}</option>
+            <option value="large" ${sel(cafe.size, 'large')}>${t('size.large')}</option></select></label>
+          <label class="field"><span>${t('modal.outlet')} <span class="info" title="${esc(def('outlets'))}">${icon('info', 12)}</span></span><select class="input" name="outlets">
+            <option value="many" ${sel(cafe.outlets, 'many')}>${t('outlet.many')}</option>
+            <option value="some" ${sel(cafe.outlets, 'some')}>${t('outlet.some')}</option>
+            <option value="few" ${sel(cafe.outlets, 'few')}>${t('outlet.few')}</option>
+            <option value="none" ${sel(cafe.outlets, 'none')}>${t('outlet.none')}</option></select></label>
+          <label class="field"><span>${t('modal.price')}</span><input class="input" type="number" min="0" step="100" name="iced_americano_price" value="${esc(cafe.iced_americano_price)}"></label>
+          <label class="field"><span>${t('modal.open')}</span><input class="input" type="time" name="open_time" value="${esc(cafe.open_time)}"></label>
+          <label class="field"><span>${t('modal.close')}</span><input class="input" type="time" name="close_time" value="${esc(cafe.close_time === '00:00' ? '00:00' : cafe.close_time)}"></label>
         </div>
-        <label class="field checkline"><input type="checkbox" name="has_view" ${cafe.has_view ? 'checked' : ''}> <span>뷰 좋음</span></label>
-        <label class="field"><span>뷰 설명</span><input class="input" name="view_note" value="${esc(cafe.view_note || '')}"></label>
+        <label class="field checkline"><input type="checkbox" name="has_view" ${cafe.has_view ? 'checked' : ''}> <span>${t('modal.viewGood')}</span></label>
+        <label class="field"><span>${t('modal.viewNote')}</span><input class="input" name="view_note" value="${esc(cafe.view_note || '')}"></label>
         <div class="grid2">
-          <label class="field"><span>네이버 링크</span><input class="input" name="naver_url" value="${esc(cafe.naver_url || '')}"></label>
-          <label class="field"><span>카카오 링크</span><input class="input" name="kakao_url" value="${esc(cafe.kakao_url || '')}"></label>
+          <label class="field"><span>${t('modal.naverLink')}</span><input class="input" name="naver_url" value="${esc(cafe.naver_url || '')}"></label>
+          <label class="field"><span>${t('modal.kakaoLink')}</span><input class="input" name="kakao_url" value="${esc(cafe.kakao_url || '')}"></label>
         </div>
-        <label class="field"><span>리뷰 요약</span><textarea class="input" rows="2" name="review_summary">${esc(cafe.review_summary || '')}</textarea></label>
-        <div class="modal__foot"><span class="err" id="eErr"></span><button type="submit" class="btn btn--primary">저장</button></div>
+        <label class="field"><span>${t('modal.aiSummary')}</span><textarea class="input" rows="2" name="review_summary">${esc(cafe.review_summary || '')}</textarea></label>
+        <div class="modal__foot"><span class="err" id="eErr"></span><button type="submit" class="btn btn--primary">${t('modal.save')}</button></div>
       </form>
     </div>`;
   document.body.appendChild(back);
@@ -368,7 +369,7 @@ export function initChat(root, cafe, { user, api }) {
 
   function renderMsgs(list) {
     if (!list.length) {
-      msgsEl.innerHTML = '<div class="muted chat__empty">아직 대화가 없어요. 이 근처라면 첫 메시지를 남겨보세요.</div>';
+      msgsEl.innerHTML = `<div class="muted chat__empty">${t('chat.empty')}</div>`;
       return;
     }
     const atBottom = msgsEl.scrollHeight - msgsEl.scrollTop - msgsEl.clientHeight < 40;
@@ -389,12 +390,12 @@ export function initChat(root, cafe, { user, api }) {
   }
 
   function renderGate() {
-    if (!user) { gateEl.innerHTML = '<div class="muted">참여하려면 로그인하세요.</div>'; return; }
+    if (!user) { gateEl.innerHTML = `<div class="muted">${t('chat.loginNeeded')}</div>`; return; }
     if (verified) {
       gateEl.innerHTML = `
         <div class="chat__input">
-          <input class="input" id="chatInput" placeholder="메시지 입력 (1km 인증됨)" maxlength="500">
-          <button class="btn btn--primary pill sm" id="chatSend">전송</button>
+          <input class="input" id="chatInput" placeholder="${esc(t('chat.input'))}" maxlength="500">
+          <button class="btn btn--primary pill sm" id="chatSend">${t('chat.send')}</button>
         </div>
         <div class="chat__err" id="chatErr"></div>`;
       const input = gateEl.querySelector('#chatInput');
@@ -416,7 +417,7 @@ export function initChat(root, cafe, { user, api }) {
       input.addEventListener('keydown', (e) => { if (e.key === 'Enter') { e.preventDefault(); send(); } });
     } else {
       gateEl.innerHTML = `
-        <button class="btn btn--ghost pill sm" id="chatVerify">${icon('gps', 14)} 1km 이내 인증하고 참여</button>
+        <button class="btn btn--ghost pill sm" id="chatVerify">${icon('gps', 14)} ${t('chat.verify')}</button>
         <div class="chat__err" id="chatErr"></div>`;
       gateEl.querySelector('#chatVerify').onclick = verify;
     }
@@ -424,8 +425,8 @@ export function initChat(root, cafe, { user, api }) {
 
   function verify() {
     const errEl = gateEl.querySelector('#chatErr');
-    if (!navigator.geolocation) { errEl.textContent = '이 기기는 위치 정보를 지원하지 않아요.'; return; }
-    errEl.textContent = '위치 확인 중…';
+    if (!navigator.geolocation) { errEl.textContent = t('chat.needGeo'); return; }
+    errEl.textContent = t('chat.locating');
     navigator.geolocation.getCurrentPosition(
       (pos) => {
         const { latitude: lat, longitude: lng } = pos.coords;
@@ -433,7 +434,7 @@ export function initChat(root, cafe, { user, api }) {
         if (km <= 1.0) { verified = { lat, lng }; renderGate(); }
         else errEl.textContent = `카페에서 ${km.toFixed(1)}km 떨어져 있어요. 1km 이내에서 참여할 수 있어요.`;
       },
-      () => { errEl.textContent = '위치 권한이 필요해요.'; },
+      () => { errEl.textContent = t('chat.needPerm'); },
       { enableHighAccuracy: true, timeout: 8000 }
     );
   }
@@ -456,7 +457,7 @@ export function renderStories(el, reviews) {
         ${photos.length ? `<div class="story__photos">${photos.map((u) => `<img class="story__photo" src="${esc(img(u))}" loading="lazy" alt="">`).join('')}</div>` : ''}
       </div>`;
       }).join('')
-    : `<p class="muted">아직 이야기가 없어요. 첫 이야기를 남겨보세요!</p>`;
+    : `<p class="muted">${t('story.empty')}</p>`;
 }
 
 // ---- View-spot detail (lighter: name + photos + comments) -----------------
@@ -466,15 +467,15 @@ export function renderViewDetail(el, spot, { user, onAddComment, onEdit, onDelet
     <button class="detail__close" title="닫기">${icon('x', 16)}</button>
     <div class="detail__scroll">
       <div class="detail__hero detail__hero--view">
-        <div class="carousel__img" id="carImg" role="button" title="크게 보기"></div>
+        <div class="carousel__img" id="carImg" role="button" title="${t('detail.zoom')}"></div>
         ${gallery.length > 1 ? `<div class="carousel__count">${icon('camera', 12)} ${gallery.length}</div>` : ''}
         <div class="detail__viewtag">${icon('view', 13)} VIEW</div>
       </div>
       <div class="detail__body">
         <h2 class="detail__name">${esc(spot.name)}</h2>
-        ${spot.canEdit ? `<div class="detail__adminrow"><button class="btn btn--ghost sm" id="vEdit">${icon('edit', 14)} 수정</button><button class="btn btn--ghost sm" id="vDel">삭제</button></div>` : ''}
-        ${gallery.length > 1 ? `<h3 class="detail__h3">사진 <small class="muted">${gallery.length}</small></h3><div class="photo-grid" id="photoGrid"></div>` : ''}
-        <h3 class="detail__h3">댓글 <small class="muted" id="cCount"></small></h3>
+        ${spot.canEdit ? `<div class="detail__adminrow"><button class="btn btn--ghost sm" id="vEdit">${icon('edit', 14)} ${t('detail.edit')}</button><button class="btn btn--ghost sm" id="vDel">${t('detail.delete')}</button></div>` : ''}
+        ${gallery.length > 1 ? `<h3 class="detail__h3">${t('detail.photos')} <small class="muted">${gallery.length}</small></h3><div class="photo-grid" id="photoGrid"></div>` : ''}
+        <h3 class="detail__h3">${t('comment.header')} <small class="muted" id="cCount"></small></h3>
         <div class="commentform" id="commentform"></div>
         <div class="comments"></div>
       </div>
@@ -496,18 +497,18 @@ export function renderViewDetail(el, spot, { user, onAddComment, onEdit, onDelet
   el.querySelector('#cCount').textContent = comments.length ? `${comments.length}` : '';
   el.querySelector('.comments').innerHTML = comments.length
     ? comments.map((c) => `<div class="story"><div class="story__head"><b>${esc(c.user_name)}</b><span class="muted">${esc((c.created_at || '').slice(0, 10))}</span></div><div class="story__body">${esc(c.body)}</div></div>`).join('')
-    : '<p class="muted">아직 댓글이 없어요.</p>';
+    : `<p class="muted">${t('comment.empty')}</p>`;
   const cf = el.querySelector('#commentform');
   if (user) {
-    cf.innerHTML = `<textarea class="input" id="cBody" rows="2" placeholder="이 곳에 대한 이야기를 남겨보세요..."></textarea>
-      <div class="storyform__row"><button class="btn btn--primary sm" id="cSubmit">등록</button></div>`;
+    cf.innerHTML = `<textarea class="input" id="cBody" rows="2" placeholder="${esc(t('comment.placeholder'))}"></textarea>
+      <div class="storyform__row"><button class="btn btn--primary sm" id="cSubmit">${t('comment.post')}</button></div>`;
     cf.querySelector('#cSubmit').onclick = async () => {
       const b = cf.querySelector('#cBody').value.trim();
       if (!b) return;
       await onAddComment(b);
     };
   } else {
-    cf.innerHTML = `<p class="muted">댓글을 남기려면 로그인하세요.</p>`;
+    cf.innerHTML = `<p class="muted">${t('comment.loginNeeded')}</p>`;
   }
 }
 
@@ -517,22 +518,22 @@ export function openViewModal({ mode = 'create', spot, onPickLocation, onCancelP
   back.className = 'modal-back';
   back.innerHTML = `
     <div class="modal" role="dialog" aria-modal="true">
-      <div class="modal__head"><h2>${mode === 'edit' ? '뷰 맛집 수정' : '뷰 맛집 등록'}</h2>
+      <div class="modal__head"><h2>${mode === 'edit' ? t('modal.editView') : t('modal.addView')}</h2>
         <button class="detail__close" id="vClose">${icon('x', 16)}</button></div>
-      <p class="muted">뷰가 좋은 곳을 지도에 남겨보세요. 이름 + 위치 + 사진이면 충분합니다.</p>
+      <p class="muted">${t('modal.viewIntro')}</p>
       <form class="cafeform" id="viewForm">
-        <label class="field"><span>장소 이름 *</span>
+        <label class="field"><span>${t('modal.placeName')} *</span>
           <input class="input" name="name" value="${esc(spot?.name || '')}"></label>
-        <div class="field"><span>위치 * <small class="muted">(지도 클릭)</small></span>
+        <div class="field"><span>${t('modal.location')} *</span>
           <div class="loc-row">
-            <input class="input" name="lat" placeholder="위도" readonly value="${spot ? esc(spot.lat) : ''}">
-            <input class="input" name="lng" placeholder="경도" readonly value="${spot ? esc(spot.lng) : ''}">
-            <button type="button" class="btn btn--ghost" id="vPick">지도에서 선택</button>
+            <input class="input" name="lat" readonly value="${spot ? esc(spot.lat) : ''}">
+            <input class="input" name="lng" readonly value="${spot ? esc(spot.lng) : ''}">
+            <button type="button" class="btn btn--ghost" id="vPick">${t('modal.pickOnMap')}</button>
           </div><small class="muted" id="vHint"></small></div>
-        <div class="field"><span>사진 * <small class="muted">(첫 번째가 대표 · 드래그로 순서)</small></span>
+        <div class="field"><span>${t('modal.photo')} * <small class="muted">${t('modal.photoHint')}</small></span>
           <div class="photo-picker" id="vPicker"></div></div>
         <div class="modal__foot"><span class="err" id="vErr"></span>
-          <button type="submit" class="btn btn--primary">${mode === 'edit' ? '저장' : '등록'}</button></div>
+          <button type="submit" class="btn btn--primary">${mode === 'edit' ? t('modal.save') : t('modal.submit')}</button></div>
       </form>
     </div>`;
   document.body.appendChild(back);
@@ -643,98 +644,98 @@ export function openAddCafeModal(opts) {
   back.innerHTML = `
     <div class="modal" role="dialog" aria-modal="true">
       <div class="modal__head">
-        <h2>카페 등록</h2>
+        <h2>${t('modal.addCafe')}</h2>
         <button class="detail__close" id="mClose">${icon('x', 16)}</button>
       </div>
 
       <form class="cafeform" id="cafeForm">
         <div class="formsec">
-          <div class="formsec__title">1. 카페 찾기</div>
+          <div class="formsec__title">1. ${t('modal.find')}</div>
           <input type="hidden" name="kakao_place_id">
           <input type="hidden" name="hours_json">
           ${canFetch ? `
-          <div class="field"><span>카페 이름으로 검색 <small class="muted">→ 후보 선택 시 AI가 자동으로 채웁니다</small></span>
+          <div class="field"><span>${t('modal.searchByName')} <small class="muted">${t('modal.searchHint')}</small></span>
             <div class="autofill__search">
-              <input class="input" id="afQuery" placeholder="예) 블루보틀 성수" autocomplete="off">
-              <button type="button" class="btn btn--primary" id="afSearchBtn">${icon('search', 14)} 검색</button>
+              <input class="input" id="afQuery" placeholder="Blue Bottle Seongsu" autocomplete="off">
+              <button type="button" class="btn btn--primary" id="afSearchBtn">${icon('search', 14)} ${t('modal.search')}</button>
             </div>
           </div>
           <div class="autofill__results" id="afResults"></div>
           <div class="fetch-status" id="fetchStatus" hidden></div>
           <details class="manual">
-            <summary>직접 입력 / 링크 붙여넣기</summary>
-            <label class="field"><span>카페 이름 *</span><input class="input" name="name"></label>
-            <label class="field"><span>카카오 지도 링크 *</span>
-              <div class="autofill__search"><input class="input" name="kakao_url" placeholder="https://place.map.kakao.com/... 또는 공유 링크">
-                <button type="button" class="btn btn--ghost" id="fetchBtn">가져오기</button></div></label>
-            <label class="field"><span>네이버 지도 링크 <small class="muted">(선택)</small></span><input class="input" name="naver_url"></label>
+            <summary>${t('modal.manual')}</summary>
+            <label class="field"><span>${t('modal.name')} *</span><input class="input" name="name"></label>
+            <label class="field"><span>${t('modal.kakaoLink')} *</span>
+              <div class="autofill__search"><input class="input" name="kakao_url" placeholder="https://place.map.kakao.com/...">
+                <button type="button" class="btn btn--ghost" id="fetchBtn">${t('modal.fetch')}</button></div></label>
+            <label class="field"><span>${t('modal.naverLink')}</span><input class="input" name="naver_url"></label>
           </details>` : `
-          <label class="field"><span>카페 이름 *</span><input class="input" name="name" required></label>
-          <label class="field"><span>카카오 지도 링크 * <small class="muted">(실제 장소 링크)</small></span>
+          <label class="field"><span>${t('modal.name')} *</span><input class="input" name="name" required></label>
+          <label class="field"><span>${t('modal.kakaoLink')} *</span>
             <input class="input" name="kakao_url" placeholder="https://place.map.kakao.com/..."></label>
-          <label class="field"><span>네이버 지도 링크 <small class="muted">(선택)</small></span>
+          <label class="field"><span>${t('modal.naverLink')}</span>
             <input class="input" name="naver_url"></label>`}
         </div>
 
         <div class="formsec">
-          <div class="formsec__title">2. 가져온 정보 (수정 가능)</div>
-          <label class="field"><span>주소</span>
-            <input class="input" name="address" placeholder="예) 서울 성동구 성수동"></label>
+          <div class="formsec__title">2. ${t('modal.fetched')}</div>
+          <label class="field"><span>${t('modal.address')}</span>
+            <input class="input" name="address"></label>
 
           <div class="field">
-            <span>위치 * <small class="muted">(가져오기 또는 지도 클릭)</small></span>
+            <span>${t('modal.location')} *</span>
             <div class="loc-row">
-              <input class="input" name="lat" placeholder="위도" readonly required>
-              <input class="input" name="lng" placeholder="경도" readonly required>
-              <button type="button" class="btn btn--ghost" id="pickBtn">지도에서 선택</button>
+              <input class="input" name="lat" readonly required>
+              <input class="input" name="lng" readonly required>
+              <button type="button" class="btn btn--ghost" id="pickBtn">${t('modal.pickOnMap')}</button>
             </div>
             <small class="muted" id="pickHint"></small>
           </div>
 
-          <div class="field"><span>사진 * <small class="muted">(첫 번째가 대표사진 · 화살표로 순서 변경)</small></span>
+          <div class="field"><span>${t('modal.photo')} * <small class="muted">${t('modal.photoHint')}</small></span>
             <div class="photo-picker" id="photoPicker"></div>
           </div>
 
           <div class="grid2">
-            <label class="field"><span>오픈 *</span>
+            <label class="field"><span>${t('modal.open')} *</span>
               <input class="input" type="time" name="open_time" value="09:00" required></label>
-            <label class="field"><span>마감 *</span>
+            <label class="field"><span>${t('modal.close')} *</span>
               <input class="input" type="time" name="close_time" value="22:00" required></label>
-            <label class="field"><span>아이스 아메리카노 가격(원) *</span>
+            <label class="field"><span>${t('modal.price')} *</span>
               <input class="input" type="number" name="iced_americano_price" min="0" step="100" value="4500" required></label>
           </div>
 
-          <label class="field"><span>리뷰 AI 요약 <small class="muted">(수정 가능)</small></span>
-            <textarea class="input" name="review_summary" rows="3" placeholder="카카오 리뷰를 AI가 요약해줍니다."></textarea></label>
+          <label class="field"><span>${t('modal.aiSummary')} <small class="muted">(${t('modal.editable')})</small></span>
+            <textarea class="input" name="review_summary" rows="3"></textarea></label>
         </div>
 
         <div class="formsec">
-          <div class="formsec__title">3. 직접 판단 (카공 핵심)</div>
+          <div class="formsec__title">3. ${t('modal.judge')}</div>
           <div class="grid2">
-            <label class="field"><span>층수 * <span class="info" title="${esc(DEFS.floors)}">${icon('info', 12)}</span></span>
+            <label class="field"><span>${t('modal.floors')} * <span class="info" title="${esc(def('floors'))}">${icon('info', 12)}</span></span>
               <input class="input" type="number" name="floors" min="1" value="1" required></label>
-            <label class="field"><span>면적 * <span class="info" title="${esc(DEFS.size)}">${icon('info', 12)}</span></span>
+            <label class="field"><span>${t('modal.area')} * <span class="info" title="${esc(def('size'))}">${icon('info', 12)}</span></span>
               <select class="input" name="size" required>
-                <option value="small">소형 (테이블 5개 이하)</option>
-                <option value="medium" selected>중형 (테이블 6–15)</option>
-                <option value="large">대형 (16개 이상)</option>
+                <option value="small">${t('size.small')}</option>
+                <option value="medium" selected>${t('size.medium')}</option>
+                <option value="large">${t('size.large')}</option>
               </select></label>
-            <label class="field"><span>콘센트 * <span class="info" title="${esc(DEFS.outlets)}">${icon('info', 12)}</span></span>
+            <label class="field"><span>${t('modal.outlet')} * <span class="info" title="${esc(def('outlets'))}">${icon('info', 12)}</span></span>
               <select class="input" name="outlets" required>
-                <option value="many">대부분 있음</option>
-                <option value="some" selected>일부 있음</option>
-                <option value="few">드물게 있음</option>
-                <option value="none">없음</option>
+                <option value="many">${t('outlet.many')}</option>
+                <option value="some" selected>${t('outlet.some')}</option>
+                <option value="few">${t('outlet.few')}</option>
+                <option value="none">${t('outlet.none')}</option>
               </select></label>
           </div>
-          <label class="field checkline"><input type="checkbox" name="has_view"> <span>뷰가 좋은 편이에요 <span class="info" title="${esc(DEFS.view)}">${icon('info', 12)}</span></span></label>
-          <label class="field"><span>뷰 설명 (선택)</span>
-            <input class="input" name="view_note" placeholder="예) 2층 창가 한강 방향"></label>
+          <label class="field checkline"><input type="checkbox" name="has_view"> <span>${t('modal.viewGood')} <span class="info" title="${esc(def('view'))}">${icon('info', 12)}</span></span></label>
+          <label class="field"><span>${t('modal.viewNote')}</span>
+            <input class="input" name="view_note"></label>
         </div>
 
         <div class="modal__foot">
           <span class="err" id="formErr"></span>
-          <button type="submit" class="btn btn--primary">등록하기</button>
+          <button type="submit" class="btn btn--primary">${t('modal.submit')}</button>
         </div>
       </form>
     </div>`;

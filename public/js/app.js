@@ -4,6 +4,7 @@ import { renderAuth, renderDetail, openAddCafeModal, openEditCafeModal, renderPe
   renderViewDetail, openViewModal } from './ui.js';
 import { passesFilters } from './util.js';
 import { icon } from './icons.js';
+import { t, getLang, setLang, onLangChange, applyStaticI18n } from './i18n.js';
 
 const $ = (sel) => document.querySelector(sel);
 
@@ -68,7 +69,7 @@ function applyFilters() {
   if (showCafes) for (const c of state.cafes) if (passesFilters(c, f)) { ids.add(c.id); cafeCount++; }
   if (showViews) for (const v of state.viewspots) ids.add(v.id);
   map.setFiltered(ids);
-  $('#result-count').textContent = `카페 ${cafeCount} · 뷰 ${showViews ? state.viewspots.length : 0}`;
+  $('#result-count').textContent = `${t('show.cafes')} ${cafeCount} · ${t('show.views')} ${showViews ? state.viewspots.length : 0}`;
   saveFilters();
 }
 
@@ -84,10 +85,12 @@ function wireFilters() {
     el.addEventListener('input', update);
     label.textContent = fmt(el.value);
   };
-  bindRange('f-price', 'f-price-val', (v) => `${Number(v).toLocaleString('ko-KR')}원 이하`);
-  bindRange('f-quiet', 'f-quiet-val', (v) => (+v ? `${v}점 이상` : '전체'));
-  bindRange('f-coffee', 'f-coffee-val', (v) => (+v ? `${v}점 이상` : '전체'));
-  bindRange('f-restroom', 'f-restroom-val', (v) => (+v ? `${v}점 이상` : '전체'));
+  const priceFmt = (v) => (getLang() === 'ko' ? `${Number(v).toLocaleString('ko-KR')}원 이하` : `≤ ₩${Number(v).toLocaleString('en-US')}`);
+  const ratingFmt = (v) => (+v ? (getLang() === 'ko' ? `${v}점 이상` : `${v}+`) : t('f.outlet.all'));
+  bindRange('f-price', 'f-price-val', priceFmt);
+  bindRange('f-quiet', 'f-quiet-val', ratingFmt);
+  bindRange('f-coffee', 'f-coffee-val', ratingFmt);
+  bindRange('f-restroom', 'f-restroom-val', ratingFmt);
 
   $('#f-reset').addEventListener('click', () => {
     ['f-multifloor', 'f-view', 'f-opennow', 'f-openlate',
@@ -189,7 +192,7 @@ async function handleViewDelete(id) {
   catch (e) { alert(e.message); }
 }
 function wireAddView() {
-  $('#addViewBtn').innerHTML = `${icon('view', 15)} 뷰 맛집 등록`;
+  $('#addViewBtn').innerHTML = `${icon('view', 15)} ${t('nav.addView')}`;
   $('#addViewBtn').addEventListener('click', () => {
     if (!state.me.user) { alert('뷰 맛집을 등록하려면 로그인이 필요합니다.'); return; }
     openViewModal({
@@ -296,8 +299,25 @@ function wireCardZoom() {
   $('#cardSmaller').onclick = () => map.setCardScale(-0.15);
 }
 
+async function rerenderI18n() {
+  applyStaticI18n();
+  $('#langToggle').textContent = getLang() === 'ko' ? 'EN' : 'KO';
+  $('#addCafeBtn').innerHTML = `${icon('plus', 15)} ${t('nav.addCafe')}`;
+  $('#addViewBtn').innerHTML = `${icon('view', 15)} ${t('nav.addView')}`;
+  ['f-price', 'f-quiet', 'f-coffee', 'f-restroom'].forEach((id) => $(`#${id}`).dispatchEvent(new Event('input')));
+  await refreshMe();               // re-render auth bar in the new language
+  applyFilters();                  // result text
+  await refreshPendingQueue();
+  if (state.openCafeId) await openDetail(state.openCafeId);
+  else if (state.openViewId) await openViewDetail(state.openViewId);
+}
+
 async function boot() {
-  document.getElementById('addCafeBtn').innerHTML = `${icon('plus', 15)} 카페 등록`;
+  applyStaticI18n();
+  $('#langToggle').textContent = getLang() === 'ko' ? 'EN' : 'KO';
+  $('#langToggle').onclick = () => setLang(getLang() === 'ko' ? 'en' : 'ko');
+  onLangChange(() => rerenderI18n());
+  $('#addCafeBtn').innerHTML = `${icon('plus', 15)} ${t('nav.addCafe')}`;
   wireFilters();
   loadFilters();     // restore saved filter toggles before first apply
   wireCardZoom();

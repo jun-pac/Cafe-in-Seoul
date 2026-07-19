@@ -59,6 +59,9 @@ body.detail-open #app { grid-template-columns: var(--side-w) 1fr var(--detail-w)
   gap: 22px;
 }
 .brand { display: flex; align-items: center; gap: 13px; }
+.brand__text { margin-right: auto; }
+.langtoggle { border: 1px solid var(--hair-strong); background: transparent; color: var(--ink); font-family: var(--font-display); font-weight: 700; font-size: 11px; letter-spacing: 1px; padding: 6px 10px; border-radius: var(--pill); cursor: pointer; flex: none; }
+.langtoggle:hover { border-color: var(--ink); background: var(--cool); }
 .brand__logo {
   width: 42px; height: 42px; border-radius: 50%;
   border: 1.5px solid var(--ink); display: grid; place-items: center; font-size: 20px; flex: none;

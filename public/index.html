@@ -23,10 +23,11 @@
         <div class="brand__logo">
           <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.85" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M17 8h1a4 4 0 1 1 0 8h-1"/><path d="M3 8h14v9a4 4 0 0 1-4 4H7a4 4 0 0 1-4-4Z"/><line x1="6" y1="2" x2="6" y2="4"/><line x1="10" y1="2" x2="10" y2="4"/><line x1="14" y1="2" x2="14" y2="4"/></svg>
         </div>
-        <div>
+        <div class="brand__text">
           <h1 class="brand__title">Seoul Cafe</h1>
-          <p class="brand__sub">카공하기 좋은 서울 카페 지도</p>
+          <p class="brand__sub" data-i18n="brand.sub">카공하기 좋은 서울 카페 지도</p>
         </div>
+        <button id="langToggle" class="langtoggle" title="Language / 언어">EN</button>
       </header>
 
       <div id="auth" class="section"></div>
@@ -40,66 +41,66 @@
 
       <div class="section filters">
         <div class="filters__head">
-          <h2>필터</h2>
-          <button id="f-reset" class="linkbtn">초기화</button>
+          <h2 data-i18n="filters">필터</h2>
+          <button id="f-reset" class="linkbtn" data-i18n="filters.reset">초기화</button>
         </div>
 
         <div class="fgroup fgroup--row">
-          <div class="fgroup__label">표시</div>
+          <div class="fgroup__label" data-i18n="filters.show">표시</div>
           <div class="pilltogs">
-            <label class="pilltog"><input type="checkbox" id="show-cafes" checked><span>카페</span></label>
-            <label class="pilltog pilltog--view"><input type="checkbox" id="show-views" checked><span>뷰 맛집</span></label>
+            <label class="pilltog"><input type="checkbox" id="show-cafes" checked><span data-i18n="show.cafes">카페</span></label>
+            <label class="pilltog pilltog--view"><input type="checkbox" id="show-views" checked><span data-i18n="show.views">뷰 맛집</span></label>
           </div>
         </div>
 
-        <label class="check"><input type="checkbox" id="f-opennow" checked> <b>지금 영업중만</b> <span class="hint">(실시간)</span></label>
-        <label class="check"><input type="checkbox" id="f-openlate"> 늦게까지 (22시+)</label>
-        <label class="check"><input type="checkbox" id="f-multifloor"> 다층 카페만 <span class="hint">(오래 머물기 좋음)</span></label>
-        <label class="check"><input type="checkbox" id="f-view"> 뷰 좋은 곳</label>
+        <label class="check"><input type="checkbox" id="f-opennow" checked> <b data-i18n="f.openNow">지금 영업중만</b> <span class="hint" data-i18n="f.openNow.hint">(실시간)</span></label>
+        <label class="check"><input type="checkbox" id="f-openlate"> <span data-i18n="f.openLate">늦게까지 (22시+)</span></label>
+        <label class="check"><input type="checkbox" id="f-multifloor"> <span data-i18n="f.multiFloor">다층 카페만</span> <span class="hint" data-i18n="f.multiFloor.hint">(오래 머물기 좋음)</span></label>
+        <label class="check"><input type="checkbox" id="f-view"> <span data-i18n="f.view">뷰 좋은 곳</span></label>
 
         <div class="fgroup fgroup--row">
-          <div class="fgroup__label">면적</div>
+          <div class="fgroup__label" data-i18n="f.area">면적</div>
           <div class="pilltogs">
-            <label class="pilltog"><input type="checkbox" id="f-size-small"><span>소형</span></label>
-            <label class="pilltog"><input type="checkbox" id="f-size-medium"><span>중형</span></label>
-            <label class="pilltog"><input type="checkbox" id="f-size-large"><span>대형</span></label>
+            <label class="pilltog"><input type="checkbox" id="f-size-small"><span data-i18n="size.small">소형</span></label>
+            <label class="pilltog"><input type="checkbox" id="f-size-medium"><span data-i18n="size.medium">중형</span></label>
+            <label class="pilltog"><input type="checkbox" id="f-size-large"><span data-i18n="size.large">대형</span></label>
           </div>
         </div>
 
         <div class="fgroup">
-          <label class="fgroup__label" for="f-outlet">콘센트</label>
+          <label class="fgroup__label" for="f-outlet" data-i18n="f.outlet">콘센트</label>
           <select id="f-outlet" class="input">
-            <option value="">전체</option>
-            <option value="few">있음</option>
-            <option value="some">보통 이상</option>
-            <option value="many">많음</option>
+            <option value="" data-i18n="f.outlet.all">전체</option>
+            <option value="few" data-i18n="f.outlet.few">있음</option>
+            <option value="some" data-i18n="f.outlet.some">보통 이상</option>
+            <option value="many" data-i18n="f.outlet.many">많음</option>
           </select>
         </div>
 
         <div class="fgroup">
-          <label class="fgroup__label">아이스 아메리카노 <b id="f-price-val"></b></label>
+          <label class="fgroup__label"><span data-i18n="f.price">아이스 아메리카노</span> <b id="f-price-val"></b></label>
           <input type="range" id="f-price" min="3000" max="8000" step="100" value="8000">
         </div>
 
         <div class="fgroup">
-          <div class="fgroup__label">최소 평가 <span class="hint">(집단지성 투표)</span></div>
-          <div class="slider-row"><span>조용함</span><b id="f-quiet-val"></b></div>
+          <div class="fgroup__label"><span data-i18n="f.minRating">최소 평가</span> <span class="hint" data-i18n="f.minRating.hint">(집단지성 투표)</span></div>
+          <div class="slider-row"><span data-i18n="vote.quiet">조용함</span><b id="f-quiet-val"></b></div>
           <input type="range" id="f-quiet" min="0" max="5" step="1" value="0">
-          <div class="slider-row"><span>커피맛</span><b id="f-coffee-val"></b></div>
+          <div class="slider-row"><span data-i18n="vote.coffee">커피맛</span><b id="f-coffee-val"></b></div>
           <input type="range" id="f-coffee" min="0" max="5" step="1" value="0">
-          <div class="slider-row"><span>화장실</span><b id="f-restroom-val"></b></div>
+          <div class="slider-row"><span data-i18n="vote.restroom">화장실</span><b id="f-restroom-val"></b></div>
           <input type="range" id="f-restroom" min="0" max="5" step="1" value="0">
         </div>
       </div>
 
-      <div class="section result">표시중 <b id="result-count">–</b></div>
-      <footer class="foot">카드가 겹치면 종합점수가 높은 곳만 남습니다.</footer>
+      <div class="section result"><span data-i18n="result.shown">표시중</span> <b id="result-count">–</b></div>
+      <footer class="foot" data-i18n="foot.declutter">카드가 겹치면 종합점수가 높은 곳만 남습니다.</footer>
     </aside>
 
     <!-- Map -->
     <main id="map">
       <div class="cardzoom" id="cardZoom">
-        <span class="cardzoom__label">카드</span>
+        <span class="cardzoom__label" data-i18n="card.size">카드</span>
         <button type="button" id="cardBigger" title="카드 크게" aria-label="카드 크게">＋</button>
         <button type="button" id="cardSmaller" title="카드 작게" aria-label="카드 작게">－</button>
       </div>
