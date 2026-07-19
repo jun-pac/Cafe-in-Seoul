@@ -1,6 +1,6 @@
 import { api } from './api.js';
 import { initMap } from './map.js';
-import { renderAuth, renderDetail, openAddCafeModal, renderPendingQueue, initChat } from './ui.js';
+import { renderAuth, renderDetail, openAddCafeModal, openEditCafeModal, renderPendingQueue, initChat } from './ui.js';
 import { passesFilters } from './util.js';
 
 const $ = (sel) => document.querySelector(sel);
@@ -101,6 +101,7 @@ async function openDetail(id) {
     onVote: (category, score) => handleVote(id, category, score),
     onAddReview: (fd) => handleAddReview(id, fd),
     onClose: closeDetail,
+    onEdit: (action) => handleAdminEdit(id, cafe, action),
   });
   // (re)mount the GPS-gated chat for this cafe
   state.chatCleanup?.();
@@ -126,6 +127,21 @@ async function handleVote(id, category, score) {
   } catch (e) {
     alert(e.message);
   }
+}
+
+async function handleAdminEdit(id, cafe, action) {
+  if (action === 'approve') {
+    try { await api.adminApprove(id); await loadCafes(); await openDetail(id); }
+    catch (e) { alert(e.message); }
+    return;
+  }
+  openEditCafeModal(cafe, {
+    onSave: async (patch) => {
+      await api.updateCafe(id, patch);
+      await loadCafes();
+      await openDetail(id);
+    },
+  });
 }
 
 async function handleAddReview(id, fd) {

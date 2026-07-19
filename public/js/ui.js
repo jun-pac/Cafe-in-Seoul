@@ -64,7 +64,7 @@ export function renderAuth(el, me, { onLogout, onGoogleCredential, onLocalLogin,
     </div>
     <div class="err" id="loginErr"></div>`;
   const errEl = form.querySelector('#loginErr');
-  const creds = () => ({ u: form.username.value.trim(), p: form.password.value });
+  const creds = () => ({ u: form.elements.username.value.trim(), p: form.elements.password.value });
   form.onsubmit = async (e) => {
     e.preventDefault();
     errEl.textContent = '';
@@ -105,7 +105,7 @@ export function renderPendingQueue(el, cafes, { onApprove, onReject, onOpen }) {
 }
 
 // ---- Detail panel ---------------------------------------------------------
-export function renderDetail(el, cafe, { user, onVote, onAddReview, onClose }) {
+export function renderDetail(el, cafe, { user, onVote, onAddReview, onClose, onEdit }) {
   const openNow = isOpenNow(cafe);
   const floorTxt = cafe.multi_floor ? `${cafe.floors}층 (다층)` : '단층';
   const viewTxt = cafe.has_view ? (cafe.view_note ? `뷰 좋음 · ${esc(cafe.view_note)}` : '뷰 좋음') : '뷰 별로';
@@ -119,6 +119,7 @@ export function renderDetail(el, cafe, { user, onVote, onAddReview, onClose }) {
       <h2 class="detail__name">${esc(cafe.name)}</h2>
       <div class="detail__addr">${esc(cafe.address || '')}</div>
       ${cafe.status === 'pending' ? `<div class="detail__pending">🛡️ 심사 대기중 <span class="muted">— ${esc(cafe.moderation_reason || '관리자 확인 필요')}</span></div>` : ''}
+      ${user?.isAdmin ? `<div class="detail__adminrow"><button class="btn btn--ghost sm" id="editCafeBtn">✎ 수정</button>${cafe.status === 'pending' ? '<button class="btn btn--primary sm" id="approveCafeBtn">승인</button>' : ''}</div>` : ''}
 
       <div class="detail__hours ${openNow ? 'is-open' : 'is-closed'}">
         <span class="dot"></span>${openNow ? '영업중' : '영업종료'} · ${esc(hoursText(cafe))}
@@ -151,6 +152,8 @@ export function renderDetail(el, cafe, { user, onVote, onAddReview, onClose }) {
     </div>`;
 
   el.querySelector('.detail__close').onclick = onClose;
+  el.querySelector('#editCafeBtn')?.addEventListener('click', () => onEdit?.('edit'));
+  el.querySelector('#approveCafeBtn')?.addEventListener('click', () => onEdit?.('approve'));
 
   // votes
   const votesEl = el.querySelector('.votes');
@@ -210,6 +213,64 @@ export function renderDetail(el, cafe, { user, onVote, onAddReview, onClose }) {
   } else {
     formEl.innerHTML = `<p class="muted">후기를 남기려면 로그인하세요.</p>`;
   }
+}
+
+// ---- Admin edit modal (curate any cafe's fields) --------------------------
+export function openEditCafeModal(cafe, { onSave }) {
+  const back = document.createElement('div');
+  back.className = 'modal-back';
+  const sel = (v, o) => (v === o ? 'selected' : '');
+  back.innerHTML = `
+    <div class="modal" role="dialog" aria-modal="true">
+      <div class="modal__head"><h2>카페 수정</h2><button class="detail__close" id="eClose">✕</button></div>
+      <form class="cafeform" id="editForm">
+        <label class="field"><span>이름</span><input class="input" name="name" value="${esc(cafe.name)}"></label>
+        <label class="field"><span>주소</span><input class="input" name="address" value="${esc(cafe.address || '')}"></label>
+        <label class="field"><span>대표사진 URL</span><input class="input" name="photo_url" value="${esc(cafe.photo_url || '')}"></label>
+        <div class="grid2">
+          <label class="field"><span>층수 (다층이면 2+)</span><input class="input" type="number" min="1" name="floors" value="${esc(cafe.floors)}"></label>
+          <label class="field"><span>면적</span><select class="input" name="size">
+            <option value="small" ${sel(cafe.size, 'small')}>소형</option>
+            <option value="medium" ${sel(cafe.size, 'medium')}>중형</option>
+            <option value="large" ${sel(cafe.size, 'large')}>대형</option></select></label>
+          <label class="field"><span>콘센트</span><select class="input" name="outlets">
+            <option value="many" ${sel(cafe.outlets, 'many')}>많음</option>
+            <option value="some" ${sel(cafe.outlets, 'some')}>보통</option>
+            <option value="few" ${sel(cafe.outlets, 'few')}>적음</option>
+            <option value="none" ${sel(cafe.outlets, 'none')}>없음</option></select></label>
+          <label class="field"><span>아이스아메리카노(원)</span><input class="input" type="number" min="0" step="100" name="iced_americano_price" value="${esc(cafe.iced_americano_price)}"></label>
+          <label class="field"><span>오픈</span><input class="input" type="time" name="open_time" value="${esc(cafe.open_time)}"></label>
+          <label class="field"><span>마감</span><input class="input" type="time" name="close_time" value="${esc(cafe.close_time === '00:00' ? '00:00' : cafe.close_time)}"></label>
+        </div>
+        <label class="field checkline"><input type="checkbox" name="has_view" ${cafe.has_view ? 'checked' : ''}> <span>뷰 좋음</span></label>
+        <label class="field"><span>뷰 설명</span><input class="input" name="view_note" value="${esc(cafe.view_note || '')}"></label>
+        <div class="grid2">
+          <label class="field"><span>네이버 링크</span><input class="input" name="naver_url" value="${esc(cafe.naver_url || '')}"></label>
+          <label class="field"><span>카카오 링크</span><input class="input" name="kakao_url" value="${esc(cafe.kakao_url || '')}"></label>
+        </div>
+        <label class="field"><span>리뷰 요약</span><textarea class="input" rows="2" name="review_summary">${esc(cafe.review_summary || '')}</textarea></label>
+        <div class="modal__foot"><span class="err" id="eErr"></span><button type="submit" class="btn btn--primary">저장</button></div>
+      </form>
+    </div>`;
+  document.body.appendChild(back);
+  const form = back.querySelector('#editForm');
+  const close = () => back.remove();
+  back.querySelector('#eClose').onclick = close;
+  back.addEventListener('mousedown', (e) => { if (e.target === back) close(); });
+  form.onsubmit = async (e) => {
+    e.preventDefault();
+    const patch = {
+      name: form.elements.name.value, address: form.elements.address.value, photo_url: form.elements.photo_url.value,
+      floors: form.elements.floors.value, size: form.elements.size.value, outlets: form.elements.outlets.value,
+      iced_americano_price: form.elements.iced_americano_price.value, open_time: form.elements.open_time.value,
+      close_time: form.elements.close_time.value, has_view: form.elements.has_view.checked,
+      view_note: form.elements.view_note.value, naver_url: form.elements.naver_url.value,
+      kakao_url: form.elements.kakao_url.value, review_summary: form.elements.review_summary.value,
+    };
+    try { await onSave(patch); close(); }
+    catch (err) { back.querySelector('#eErr').textContent = err.message || '저장 실패'; }
+  };
+  return { close };
 }
 
 // ---- GPS-gated per-cafe chat ----------------------------------------------
@@ -436,37 +497,37 @@ export function openAddCafeModal(opts) {
   back.querySelector('#pickBtn').onclick = () => {
     hint.textContent = '지도를 클릭해 위치를 지정하세요...';
     onPickLocation((lng, lat) => {
-      form.lat.value = lat.toFixed(6);
-      form.lng.value = lng.toFixed(6);
+      form.elements.lat.value = lat.toFixed(6);
+      form.elements.lng.value = lng.toFixed(6);
       hint.textContent = `선택됨: ${lat.toFixed(5)}, ${lng.toFixed(5)}`;
     });
   };
 
-  form.photo.addEventListener('change', () => {
-    if (form.photo.files[0]) { form.photo_url.value = ''; preview.hidden = true; }
+  form.elements.photo.addEventListener('change', () => {
+    if (form.elements.photo.files[0]) { form.elements.photo_url.value = ''; preview.hidden = true; }
   });
 
   function setPhotoUrl(url) {
-    form.photo_url.value = url;
-    form.photo.value = '';
+    form.elements.photo_url.value = url;
+    form.elements.photo.value = '';
     preview.hidden = false;
     preview.querySelectorAll('.photo-thumb').forEach((t) => t.classList.toggle('is-sel', t.dataset.url === url));
   }
 
   function applyFetched(data) {
     const f = data.fetched || {};
-    form.kakao_place_id.value = data.placeId || '';
-    if (f.kakao_place_url) form.kakao_url.value = f.kakao_place_url; // canonical real link
-    if (f.address) form.address.value = f.address;
+    form.elements.kakao_place_id.value = data.placeId || '';
+    if (f.kakao_place_url) form.elements.kakao_url.value = f.kakao_place_url; // canonical real link
+    if (f.address) form.elements.address.value = f.address;
     if (f.lat != null && f.lng != null) {
-      form.lat.value = Number(f.lat).toFixed(6);
-      form.lng.value = Number(f.lng).toFixed(6);
+      form.elements.lat.value = Number(f.lat).toFixed(6);
+      form.elements.lng.value = Number(f.lng).toFixed(6);
       hint.textContent = `카카오에서 위치 가져옴: ${Number(f.lat).toFixed(5)}, ${Number(f.lng).toFixed(5)}`;
     }
-    if (f.open_time) form.open_time.value = f.open_time;
-    if (f.close_time) form.close_time.value = f.close_time === '24:00' ? '00:00' : f.close_time;
-    if (f.iced_americano_price) form.iced_americano_price.value = f.iced_americano_price;
-    if (data.review_summary) form.review_summary.value = data.review_summary;
+    if (f.open_time) form.elements.open_time.value = f.open_time;
+    if (f.close_time) form.elements.close_time.value = f.close_time === '24:00' ? '00:00' : f.close_time;
+    if (f.iced_americano_price) form.elements.iced_americano_price.value = f.iced_americano_price;
+    if (data.review_summary) form.elements.review_summary.value = data.review_summary;
 
     const photos = (f.photos || []).slice(0, 8);
     preview.hidden = photos.length === 0;
@@ -491,7 +552,7 @@ export function openAddCafeModal(opts) {
     const fetchBtn = back.querySelector('#fetchBtn');
     const statusEl = back.querySelector('#fetchStatus');
     const doFetch = async () => {
-      const kakaoUrl = form.kakao_url.value.trim();
+      const kakaoUrl = form.elements.kakao_url.value.trim();
       if (!kakaoUrl) { errEl.textContent = '카카오 지도 링크를 먼저 입력하세요.'; return; }
       errEl.textContent = '';
       fetchBtn.disabled = true;
@@ -528,8 +589,8 @@ export function openAddCafeModal(opts) {
           : '<span class="muted">결과 없음</span>';
         resultsEl.querySelectorAll('.af-result').forEach((b) => {
           b.onclick = () => {
-            if (!form.name.value.trim()) form.name.value = b.dataset.name;
-            form.kakao_url.value = b.dataset.url;
+            if (!form.elements.name.value.trim()) form.elements.name.value = b.dataset.name;
+            form.elements.kakao_url.value = b.dataset.url;
             finder.hidden = true;
             doFetch();
           };
@@ -545,13 +606,13 @@ export function openAddCafeModal(opts) {
   form.onsubmit = async (e) => {
     e.preventDefault();
     errEl.textContent = '';
-    if (!form.kakao_url.value.trim()) { errEl.textContent = '카카오 지도 링크는 필수입니다.'; return; }
-    if (!form.lat.value || !form.lng.value) { errEl.textContent = '위치를 가져오거나 지도에서 선택하세요.'; return; }
-    if (!form.photo.files[0] && !form.photo_url.value) { errEl.textContent = '대표사진(파일 또는 가져온 사진)이 필요합니다.'; return; }
+    if (!form.elements.kakao_url.value.trim()) { errEl.textContent = '카카오 지도 링크는 필수입니다.'; return; }
+    if (!form.elements.lat.value || !form.elements.lng.value) { errEl.textContent = '위치를 가져오거나 지도에서 선택하세요.'; return; }
+    if (!form.elements.photo.files[0] && !form.elements.photo_url.value) { errEl.textContent = '대표사진(파일 또는 가져온 사진)이 필요합니다.'; return; }
 
     const fd = new FormData(form);
-    fd.set('has_view', form.has_view.checked ? 'true' : 'false');
-    if (!form.photo.files[0]) fd.delete('photo');
+    fd.set('has_view', form.elements.has_view.checked ? 'true' : 'false');
+    if (!form.elements.photo.files[0]) fd.delete('photo');
     try {
       await onSubmit(fd);
       close();

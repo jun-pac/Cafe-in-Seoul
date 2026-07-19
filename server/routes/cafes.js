@@ -7,7 +7,7 @@ const express = require('express');
 const multer = require('multer');
 const db = require('../db');
 const { decorate } = require('../cafeModel');
-const { requireAuth, isAdmin } = require('../auth');
+const { requireAuth, requireAdmin, isAdmin } = require('../auth');
 const { moderate } = require('../moderation');
 
 const router = express.Router();
@@ -132,6 +132,36 @@ router.post('/', requireAuth, upload.single('photo'), async (req, res, next) => 
     if (req.file) fs.unlink(req.file.path, () => {});
     next(e);
   }
+});
+
+// PATCH /api/cafes/:id — admin edits (curate the discrete/core fields).
+const EDITABLE = {
+  name: 'text', address: 'text', floors: 'int', size: 'size', outlets: 'outlets',
+  has_view: 'bool', view_note: 'text', open_time: 'time', close_time: 'time',
+  iced_americano_price: 'int', naver_url: 'text', kakao_url: 'text',
+  photo_url: 'text', review_summary: 'text',
+};
+router.patch('/:id', requireAdmin, express.json(), (req, res) => {
+  const cafe = getStmt.get(req.params.id);
+  if (!cafe) return res.status(404).json({ error: 'not found' });
+  const b = req.body || {};
+  const sets = [];
+  const params = { id: req.params.id };
+  for (const [k, type] of Object.entries(EDITABLE)) {
+    if (!(k in b)) continue;
+    let v = b[k];
+    if (type === 'int') { v = Number(v); if (!Number.isInteger(v) || v < 0) return res.status(400).json({ error: `${k} 값이 올바르지 않습니다.` }); }
+    else if (type === 'bool') { v = (v === true || v === 'true' || v === 1 || v === '1') ? 1 : 0; }
+    else if (type === 'time') { if (!TIME_RE.test(v)) return res.status(400).json({ error: '시간 형식은 HH:MM' }); }
+    else if (type === 'size') { if (!SIZES.has(v)) return res.status(400).json({ error: 'size 값 오류' }); }
+    else if (type === 'outlets') { if (!OUTLETS.has(v)) return res.status(400).json({ error: 'outlets 값 오류' }); }
+    else { v = (v == null ? '' : String(v).trim()) || null; if (k === 'name' && !v) return res.status(400).json({ error: '이름은 비울 수 없습니다.' }); }
+    sets.push(`${k} = @${k}`);
+    params[k] = v;
+  }
+  if (!sets.length) return res.status(400).json({ error: '변경할 항목이 없습니다.' });
+  db.prepare(`UPDATE cafes SET ${sets.join(', ')} WHERE id = @id`).run(params);
+  res.json(decorate(getStmt.get(req.params.id)));
 });
 
 module.exports = router;

@@ -214,6 +214,7 @@ input[type="checkbox"] { accent-color: #ffffff; width: 15px; height: 15px; }
 .detail__addr { color: var(--mute); font-size: 12px; margin-top: 6px; letter-spacing: 0.3px; }
 .detail__pending { margin-top: 10px; border: 1px dashed var(--ink); color: var(--ink);
   border-radius: var(--r-sm); padding: 7px 11px; font-size: 12px; font-weight: 600; }
+.detail__adminrow { display: flex; gap: 8px; margin-top: 10px; }
 
 .detail__hours {
   display: inline-flex; align-items: center; gap: 8px; margin-top: 14px;
