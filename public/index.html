@@ -1,0 +1,86 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>서울 카공 카페 지도</title>
+  <meta name="description" content="카공하기 좋은 서울 카페를 지도에서 찾아보세요." />
+  <link rel="stylesheet" href="https://unpkg.com/maplibre-gl@4.7.1/dist/maplibre-gl.css" />
+  <link rel="stylesheet" href="/css/style.css" />
+</head>
+<body>
+  <div id="app">
+    <!-- Sidebar: brand, auth, filters -->
+    <aside id="sidebar">
+      <header class="brand">
+        <div class="brand__logo">☕</div>
+        <div>
+          <h1 class="brand__title">서울 카공 지도</h1>
+          <p class="brand__sub">카공하기 좋은 카페 찾기</p>
+        </div>
+      </header>
+
+      <div id="auth" class="section"></div>
+
+      <button id="addCafeBtn" class="btn btn--add">＋ 카페 등록</button>
+
+      <div class="section filters">
+        <div class="filters__head">
+          <h2>필터</h2>
+          <button id="f-reset" class="linkbtn">초기화</button>
+        </div>
+
+        <label class="check"><input type="checkbox" id="f-multifloor"> 다층 카페만 <span class="hint">(오래 머물기 좋음)</span></label>
+        <label class="check"><input type="checkbox" id="f-view"> 뷰 좋은 곳</label>
+        <label class="check"><input type="checkbox" id="f-opennow"> 지금 영업중</label>
+        <label class="check"><input type="checkbox" id="f-openlate"> 늦게까지 (22시+)</label>
+
+        <div class="fgroup">
+          <div class="fgroup__label">면적</div>
+          <label class="check"><input type="checkbox" id="f-size-small"> 소형</label>
+          <label class="check"><input type="checkbox" id="f-size-medium"> 중형</label>
+          <label class="check"><input type="checkbox" id="f-size-large"> 대형</label>
+        </div>
+
+        <div class="fgroup">
+          <label class="fgroup__label" for="f-outlet">콘센트</label>
+          <select id="f-outlet" class="input">
+            <option value="">전체</option>
+            <option value="few">있음</option>
+            <option value="some">보통 이상</option>
+            <option value="many">많음</option>
+          </select>
+        </div>
+
+        <div class="fgroup">
+          <label class="fgroup__label">아이스 아메리카노 <b id="f-price-val"></b></label>
+          <input type="range" id="f-price" min="3000" max="8000" step="100" value="8000">
+        </div>
+
+        <div class="fgroup">
+          <div class="fgroup__label">최소 평가 <span class="hint">(집단지성 투표)</span></div>
+          <div class="slider-row"><span>🔇 조용함</span><b id="f-quiet-val"></b></div>
+          <input type="range" id="f-quiet" min="0" max="5" step="1" value="0">
+          <div class="slider-row"><span>☕ 커피맛</span><b id="f-coffee-val"></b></div>
+          <input type="range" id="f-coffee" min="0" max="5" step="1" value="0">
+          <div class="slider-row"><span>🚻 화장실</span><b id="f-restroom-val"></b></div>
+          <input type="range" id="f-restroom" min="0" max="5" step="1" value="0">
+        </div>
+      </div>
+
+      <div class="section result">표시중 <b id="result-count">–</b></div>
+      <footer class="foot">카드가 겹치면 종합점수가 높은 곳만 남습니다.</footer>
+    </aside>
+
+    <!-- Map -->
+    <main id="map"></main>
+
+    <!-- Detail panel -->
+    <section id="detail" class="detail" aria-label="카페 상세정보"></section>
+  </div>
+
+  <script src="https://accounts.google.com/gsi/client" async></script>
+  <script src="https://unpkg.com/maplibre-gl@4.7.1/dist/maplibre-gl.js"></script>
+  <script type="module" src="/js/app.js"></script>
+</body>
+</html>

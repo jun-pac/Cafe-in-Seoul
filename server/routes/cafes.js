@@ -1,0 +1,120 @@
+'use strict';
+
+const crypto = require('crypto');
+const fs = require('fs');
+const path = require('path');
+const express = require('express');
+const multer = require('multer');
+const db = require('../db');
+const { decorate } = require('../cafeModel');
+const { requireAuth } = require('../auth');
+
+const router = express.Router();
+
+const upload = multer({
+  storage: multer.diskStorage({
+    destination: path.join(__dirname, '..', '..', 'uploads'),
+    filename: (req, file, cb) => {
+      const ext = (path.extname(file.originalname) || '.jpg').toLowerCase().slice(0, 5);
+      cb(null, `${Date.now()}-${crypto.randomBytes(4).toString('hex')}${ext}`);
+    },
+  }),
+  limits: { fileSize: 8 * 1024 * 1024 },
+  fileFilter: (req, file, cb) => cb(null, /^image\//.test(file.mimetype)),
+});
+
+const listStmt = db.prepare('SELECT * FROM cafes');
+const getStmt = db.prepare('SELECT * FROM cafes WHERE id = ?');
+const reviewsStmt = db.prepare(`
+  SELECT r.id, r.body, r.photo_url, r.created_at, u.name AS user_name, u.avatar_url AS user_avatar
+  FROM reviews r JOIN users u ON u.id = r.user_id
+  WHERE r.cafe_id = ? ORDER BY r.created_at DESC
+`);
+const myVotesStmt = db.prepare('SELECT category, score FROM votes WHERE cafe_id = ? AND user_id = ?');
+
+const insertCafe = db.prepare(`
+  INSERT INTO cafes (id, name, address, lat, lng, photo_url, floors, open_time, close_time,
+                     size, naver_url, kakao_url, iced_americano_price, has_view, view_note,
+                     outlets, created_by)
+  VALUES (@id, @name, @address, @lat, @lng, @photo_url, @floors, @open_time, @close_time,
+          @size, @naver_url, @kakao_url, @iced_americano_price, @has_view, @view_note,
+          @outlets, @created_by)
+`);
+
+// GET /api/cafes  — lightweight list for the map (each with score for declutter)
+router.get('/', (req, res) => {
+  const cafes = listStmt.all().map(decorate);
+  cafes.sort((a, b) => b.score - a.score);
+  res.json(cafes);
+});
+
+// GET /api/cafes/:id — full detail incl. reviews + this user's votes
+router.get('/:id', (req, res) => {
+  const cafe = getStmt.get(req.params.id);
+  if (!cafe) return res.status(404).json({ error: 'not found' });
+  const detail = decorate(cafe);
+  detail.reviews = reviewsStmt.all(cafe.id);
+  detail.myVotes = {};
+  if (req.user) {
+    for (const v of myVotesStmt.all(cafe.id, req.user.id)) detail.myVotes[v.category] = v.score;
+  }
+  res.json(detail);
+});
+
+const SIZES = new Set(['small', 'medium', 'large']);
+const OUTLETS = new Set(['many', 'some', 'few', 'none']);
+const TIME_RE = /^([01]?\d|2[0-3]):[0-5]\d$/;
+
+function validationError(body, hasPhoto) {
+  const missing = [];
+  const need = (k) => (body[k] === undefined || body[k] === null || String(body[k]).trim() === '') && missing.push(k);
+  ['name', 'lat', 'lng', 'floors', 'open_time', 'close_time', 'size',
+   'naver_url', 'kakao_url', 'iced_americano_price', 'outlets'].forEach(need);
+  if (!hasPhoto) missing.push('photo');
+  if (body.has_view === undefined || body.has_view === null || body.has_view === '') missing.push('has_view');
+  if (missing.length) return `필수 항목 누락: ${missing.join(', ')}`;
+
+  if (!Number.isFinite(+body.lat) || !Number.isFinite(+body.lng)) return '좌표(lat/lng)가 올바르지 않습니다.';
+  if (!Number.isInteger(+body.floors) || +body.floors < 1) return '층수(floors)가 올바르지 않습니다.';
+  if (!TIME_RE.test(body.open_time) || !TIME_RE.test(body.close_time)) return '영업시간 형식은 HH:MM 이어야 합니다.';
+  if (!SIZES.has(body.size)) return '면적(size)은 small/medium/large 중 하나여야 합니다.';
+  if (!OUTLETS.has(body.outlets)) return '콘센트(outlets)는 many/some/few/none 중 하나여야 합니다.';
+  if (!Number.isInteger(+body.iced_americano_price) || +body.iced_americano_price < 0) return '아이스 아메리카노 가격이 올바르지 않습니다.';
+  return null;
+}
+
+// POST /api/cafes — register a cafe (auth required). multipart/form-data with `photo`.
+router.post('/', requireAuth, upload.single('photo'), (req, res) => {
+  const b = req.body;
+  const photoUrl = req.file ? `/uploads/${req.file.filename}` : (b.photo_url || '').trim();
+  const err = validationError(b, !!photoUrl);
+  if (err) {
+    if (req.file) fs.unlink(req.file.path, () => {}); // don't keep orphaned upload
+    return res.status(400).json({ error: err });
+  }
+
+  const toBool = (v) => (v === true || v === 'true' || v === '1' || v === 1 ? 1 : 0);
+  const id = crypto.randomUUID();
+  insertCafe.run({
+    id,
+    name: b.name.trim(),
+    address: (b.address || '').trim() || null,
+    lat: +b.lat,
+    lng: +b.lng,
+    photo_url: photoUrl,
+    floors: +b.floors,
+    open_time: b.open_time,
+    close_time: b.close_time,
+    size: b.size,
+    naver_url: b.naver_url.trim(),
+    kakao_url: b.kakao_url.trim(),
+    iced_americano_price: +b.iced_americano_price,
+    has_view: toBool(b.has_view),
+    view_note: (b.view_note || '').trim() || null,
+    outlets: b.outlets,
+    created_by: req.user.id,
+  });
+  res.status(201).json(decorate(getStmt.get(id)));
+});
+
+module.exports = router;

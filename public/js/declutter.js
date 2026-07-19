@@ -1,0 +1,62 @@
+// Greedy overlap resolution for photo cards.
+//
+// As you zoom out, cards start colliding. We keep the highest-scoring card in
+// any overlapping cluster and hide the rest — the survivor shows a "+N" badge
+// counting how many nearby cards it absorbed.
+//
+// Cards are anchored bottom-center on their point, so the card's bounding box
+// sits ABOVE the point: [x - W/2, y - H, x + W/2, y].
+
+export const CARD_W = 132; // keep in sync with .cafe-card width in CSS
+export const CARD_H = 112; // photo + label height
+const PAD = 6; // extra gap so survivors breathe
+
+function overlaps(a, b) {
+  return !(
+    a.right + PAD < b.left ||
+    a.left - PAD > b.right ||
+    a.bottom + PAD < b.top ||
+    a.top - PAD > b.bottom
+  );
+}
+
+// items: [{ id, score, x, y }]  (x,y = pixel position of the anchor point)
+// viewport: { width, height }
+// Returns Map<id, { visible, absorbed }>
+export function declutter(items, viewport) {
+  const sorted = [...items].sort((a, b) => b.score - a.score);
+  const placed = []; // { box, id }
+  const result = new Map();
+  const margin = 80; // allow slightly off-screen so cards don't pop at edges
+
+  for (const it of sorted) {
+    const box = {
+      left: it.x - CARD_W / 2,
+      right: it.x + CARD_W / 2,
+      top: it.y - CARD_H,
+      bottom: it.y,
+    };
+
+    const offscreen =
+      box.right < -margin ||
+      box.left > viewport.width + margin ||
+      box.bottom < -margin ||
+      box.top > viewport.height + margin;
+
+    if (offscreen) {
+      result.set(it.id, { visible: false, absorbed: 0 });
+      continue;
+    }
+
+    const hit = placed.find((p) => overlaps(p.box, box));
+    if (hit) {
+      result.set(it.id, { visible: false, absorbed: 0 });
+      const survivor = result.get(hit.id);
+      survivor.absorbed += 1;
+    } else {
+      placed.push({ box, id: it.id });
+      result.set(it.id, { visible: true, absorbed: 0 });
+    }
+  }
+  return result;
+}
