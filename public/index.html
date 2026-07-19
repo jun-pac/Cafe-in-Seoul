@@ -24,16 +24,18 @@
 
       <button id="addCafeBtn" class="btn btn--add">＋ 카페 등록</button>
 
+      <div id="pendingQueue" class="section pending-queue" hidden></div>
+
       <div class="section filters">
         <div class="filters__head">
           <h2>필터</h2>
           <button id="f-reset" class="linkbtn">초기화</button>
         </div>
 
+        <label class="check"><input type="checkbox" id="f-opennow" checked> <b>지금 영업중만</b> <span class="hint">(실시간)</span></label>
+        <label class="check"><input type="checkbox" id="f-openlate"> 늦게까지 (22시+)</label>
         <label class="check"><input type="checkbox" id="f-multifloor"> 다층 카페만 <span class="hint">(오래 머물기 좋음)</span></label>
         <label class="check"><input type="checkbox" id="f-view"> 뷰 좋은 곳</label>
-        <label class="check"><input type="checkbox" id="f-opennow"> 지금 영업중</label>
-        <label class="check"><input type="checkbox" id="f-openlate"> 늦게까지 (22시+)</label>
 
         <div class="fgroup">
           <div class="fgroup__label">면적</div>

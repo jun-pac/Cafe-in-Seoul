@@ -15,6 +15,9 @@ const adminRouter = require('./routes/admin');
 const app = express();
 const PORT = process.env.PORT || 3000;
 
+// don't let a single unhandled async error take down the whole server
+process.on('unhandledRejection', (e) => console.error('unhandledRejection:', e));
+
 app.set('trust proxy', 1); // correct https cookies behind Cloudflare tunnel / proxy
 
 app.use(session({

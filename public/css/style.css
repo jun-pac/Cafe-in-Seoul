@@ -135,6 +135,22 @@ input[type="checkbox"] { accent-color: var(--brand); width: 15px; height: 15px; 
 }
 .cafe-card.is-selected .cafe-card__photo { border-color: var(--accent); box-shadow: 0 0 0 3px rgba(37,99,235,.35), var(--shadow); }
 .cafe-card.is-selected .cafe-card__tip { border-top-color: var(--accent); }
+.cafe-card__pending { display: none; position: absolute; bottom: 5px; left: 5px;
+  background: rgba(180,83,9,.92); color: #fff; font-size: 10px; font-weight: 800; padding: 2px 6px; border-radius: 999px; }
+.cafe-card.is-pending .cafe-card__pending { display: inline-block; }
+.cafe-card.is-pending .cafe-card__photo { border-style: dashed; border-color: #f59e0b; opacity: .9; }
+
+/* admin pending queue */
+.pending-queue { display: flex; flex-direction: column; gap: 8px; }
+.pending-queue__title { font-size: 13px; font-weight: 800; }
+.pending-item { border: 1px solid var(--line); border-radius: 8px; padding: 8px; display: flex; flex-direction: column; gap: 5px; }
+.pending-item__name { background: none; border: 0; text-align: left; font-weight: 700; font-size: 13px; cursor: pointer; color: var(--ink); padding: 0; }
+.pending-item__reason { font-size: 11px; color: var(--muted); }
+.pending-item__actions { display: flex; gap: 6px; }
+.btn.pill { border-radius: 999px; }
+.btn.sm { padding: 4px 10px; font-size: 12px; }
+.detail__pending { margin-top: 8px; background: #fffbeb; border: 1px solid #fde68a; color: #92400e;
+  border-radius: 8px; padding: 6px 10px; font-size: 12px; font-weight: 600; }
 
 .pick-pin {
   width: 18px; height: 18px; border-radius: 50% 50% 50% 0;

@@ -39,6 +39,9 @@ export const api = {
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify(payload), // { kakaoUrl } or { placeId }
     }).then(json),
+  adminPending: () => fetch('/api/admin/pending').then(json),
+  adminApprove: (id) => fetch(`/api/admin/cafes/${id}/approve`, { method: 'POST' }).then(json),
+  adminReject: (id) => fetch(`/api/admin/cafes/${id}/reject`, { method: 'POST' }).then(json),
 
   listCafes: () => fetch('/api/cafes').then(json),
   getCafe: (id) => fetch(`/api/cafes/${id}`).then(json),

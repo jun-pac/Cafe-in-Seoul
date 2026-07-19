@@ -7,7 +7,8 @@ const express = require('express');
 const multer = require('multer');
 const db = require('../db');
 const { decorate } = require('../cafeModel');
-const { requireAuth } = require('../auth');
+const { requireAuth, isAdmin } = require('../auth');
+const { moderate } = require('../moderation');
 
 const router = express.Router();
 
@@ -35,15 +36,20 @@ const myVotesStmt = db.prepare('SELECT category, score FROM votes WHERE cafe_id 
 const insertCafe = db.prepare(`
   INSERT INTO cafes (id, name, address, lat, lng, photo_url, floors, open_time, close_time,
                      size, naver_url, kakao_url, iced_americano_price, has_view, view_note,
-                     outlets, review_summary, kakao_place_id, created_by)
+                     outlets, review_summary, kakao_place_id, status, moderation_reason, created_by)
   VALUES (@id, @name, @address, @lat, @lng, @photo_url, @floors, @open_time, @close_time,
           @size, @naver_url, @kakao_url, @iced_americano_price, @has_view, @view_note,
-          @outlets, @review_summary, @kakao_place_id, @created_by)
+          @outlets, @review_summary, @kakao_place_id, @status, @moderation_reason, @created_by)
 `);
 
-// GET /api/cafes  — lightweight list for the map (each with score for declutter)
+// GET /api/cafes — map list. Everyone sees approved cafes; a logged-in user also
+// sees their OWN pending drafts; admins see all pending too.
 router.get('/', (req, res) => {
-  const cafes = listStmt.all().map(decorate);
+  const uid = req.user?.id;
+  const admin = isAdmin(req.user);
+  const cafes = listStmt.all()
+    .filter((c) => c.status === 'approved' || admin || (uid && c.created_by === uid))
+    .map(decorate);
   cafes.sort((a, b) => b.score - a.score);
   res.json(cafes);
 });
@@ -85,8 +91,9 @@ function validationError(body, hasPhoto) {
 }
 
 // POST /api/cafes — register a cafe (auth required). multipart/form-data with `photo`.
-router.post('/', requireAuth, upload.single('photo'), (req, res) => {
-  const b = req.body;
+// Admins auto-publish; others go through AI moderation → approved or pending.
+router.post('/', requireAuth, upload.single('photo'), async (req, res, next) => {
+  const b = req.body || {};
   const photoUrl = req.file ? `/uploads/${req.file.filename}` : (b.photo_url || '').trim();
   const err = validationError(b, !!photoUrl);
   if (err) {
@@ -95,9 +102,8 @@ router.post('/', requireAuth, upload.single('photo'), (req, res) => {
   }
 
   const toBool = (v) => (v === true || v === 'true' || v === '1' || v === 1 ? 1 : 0);
-  const id = crypto.randomUUID();
-  insertCafe.run({
-    id,
+  const cafe = {
+    id: crypto.randomUUID(),
     name: b.name.trim(),
     address: (b.address || '').trim() || null,
     lat: +b.lat,
@@ -116,8 +122,16 @@ router.post('/', requireAuth, upload.single('photo'), (req, res) => {
     review_summary: (b.review_summary || '').trim() || null,
     kakao_place_id: (b.kakao_place_id || '').trim() || null,
     created_by: req.user.id,
-  });
-  res.status(201).json(decorate(getStmt.get(id)));
+  };
+
+  try {
+    const verdict = await moderate(cafe, { isAdmin: isAdmin(req.user) });
+    insertCafe.run({ ...cafe, status: verdict.status, moderation_reason: verdict.reason });
+    res.status(201).json({ ...decorate(getStmt.get(cafe.id)), moderation: verdict });
+  } catch (e) {
+    if (req.file) fs.unlink(req.file.path, () => {});
+    next(e);
+  }
 });
 
 module.exports = router;

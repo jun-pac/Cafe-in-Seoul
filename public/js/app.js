@@ -1,6 +1,6 @@
 import { api } from './api.js';
 import { initMap } from './map.js';
-import { renderAuth, renderDetail, openAddCafeModal } from './ui.js';
+import { renderAuth, renderDetail, openAddCafeModal, renderPendingQueue } from './ui.js';
 import { passesFilters } from './util.js';
 
 const $ = (sel) => document.querySelector(sel);
@@ -76,6 +76,20 @@ async function loadCafes() {
   state.cafes = await api.listCafes();
   map.setCafes(state.cafes);
   applyFilters();
+  await refreshPendingQueue();
+}
+
+async function refreshPendingQueue() {
+  const el = document.getElementById('pendingQueue');
+  if (!state.me.user?.isAdmin) { el.hidden = true; el.innerHTML = ''; return; }
+  try {
+    const pending = await api.adminPending();
+    renderPendingQueue(el, pending, {
+      onOpen: (id) => openDetail(id),
+      onApprove: async (id) => { await api.adminApprove(id); await loadCafes(); },
+      onReject: async (id) => { await api.adminReject(id); await loadCafes(); if (state.openCafeId === id) closeDetail(); },
+    });
+  } catch { el.hidden = true; }
 }
 
 // ---------- detail ----------
@@ -158,6 +172,9 @@ function wireAddCafe() {
         const created = await api.createCafe(fd);
         map.disablePick();
         await loadCafes();
+        if (created.status === 'pending') {
+          alert(`🤖 AI 심사: 관리자 승인 대기\n\n사유: ${created.moderation?.reason || '특별함 확인 필요'}\n\n승인 전까지는 나에게만 보여요.`);
+        }
         openDetail(created.id);
       },
     });

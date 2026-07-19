@@ -45,9 +45,11 @@ export function initMap(containerId, { onCardClick }) {
       <div class="cafe-card__photo" style="background-image:url('${esc(cafe.photo_url)}')">
         <span class="cafe-card__score">${cafe.score}</span>
         <span class="cafe-card__badge" hidden></span>
+        <span class="cafe-card__pending">심사중</span>
       </div>
       <div class="cafe-card__name">${esc(cafe.name)}</div>
       <div class="cafe-card__tip"></div>`;
+    el.classList.toggle('is-pending', cafe.status === 'pending');
     el.addEventListener('click', (e) => {
       e.stopPropagation();
       onCardClick?.(cafe);
@@ -69,6 +71,7 @@ export function initMap(containerId, { onCardClick }) {
       if (existing) {
         existing.cafe = cafe;
         existing.el.querySelector('.cafe-card__score').textContent = cafe.score;
+        existing.el.classList.toggle('is-pending', cafe.status === 'pending');
         continue;
       }
       const el = buildCard(cafe);

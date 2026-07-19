@@ -83,6 +83,13 @@ if (!cafeCols.has('review_summary')) {
 if (!cafeCols.has('kakao_place_id')) {
   db.exec(`ALTER TABLE cafes ADD COLUMN kakao_place_id TEXT`); // source place id when imported from Kakao
 }
+if (!cafeCols.has('status')) {
+  // 'approved' (public) | 'pending' (awaiting admin review, hidden from others)
+  db.exec(`ALTER TABLE cafes ADD COLUMN status TEXT NOT NULL DEFAULT 'approved'`);
+}
+if (!cafeCols.has('moderation_reason')) {
+  db.exec(`ALTER TABLE cafes ADD COLUMN moderation_reason TEXT`);
+}
 
 const userCols = new Set(db.prepare(`PRAGMA table_info(users)`).all().map((c) => c.name));
 if (!userCols.has('password_hash')) {

@@ -69,4 +69,43 @@ ${blogs || '없음'}`;
   }
 }
 
-module.exports = { summarize, HAS_AI };
+// Curation gate: decide whether a submitted cafe belongs in the directory of
+// cafes with "확실한 특별함" (clear distinction) for studying. Returns
+// { decision:'approve'|'pending', reason, axis }. On no key, returns null so the
+// caller falls back to rule-based judgment.
+const MOD_SYSTEM = `너는 "카공(카페에서 오래 공부/작업)에 특별히 좋은 카페"만 모으는 큐레이션 심사원이다.
+포함(approve) 기준 — 아래 중 최소 하나의 "확실한 특별함"이 있어야 한다:
+1) 영업시간이 정말 늦게까지(밤 23시 이후 또는 새벽까지)
+2) 규모가 크고 복층이라 눈치 안 보고 오래 있을 수 있음(대형+2층 이상)
+3) 뷰가 정말 좋음
+제외/보류(pending) 기준:
+- 특별할 것 없는 평범한 프랜차이즈 매장
+- 카공하기엔 너무 작은 개인 카페
+- 정보가 부실하거나 서로 상충(실존 의심)
+확실치 않으면 pending. 반드시 아래 JSON만:
+{ "decision":"approve"|"pending", "reason":"한국어 한 문장", "axis":"late"|"scale"|"view"|null }`;
+
+async function moderate(cafe) {
+  if (!HAS_AI) return null;
+  const info = `이름: ${cafe.name}
+카테고리/체인 여부: ${cafe.category || cafe.name}
+영업: ${cafe.open_time} ~ ${cafe.close_time}
+층수: ${cafe.floors} / 면적: ${cafe.size} / 콘센트: ${cafe.outlets} / 뷰: ${cafe.has_view ? '있음' : '없음'}${cafe.view_note ? `(${cafe.view_note})` : ''}
+아이스아메리카노: ${cafe.iced_americano_price}원
+리뷰요약: ${cafe.review_summary || '없음'}`;
+
+  const r = await fetch('https://api.openai.com/v1/chat/completions', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${OPENAI_API_KEY}` },
+    body: JSON.stringify({
+      model: MODEL, temperature: 0.1, response_format: { type: 'json_object' },
+      messages: [{ role: 'system', content: MOD_SYSTEM }, { role: 'user', content: info }],
+    }),
+  });
+  if (!r.ok) throw new Error(`OpenAI 오류 (HTTP ${r.status})`);
+  const data = await r.json();
+  try { return JSON.parse(data.choices?.[0]?.message?.content || '{}'); }
+  catch { return null; }
+}
+
+module.exports = { summarize, moderate, HAS_AI };

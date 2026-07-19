@@ -32,6 +32,7 @@ function decorate(cafe) {
     ...cafe,
     has_view: Number(cafe.has_view) === 1,
     multi_floor: Number(cafe.floors) >= 2,
+    status: cafe.status || 'approved',
     votes: { averages, counts },
     score: overallScore(cafe, averages),
   };

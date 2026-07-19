@@ -82,6 +82,28 @@ export function renderAuth(el, me, { onLogout, onGoogleCredential, onLocalLogin,
   el.appendChild(box);
 }
 
+// ---- Admin pending queue --------------------------------------------------
+export function renderPendingQueue(el, cafes, { onApprove, onReject, onOpen }) {
+  if (!cafes.length) { el.hidden = true; el.innerHTML = ''; return; }
+  el.hidden = false;
+  el.innerHTML = `<div class="pending-queue__title">🛡️ 심사 대기 <b>${cafes.length}</b></div>`;
+  for (const c of cafes) {
+    const row = document.createElement('div');
+    row.className = 'pending-item';
+    row.innerHTML = `
+      <button type="button" class="pending-item__name" title="상세 보기">${esc(c.name)}</button>
+      <div class="pending-item__reason">${esc(c.moderation_reason || '사유 미기재')}</div>
+      <div class="pending-item__actions">
+        <button class="btn btn--primary pill sm" data-a="ok">승인</button>
+        <button class="btn btn--ghost pill sm" data-a="no">거절</button>
+      </div>`;
+    row.querySelector('.pending-item__name').onclick = () => onOpen(c.id);
+    row.querySelector('[data-a="ok"]').onclick = () => onApprove(c.id);
+    row.querySelector('[data-a="no"]').onclick = () => { if (confirm(`'${c.name}' 거절(삭제)할까요?`)) onReject(c.id); };
+    el.appendChild(row);
+  }
+}
+
 // ---- Detail panel ---------------------------------------------------------
 export function renderDetail(el, cafe, { user, onVote, onAddReview, onClose }) {
   const openNow = isOpenNow(cafe);
@@ -96,6 +118,7 @@ export function renderDetail(el, cafe, { user, onVote, onAddReview, onClose }) {
     <div class="detail__body">
       <h2 class="detail__name">${esc(cafe.name)}</h2>
       <div class="detail__addr">${esc(cafe.address || '')}</div>
+      ${cafe.status === 'pending' ? `<div class="detail__pending">🛡️ 심사 대기중 <span class="muted">— ${esc(cafe.moderation_reason || '관리자 확인 필요')}</span></div>` : ''}
 
       <div class="detail__hours ${openNow ? 'is-open' : 'is-closed'}">
         <span class="dot"></span>${openNow ? '영업중' : '영업종료'} · ${esc(hoursText(cafe))}

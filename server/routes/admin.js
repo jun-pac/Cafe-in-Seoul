@@ -1,14 +1,36 @@
 'use strict';
 
 const express = require('express');
+const db = require('../db');
 const kakao = require('../kakao');
 const ai = require('../ai');
+const { decorate } = require('../cafeModel');
 const { requireAdmin } = require('../auth');
 
 const router = express.Router();
 
 router.get('/capabilities', requireAdmin, (req, res) => {
   res.json({ kakao: kakao.HAS_KAKAO, ai: ai.HAS_AI });
+});
+
+// pending review queue
+const pendingStmt = db.prepare(`SELECT * FROM cafes WHERE status = 'pending' ORDER BY created_at DESC`);
+const setApproved = db.prepare(`UPDATE cafes SET status = 'approved', moderation_reason = NULL WHERE id = ?`);
+const delCafe = db.prepare(`DELETE FROM cafes WHERE id = ?`);
+const getCafe = db.prepare(`SELECT * FROM cafes WHERE id = ?`);
+
+router.get('/pending', requireAdmin, (req, res) => {
+  res.json(pendingStmt.all().map(decorate));
+});
+router.post('/cafes/:id/approve', requireAdmin, express.json(), (req, res) => {
+  if (!getCafe.get(req.params.id)) return res.status(404).json({ error: 'not found' });
+  setApproved.run(req.params.id);
+  res.json(decorate(getCafe.get(req.params.id)));
+});
+router.post('/cafes/:id/reject', requireAdmin, express.json(), (req, res) => {
+  if (!getCafe.get(req.params.id)) return res.status(404).json({ error: 'not found' });
+  delCafe.run(req.params.id);
+  res.json({ ok: true });
 });
 
 // Optional helper: search to find a place and grab its REAL kakao link.
