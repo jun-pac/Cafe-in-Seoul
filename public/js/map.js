@@ -1,18 +1,18 @@
 import { declutter } from './declutter.js';
 import { esc } from './util.js';
 
-// Minimal grayscale OSM basemap: CARTO Positron (light_all) raster tiles.
-// No API key required, and about as visually minimal as OSM gets.
+// Minimal dark OSM basemap: CARTO dark_matter raster tiles — pure-black
+// aesthetic to match the design system. No API key required.
 const STYLE = {
   version: 8,
   sources: {
     carto: {
       type: 'raster',
       tiles: [
-        'https://a.basemaps.cartocdn.com/light_all/{z}/{x}/{y}@2x.png',
-        'https://b.basemaps.cartocdn.com/light_all/{z}/{x}/{y}@2x.png',
-        'https://c.basemaps.cartocdn.com/light_all/{z}/{x}/{y}@2x.png',
-        'https://d.basemaps.cartocdn.com/light_all/{z}/{x}/{y}@2x.png',
+        'https://a.basemaps.cartocdn.com/dark_all/{z}/{x}/{y}@2x.png',
+        'https://b.basemaps.cartocdn.com/dark_all/{z}/{x}/{y}@2x.png',
+        'https://c.basemaps.cartocdn.com/dark_all/{z}/{x}/{y}@2x.png',
+        'https://d.basemaps.cartocdn.com/dark_all/{z}/{x}/{y}@2x.png',
       ],
       tileSize: 256,
       attribution: '© OpenStreetMap contributors © CARTO',
