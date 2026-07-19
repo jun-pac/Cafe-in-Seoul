@@ -101,9 +101,14 @@ async function fetchDetail(id) {
   const { open_time, close_time, weekly } = parseHours(j.open_hours);
   const americano = pickAmericano(j.menu?.menus?.items);
 
-  const blogPhotos = (j.menu?.menus?.photos || []).map((p) => p.url).filter(Boolean);
+  // real place photos (owner-provided MYSTORE first, then indoor/outdoor/food),
+  // NOT j.menu.menus.photos which are blog menu-board shots.
+  const placePhotos = (j.photos?.photos || [])
+    .filter((p) => p.media_type === 'PHOTO' && !/MENU/i.test(p.type || '') && !/메뉴/.test(p.title || ''))
+    .map((p) => (p.url || '').replace(/^http:/, 'https:'))
+    .filter(Boolean);
   const roadview = s.road_view?.url || null;
-  const photos = [...new Set([...blogPhotos, roadview].filter(Boolean))].slice(0, 12);
+  const photos = [...new Set([...placePhotos, roadview].filter(Boolean))].slice(0, 12);
 
   const kReviews = (j.kakaomap_review?.reviews || [])
     .map((v) => ({ star: v.star_rating, text: (v.contents || '').replace(/\s+/g, ' ').trim() }))
