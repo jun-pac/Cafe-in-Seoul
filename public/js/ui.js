@@ -106,6 +106,37 @@ export function renderPendingQueue(el, cafes, { onApprove, onReject, onOpen }) {
   }
 }
 
+// ---- Lightbox (full-screen photo viewer) ----------------------------------
+export function openLightbox(photos, start = 0) {
+  if (!photos || !photos.length) return;
+  let i = start;
+  const back = document.createElement('div');
+  back.className = 'lightbox';
+  back.innerHTML = `
+    <button class="lightbox__close" aria-label="닫기">${icon('x', 20)}</button>
+    ${photos.length > 1 ? `<button class="lightbox__nav prev" aria-label="이전">${icon('chevronLeft', 30)}</button>
+    <button class="lightbox__nav next" aria-label="다음">${icon('chevronRight', 30)}</button>` : ''}
+    <img class="lightbox__img" alt="">
+    ${photos.length > 1 ? '<div class="lightbox__count"></div>' : ''}`;
+  const imgEl = back.querySelector('.lightbox__img');
+  const countEl = back.querySelector('.lightbox__count');
+  const show = () => { imgEl.src = img(photos[i]); if (countEl) countEl.textContent = `${i + 1} / ${photos.length}`; };
+  const onKey = (e) => {
+    if (e.key === 'Escape') close();
+    else if (e.key === 'ArrowLeft') go(-1);
+    else if (e.key === 'ArrowRight') go(1);
+  };
+  const close = () => { back.remove(); document.removeEventListener('keydown', onKey); };
+  const go = (d) => { i = (i + d + photos.length) % photos.length; show(); };
+  back.querySelector('.lightbox__close').onclick = close;
+  back.querySelector('.lightbox__nav.prev')?.addEventListener('click', () => go(-1));
+  back.querySelector('.lightbox__nav.next')?.addEventListener('click', () => go(1));
+  back.addEventListener('click', (e) => { if (e.target === back) close(); });
+  document.addEventListener('keydown', onKey);
+  document.body.appendChild(back);
+  show();
+}
+
 // ---- Detail panel ---------------------------------------------------------
 export function renderDetail(el, cafe, { user, onVote, onAddReview, onClose, onEdit }) {
   const openNow = isOpenNow(cafe);
@@ -118,12 +149,9 @@ export function renderDetail(el, cafe, { user, onVote, onAddReview, onClose, onE
     <button class="detail__close" title="닫기">${icon('x', 16)}</button>
     <div class="detail__scroll">
       <div class="detail__hero">
-        <div class="carousel__img" id="carImg"></div>
-        ${gallery.length > 1 ? `
-          <button class="carousel__nav prev" id="carPrev" aria-label="이전">${icon('chevronLeft', 22)}</button>
-          <button class="carousel__nav next" id="carNext" aria-label="다음">${icon('chevronRight', 22)}</button>
-          <div class="carousel__count" id="carCount"></div>` : ''}
-        <div class="detail__scorebig" title="카공 종합점수">${cafe.score}<small>SCORE</small></div>
+        <div class="carousel__img" id="carImg" role="button" title="크게 보기"></div>
+        ${gallery.length > 1 ? `<div class="carousel__count">${icon('camera', 12)} ${gallery.length}</div>` : ''}
+        <div class="detail__scorebig" title="카공 종합점수 (0–100)">${cafe.score}<small>SCORE</small></div>
       </div>
       <div class="detail__body">
         <h2 class="detail__name">${esc(cafe.name)}</h2>
@@ -153,6 +181,9 @@ export function renderDetail(el, cafe, { user, onVote, onAddReview, onClose, onE
 
         ${cafe.review_summary ? `<div class="detail__aisum"><div class="detail__aisum-h">${icon('ai', 15)} <b>리뷰 요약</b></div><p>${esc(cafe.review_summary)}</p></div>` : ''}
 
+        ${gallery.length > 1 ? `<h3 class="detail__h3">사진 <small class="muted">${gallery.length}</small></h3>
+        <div class="photo-grid" id="photoGrid"></div>` : ''}
+
         <h3 class="detail__h3">집단지성 평가 <small>1–5</small></h3>
         <div class="votes"></div>
 
@@ -172,17 +203,16 @@ export function renderDetail(el, cafe, { user, onVote, onAddReview, onClose, onE
     const w = el.querySelector('#weekHours'); if (w) w.hidden = !w.hidden;
   });
 
-  // photo carousel (representative + all story photos)
-  let ci = 0;
+  // hero = representative photo; click → lightbox. Grid below shows all photos.
   const carImg = el.querySelector('#carImg');
-  const carCount = el.querySelector('#carCount');
-  const showImg = () => {
-    carImg.style.backgroundImage = `url('${esc(img(gallery[ci] || ''))}')`;
-    if (carCount) carCount.textContent = `${ci + 1} / ${gallery.length}`;
-  };
-  showImg();
-  el.querySelector('#carPrev')?.addEventListener('click', () => { ci = (ci - 1 + gallery.length) % gallery.length; showImg(); });
-  el.querySelector('#carNext')?.addEventListener('click', () => { ci = (ci + 1) % gallery.length; showImg(); });
+  carImg.style.backgroundImage = `url('${esc(img(gallery[0] || ''))}')`;
+  carImg.addEventListener('click', () => openLightbox(gallery, 0));
+  const grid = el.querySelector('#photoGrid');
+  if (grid) {
+    grid.innerHTML = gallery.map((u, i) =>
+      `<button type="button" class="pg-item" data-i="${i}" style="background-image:url('${esc(img(u))}')"></button>`).join('');
+    grid.querySelectorAll('.pg-item').forEach((b) => (b.onclick = () => openLightbox(gallery, +b.dataset.i)));
+  }
 
   // votes — update the row in place on click (no full panel reload)
   const votesEl = el.querySelector('.votes');
@@ -444,7 +474,7 @@ export function createPhotoPicker(container, { onChange } = {}) {
     container.innerHTML = items.map((it, i) => `
       <div class="pp-item ${i === 0 ? 'is-cover' : ''}" data-i="${i}" draggable="true">
         <div class="pp-img" style="background-image:url('${it.kind === 'url' ? esc(img(it.url)) : it.obj}')"></div>
-        ${i === 0 ? '<span class="pp-cover">대표</span>' : ''}
+        ${i === 0 ? '<span class="pp-cover">대표</span>' : `<button type="button" class="pp-setcover" data-op="cover" title="대표로 설정">${icon('star', 12)}</button>`}
         <div class="pp-ops">
           <button type="button" data-op="left" title="앞으로" ${i === 0 ? 'disabled' : ''}>${icon('chevronLeft', 12)}</button>
           <button type="button" data-op="right" title="뒤로" ${i === items.length - 1 ? 'disabled' : ''}>${icon('chevronRight', 12)}</button>
@@ -460,6 +490,7 @@ export function createPhotoPicker(container, { onChange } = {}) {
       el.querySelector('[data-op="left"]').onclick = () => move(i, i - 1);
       el.querySelector('[data-op="right"]').onclick = () => move(i, i + 1);
       el.querySelector('[data-op="del"]').onclick = () => { items.splice(i, 1); render(); };
+      el.querySelector('[data-op="cover"]')?.addEventListener('click', () => move(i, 0));
       // drag to reorder
       el.addEventListener('dragstart', (e) => { dragFrom = i; el.classList.add('dragging'); e.dataTransfer.effectAllowed = 'move'; });
       el.addEventListener('dragend', () => { el.classList.remove('dragging'); dragFrom = null; });

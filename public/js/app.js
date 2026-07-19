@@ -35,12 +35,32 @@ function readFilters() {
   };
 }
 
+const FILTER_IDS = ['f-multifloor', 'f-view', 'f-opennow', 'f-openlate',
+  'f-size-small', 'f-size-medium', 'f-size-large', 'f-outlet',
+  'f-price', 'f-quiet', 'f-coffee', 'f-restroom'];
+
+function saveFilters() {
+  const s = {};
+  for (const id of FILTER_IDS) { const el = $(`#${id}`); s[id] = el.type === 'checkbox' ? el.checked : el.value; }
+  try { localStorage.setItem('filters', JSON.stringify(s)); } catch { /* ignore */ }
+}
+function loadFilters() {
+  let s; try { s = JSON.parse(localStorage.getItem('filters') || 'null'); } catch { return; }
+  if (!s) return;
+  for (const id of FILTER_IDS) {
+    const el = $(`#${id}`); if (!el || !(id in s)) continue;
+    if (el.type === 'checkbox') el.checked = !!s[id]; else el.value = s[id];
+  }
+  ['f-price', 'f-quiet', 'f-coffee', 'f-restroom'].forEach((id) => $(`#${id}`).dispatchEvent(new Event('input')));
+}
+
 function applyFilters() {
   const f = readFilters();
   const ids = new Set();
   for (const c of state.cafes) if (passesFilters(c, f)) ids.add(c.id);
   map.setFiltered(ids);
   $('#result-count').textContent = `${ids.size} / ${state.cafes.length}곳`;
+  saveFilters();
 }
 
 function wireFilters() {
@@ -208,9 +228,18 @@ function wireAddCafe() {
 }
 
 // ---------- boot ----------
+function wireCardZoom() {
+  $('#cardBigger').innerHTML = icon('plus', 16);
+  $('#cardSmaller').innerHTML = icon('minus', 16);
+  $('#cardBigger').onclick = () => map.setCardScale(+0.15);
+  $('#cardSmaller').onclick = () => map.setCardScale(-0.15);
+}
+
 async function boot() {
   document.getElementById('addCafeBtn').innerHTML = `${icon('plus', 15)} 카페 등록`;
   wireFilters();
+  loadFilters();     // restore saved filter toggles before first apply
+  wireCardZoom();
   wireAddCafe();
   await refreshMe();
   await loadCafes();

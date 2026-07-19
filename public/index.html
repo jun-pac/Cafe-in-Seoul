@@ -46,11 +46,13 @@
         <label class="check"><input type="checkbox" id="f-multifloor"> 다층 카페만 <span class="hint">(오래 머물기 좋음)</span></label>
         <label class="check"><input type="checkbox" id="f-view"> 뷰 좋은 곳</label>
 
-        <div class="fgroup">
+        <div class="fgroup fgroup--row">
           <div class="fgroup__label">면적</div>
-          <label class="check"><input type="checkbox" id="f-size-small"> 소형</label>
-          <label class="check"><input type="checkbox" id="f-size-medium"> 중형</label>
-          <label class="check"><input type="checkbox" id="f-size-large"> 대형</label>
+          <div class="pilltogs">
+            <label class="pilltog"><input type="checkbox" id="f-size-small"><span>소형</span></label>
+            <label class="pilltog"><input type="checkbox" id="f-size-medium"><span>중형</span></label>
+            <label class="pilltog"><input type="checkbox" id="f-size-large"><span>대형</span></label>
+          </div>
         </div>
 
         <div class="fgroup">
@@ -84,7 +86,13 @@
     </aside>
 
     <!-- Map -->
-    <main id="map"></main>
+    <main id="map">
+      <div class="cardzoom" id="cardZoom">
+        <span class="cardzoom__label">카드</span>
+        <button type="button" id="cardBigger" title="카드 크게" aria-label="카드 크게">＋</button>
+        <button type="button" id="cardSmaller" title="카드 작게" aria-label="카드 작게">－</button>
+      </div>
+    </main>
 
     <!-- Detail panel -->
     <section id="detail" class="detail" aria-label="카페 상세정보"></section>

@@ -7,8 +7,8 @@
 // Cards are anchored bottom-center on their point, so the card's bounding box
 // sits ABOVE the point: [x - W/2, y - H, x + W/2, y].
 
-export const CARD_W = 132; // keep in sync with .cafe-card width in CSS
-export const CARD_H = 112; // photo + label height
+export const CARD_W = 138; // base .cafe-card width (CSS)
+export const CARD_H = 122; // base photo + label height
 const PAD = 6; // extra gap so survivors breathe
 
 function overlaps(a, b) {
@@ -21,9 +21,9 @@ function overlaps(a, b) {
 }
 
 // items: [{ id, score, x, y }]  (x,y = pixel position of the anchor point)
-// viewport: { width, height }
+// viewport: { width, height }; cardW/cardH override the card box size (for scaling)
 // Returns Map<id, { visible, absorbed }>
-export function declutter(items, viewport) {
+export function declutter(items, viewport, cardW = CARD_W, cardH = CARD_H) {
   const sorted = [...items].sort((a, b) => b.score - a.score);
   const placed = []; // { box, id }
   const result = new Map();
@@ -31,9 +31,9 @@ export function declutter(items, viewport) {
 
   for (const it of sorted) {
     const box = {
-      left: it.x - CARD_W / 2,
-      right: it.x + CARD_W / 2,
-      top: it.y - CARD_H,
+      left: it.x - cardW / 2,
+      right: it.x + cardW / 2,
+      top: it.y - cardH,
       bottom: it.y,
     };
 

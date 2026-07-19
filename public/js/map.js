@@ -1,4 +1,4 @@
-import { declutter } from './declutter.js';
+import { declutter, CARD_W, CARD_H } from './declutter.js';
 import { esc, img } from './util.js';
 
 // Minimal light OSM basemap: CARTO Positron (light_all) raster tiles — clean,
@@ -34,6 +34,9 @@ export function initMap(containerId, { onCardClick }) {
   const entries = new Map(); // id -> { cafe, marker, el, imgEl, badgeEl }
   let visibleSet = null; // Set of ids passing filters (null = all)
   let selectedId = null;
+  let cardScale = Number(localStorage.getItem('cardScale')) || 1;
+  const container = map.getContainer();
+  container.style.setProperty('--card-scale', cardScale);
   let pickMode = false;
   let pickMarker = null;
   let onPick = null;
@@ -43,7 +46,7 @@ export function initMap(containerId, { onCardClick }) {
     el.className = 'cafe-card';
     el.innerHTML = `
       <div class="cafe-card__photo" style="background-image:url('${esc(img(cafe.photo_url))}')">
-        <span class="cafe-card__score">${cafe.score}</span>
+        <span class="cafe-card__score" title="카공 종합점수 (0–100): 다층·콘센트·면적·뷰·영업시간 + 집단지성 투표">${cafe.score}</span>
         <span class="cafe-card__badge" hidden></span>
         <span class="cafe-card__pending">심사중</span>
       </div>
@@ -110,7 +113,7 @@ export function initMap(containerId, { onCardClick }) {
       const p = map.project([ent.cafe.lng, ent.cafe.lat]);
       items.push({ id, score: ent.cafe.score, x: p.x, y: p.y });
     }
-    const decision = declutter(items, { width: size.width, height: size.height });
+    const decision = declutter(items, { width: size.width, height: size.height }, CARD_W * cardScale, CARD_H * cardScale);
     for (const [id, ent] of entries) {
       const d = decision.get(id);
       if (!d || !d.visible) {
@@ -150,6 +153,14 @@ export function initMap(containerId, { onCardClick }) {
     map.flyTo({ center: [cafe.lng, cafe.lat], zoom: Math.max(map.getZoom(), 15), speed: 0.8 });
   }
 
+  // scale the photo cards independently of map zoom (persisted)
+  function setCardScale(delta) {
+    cardScale = Math.min(1.8, Math.max(0.6, Math.round((cardScale + delta) * 10) / 10));
+    container.style.setProperty('--card-scale', cardScale);
+    localStorage.setItem('cardScale', String(cardScale));
+    scheduleRefresh();
+  }
+
   // --- location pick mode (for the "add cafe" form) ---
   function enablePick(cb) {
     pickMode = true;
@@ -174,5 +185,5 @@ export function initMap(containerId, { onCardClick }) {
     onPick?.({ lng, lat });
   });
 
-  return { map, setCafes, setFiltered, setSelected, refresh, flyTo, enablePick, disablePick };
+  return { map, setCafes, setFiltered, setSelected, refresh, flyTo, enablePick, disablePick, setCardScale };
 }
