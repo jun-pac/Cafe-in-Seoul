@@ -896,7 +896,7 @@ export function openAddCafeModal(opts) {
     e.preventDefault();
     errEl.textContent = '';
     if (!form.elements.name.value.trim()) { errEl.textContent = '카페를 검색해 선택하거나 이름을 입력하세요.'; return; }
-    if (!form.elements.kakao_url.value.trim()) { errEl.textContent = '카카오 지도 링크는 필수입니다.'; return; }
+    if (!form.elements.kakao_url.value.trim() && !form.elements.naver_url.value.trim()) { errEl.textContent = t('modal.needLink'); return; }
     if (!form.elements.lat.value || !form.elements.lng.value) { errEl.textContent = '위치를 가져오거나 지도에서 선택하세요.'; return; }
     const { manifest, files, count } = picker.getManifest();
     if (!count) { errEl.textContent = '사진을 한 장 이상 추가하세요 (첫 번째가 대표).'; return; }

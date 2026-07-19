@@ -75,6 +75,9 @@ export function initMap(containerId, { onCardClick }) {
         existing.item = item;
         const sc = existing.el.querySelector('.cafe-card__score');
         if (sc) sc.textContent = item.score;
+        // reflect edits to the representative photo / name without a full reload
+        existing.el.querySelector('.cafe-card__photo').style.backgroundImage = `url('${esc(img(item.photo_url))}')`;
+        existing.el.querySelector('.cafe-card__name').textContent = item.name;
         if (kind === 'cafe') existing.el.classList.toggle('is-pending', item.status === 'pending');
         continue;
       }

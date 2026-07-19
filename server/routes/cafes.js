@@ -86,12 +86,16 @@ const TIME_RE = /^([01]?\d|2[0-3]):[0-5]\d$/;
 function validationError(body, hasPhoto) {
   const missing = [];
   const need = (k) => (body[k] === undefined || body[k] === null || String(body[k]).trim() === '') && missing.push(k);
-  // naver_url is optional (not everyone has a real Naver place link); kakao_url required.
   ['name', 'lat', 'lng', 'floors', 'open_time', 'close_time', 'size',
-   'kakao_url', 'iced_americano_price', 'outlets'].forEach(need);
+   'iced_americano_price', 'outlets'].forEach(need);
   if (!hasPhoto) missing.push('photo');
   if (body.has_view === undefined || body.has_view === null || body.has_view === '') missing.push('has_view');
   if (missing.length) return `필수 항목 누락: ${missing.join(', ')}`;
+
+  // at least one map link (Kakao OR Naver) — not both required
+  if (!(body.kakao_url || '').trim() && !(body.naver_url || '').trim()) {
+    return '카카오 또는 네이버 지도 링크 중 하나는 필요합니다.';
+  }
 
   if (!Number.isFinite(+body.lat) || !Number.isFinite(+body.lng)) return '좌표(lat/lng)가 올바르지 않습니다.';
   if (!Number.isInteger(+body.floors) || +body.floors < 1) return '층수(floors)가 올바르지 않습니다.';
@@ -143,7 +147,7 @@ router.post('/', requireAuth, upload.array('photos', 10), async (req, res, next)
     hours_json: (b.hours_json || '').trim() || null,
     size: b.size,
     naver_url: (b.naver_url || '').trim(),
-    kakao_url: b.kakao_url.trim(),
+    kakao_url: (b.kakao_url || '').trim(),
     iced_americano_price: +b.iced_americano_price,
     has_view: toBool(b.has_view),
     view_note: (b.view_note || '').trim() || null,
@@ -171,7 +175,7 @@ router.post('/', requireAuth, upload.array('photos', 10), async (req, res, next)
 const EDITABLE = {
   name: 'text', address: 'text', floors: 'int', size: 'size', outlets: 'outlets',
   has_view: 'bool', view_note: 'text', open_time: 'time', close_time: 'time',
-  iced_americano_price: 'int', naver_url: 'text', kakao_url: 'text', review_summary: 'text',
+  iced_americano_price: 'int', naver_url: 'link', kakao_url: 'link', review_summary: 'text',
 };
 const delCafePhotos = db.prepare('DELETE FROM cafe_photos WHERE cafe_id = ?');
 router.patch('/:id', requireAdmin, upload.array('photos', 10), (req, res) => {
@@ -191,6 +195,7 @@ router.patch('/:id', requireAdmin, upload.array('photos', 10), (req, res) => {
     else if (type === 'time') { if (!TIME_RE.test(v)) { if (bail('시간 형식은 HH:MM')) return; } }
     else if (type === 'size') { if (!SIZES.has(v)) { if (bail('size 값 오류')) return; } }
     else if (type === 'outlets') { if (!OUTLETS.has(v)) { if (bail('outlets 값 오류')) return; } }
+    else if (type === 'link') { v = (v == null ? '' : String(v).trim()); } // NOT NULL column → store '' not null
     else { v = (v == null ? '' : String(v).trim()) || null; if (k === 'name' && !v) { if (bail('이름은 비울 수 없습니다.')) return; } }
     sets.push(`${k} = @${k}`);
     params[k] = v;
