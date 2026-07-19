@@ -23,7 +23,12 @@ export const api = {
 
   adminCapabilities: () => fetch('/api/admin/capabilities').then(json),
   adminSearch: (q) => fetch(`/api/admin/search?q=${encodeURIComponent(q)}`).then(json),
-  adminPrefill: (id) => fetch(`/api/admin/prefill/${id}`).then(json),
+  adminEnrich: (payload) =>
+    fetch('/api/admin/enrich', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(payload), // { kakaoUrl } or { placeId }
+    }).then(json),
 
   listCafes: () => fetch('/api/cafes').then(json),
   getCafe: (id) => fetch(`/api/cafes/${id}`).then(json),

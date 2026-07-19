@@ -23,8 +23,33 @@ async function searchPlaces(query) {
     phone: d.phone,
     lat: Number(d.y),
     lng: Number(d.x),
-    place_url: d.place_url,
+    place_url: d.place_url, // REAL place link (e.g. http://place.map.kakao.com/<id>)
   }));
+}
+
+function extractPlaceId(url) {
+  if (!url) return null;
+  let m = url.match(/place\.map\.kakao\.com\/(?:m\/)?(\d{5,})/);
+  if (m) return m[1];
+  m = url.match(/[?&]itemId=(\d{5,})/);
+  if (m) return m[1];
+  m = url.match(/\/(\d{6,})(?:[/?#]|$)/);
+  if (m) return m[1];
+  return null;
+}
+
+// Resolve a pasted Kakao link (incl. short links like kko.kakao.com) to a place id.
+async function resolvePlaceId(url) {
+  const direct = extractPlaceId(url);
+  if (direct) return direct;
+  // short link → follow redirects and read the final URL
+  if (/kko\.(kakao\.com|to)|\/o\//.test(url)) {
+    try {
+      const r = await fetch(url, { redirect: 'follow', headers: { 'User-Agent': 'Mozilla/5.0' } });
+      return extractPlaceId(r.url);
+    } catch { /* ignore */ }
+  }
+  return null;
 }
 
 function parseHours(openHours) {
@@ -103,4 +128,4 @@ async function fetchDetail(id) {
   };
 }
 
-module.exports = { searchPlaces, fetchDetail, HAS_KAKAO };
+module.exports = { searchPlaces, fetchDetail, resolvePlaceId, extractPlaceId, HAS_KAKAO };

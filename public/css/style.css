@@ -91,16 +91,21 @@ input[type="checkbox"] { accent-color: var(--brand); width: 15px; height: 15px; 
 /* ---------- Map + cards ---------- */
 #map { position: relative; height: 100%; width: 100%; }
 
+/* NOTE: MapLibre writes `transform: translate(...)` on the marker root every
+   frame during pan/zoom. So the root must NOT have a transform transition (it
+   would lag the position) and must NOT set its own transform on hover (it would
+   clobber the translate). All hover/scale effects go on the inner photo. */
 .cafe-card {
   width: 132px; cursor: pointer; user-select: none;
-  transform-origin: bottom center; transition: transform .12s ease;
 }
-.cafe-card:hover { transform: scale(1.05); z-index: 5; }
+.cafe-card:hover { z-index: 5; }
 .cafe-card__photo {
   position: relative; height: 84px; border-radius: 10px;
   background-size: cover; background-position: center; background-color: #d1d5db;
   box-shadow: var(--shadow); border: 2px solid #fff;
+  transform-origin: bottom center; transition: transform .12s ease;
 }
+.cafe-card:hover .cafe-card__photo { transform: scale(1.06); }
 .cafe-card__score {
   position: absolute; top: 5px; left: 5px;
   background: rgba(22,163,74,.92); color: #fff; font-size: 11px; font-weight: 800;
@@ -248,6 +253,23 @@ input[type="checkbox"] { accent-color: var(--brand); width: 15px; height: 15px; 
 .ai-ev { color: var(--muted); font-size: 11px; margin-top: 2px; }
 .ai-warn { color: #b45309; background: #fffbeb; border-radius: 6px; padding: 5px 8px; font-size: 11px; }
 .ai-note { color: var(--muted); font-size: 12px; }
+
+.formsec { border: 1px solid var(--line); border-radius: 12px; padding: 12px; display: flex; flex-direction: column; gap: 10px; }
+.formsec__title { font-weight: 800; font-size: 13px; color: #374151; }
+.fetch-row { display: flex; align-items: center; gap: 12px; flex-wrap: wrap; }
+.finder { display: flex; flex-direction: column; gap: 8px; background: #f0f7ff; border: 1px solid #cfe0f5; border-radius: 10px; padding: 10px; }
+.fetch-status {
+  background: #fff; border: 1px solid #cfe0f5; border-radius: 8px; padding: 10px;
+  font-size: 12px; display: flex; flex-direction: column; gap: 6px;
+}
+.kw { display: flex; flex-wrap: wrap; gap: 5px; }
+.kw__t { background: #eef2ff; color: #3730a3; font-size: 11px; padding: 2px 7px; border-radius: 999px; }
+
+.detail__aisum {
+  margin-top: 14px; background: #f0f7ff; border: 1px solid #cfe0f5; border-radius: 10px;
+  padding: 10px 12px; font-size: 13px;
+}
+.detail__aisum p { margin: 4px 0 0; line-height: 1.5; }
 
 .photo-preview { display: flex; flex-wrap: wrap; gap: 6px; margin-top: 6px; }
 .photo-thumb {

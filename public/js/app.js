@@ -150,7 +150,7 @@ function wireAddCafe() {
       user: state.me.user,
       capabilities: state.capabilities,
       onSearch: (q) => api.adminSearch(q),
-      onPrefill: (id) => api.adminPrefill(id),
+      onEnrich: (payload) => api.adminEnrich(payload),
       onPickLocation: (cb) => map.enablePick(({ lng, lat }) => cb(lng, lat)),
       onCancelPick: () => map.disablePick(),
       onSubmit: async (fd) => {

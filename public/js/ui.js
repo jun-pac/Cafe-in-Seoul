@@ -84,9 +84,11 @@ export function renderDetail(el, cafe, { user, onVote, onAddReview, onClose }) {
       </div>
 
       <div class="detail__links">
-        <a class="btn btn--map naver" href="${esc(cafe.naver_url)}" target="_blank" rel="noopener">네이버 지도</a>
-        <a class="btn btn--map kakao" href="${esc(cafe.kakao_url)}" target="_blank" rel="noopener">카카오 지도</a>
+        ${cafe.naver_url ? `<a class="btn btn--map naver" href="${esc(cafe.naver_url)}" target="_blank" rel="noopener">네이버 지도</a>` : ''}
+        ${cafe.kakao_url ? `<a class="btn btn--map kakao" href="${esc(cafe.kakao_url)}" target="_blank" rel="noopener">카카오 지도</a>` : ''}
       </div>
+
+      ${cafe.review_summary ? `<div class="detail__aisum">🤖 <b>리뷰 요약</b><p>${esc(cafe.review_summary)}</p></div>` : ''}
 
       <h3 class="detail__h3">집단지성 평가 <small>1–5 투표</small></h3>
       <div class="votes"></div>
@@ -171,9 +173,12 @@ export function renderReviews(revEl, reviews) {
 }
 
 // ---- Add-cafe modal -------------------------------------------------------
+// Flow: human enters name + Naver/Kakao links → "카카오 링크로 가져오기" fetches
+// location / photos / hours / americano price / AI review summary → human edits
+// the rest (floors/size/outlets/view) and saves. No fake links are generated.
 export function openAddCafeModal(opts) {
-  const { user, capabilities, onSearch, onPrefill, onPickLocation, onCancelPick, onSubmit } = opts;
-  const canAutofill = user?.isAdmin && capabilities?.kakao;
+  const { user, capabilities, onSearch, onEnrich, onPickLocation, onCancelPick, onSubmit } = opts;
+  const canFetch = user?.isAdmin && capabilities?.kakao;
 
   const back = document.createElement('div');
   back.className = 'modal-back';
@@ -184,73 +189,88 @@ export function openAddCafeModal(opts) {
         <button class="detail__close" id="mClose">✕</button>
       </div>
 
-      ${canAutofill ? `
-      <div class="autofill">
-        <div class="autofill__head">🤖 카카오 + AI 자동 채우기 <span class="muted">(관리자)</span></div>
-        <div class="autofill__search">
-          <input class="input" id="afQuery" placeholder="카페 이름/지역 검색 (예: 블루보틀 성수)">
-          <button type="button" class="btn btn--primary" id="afSearchBtn">검색</button>
-        </div>
-        <div class="autofill__results" id="afResults"></div>
-        <div class="autofill__ai" id="afAi" hidden></div>
-      </div>` : ''}
-
-      <p class="muted">대표사진과 아래 7개 항목은 필수입니다. (주관적 평가는 등록 후 투표로 채워집니다.)</p>
       <form class="cafeform" id="cafeForm">
-        <label class="field"><span>카페 이름 *</span>
-          <input class="input" name="name" required></label>
-        <label class="field"><span>주소</span>
-          <input class="input" name="address" placeholder="예) 서울 성동구 성수동"></label>
-
-        <div class="field">
-          <span>위치 (지도 클릭) *</span>
-          <div class="loc-row">
-            <input class="input" name="lat" placeholder="위도" readonly required>
-            <input class="input" name="lng" placeholder="경도" readonly required>
-            <button type="button" class="btn btn--ghost" id="pickBtn">지도에서 선택</button>
+        <div class="formsec">
+          <div class="formsec__title">1. 직접 입력</div>
+          <label class="field"><span>카페 이름 *</span>
+            <input class="input" name="name" required></label>
+          <label class="field"><span>네이버 지도 링크 <small class="muted">(선택 · 실제 장소 링크)</small></span>
+            <input class="input" name="naver_url" placeholder="https://naver.me/... 또는 map.naver.com 장소 링크"></label>
+          <label class="field"><span>카카오 지도 링크 * <small class="muted">(실제 장소 링크)</small></span>
+            <input class="input" name="kakao_url" placeholder="https://place.map.kakao.com/... 또는 공유 링크"></label>
+          <input type="hidden" name="kakao_place_id">
+          ${canFetch ? `
+          <div class="fetch-row">
+            <button type="button" class="btn btn--primary" id="fetchBtn">🤖 카카오 링크로 정보 가져오기</button>
+            <button type="button" class="linkbtn" id="findLinkBtn">🔎 검색으로 링크 찾기</button>
           </div>
-          <small class="muted" id="pickHint"></small>
+          <div class="finder" id="finder" hidden>
+            <div class="autofill__search">
+              <input class="input" id="afQuery" placeholder="카페 이름/지역 (예: 블루보틀 성수)">
+              <button type="button" class="btn btn--ghost" id="afSearchBtn">검색</button>
+            </div>
+            <div class="autofill__results" id="afResults"></div>
+          </div>
+          <div class="fetch-status" id="fetchStatus" hidden></div>` :
+          (user?.isAdmin ? '<div class="ai-note">KAKAO_API_KEY 미설정 — 링크 자동 가져오기 비활성화. 수동 입력만 가능.</div>' : '')}
         </div>
 
-        <div class="field"><span>대표사진 * <small class="muted">(파일 업로드 또는 자동 채우기 사진)</small></span>
-          <input class="input" type="file" name="photo" accept="image/*">
-          <input type="hidden" name="photo_url">
-          <div class="photo-preview" id="photoPreview" hidden></div>
+        <div class="formsec">
+          <div class="formsec__title">2. 가져온 정보 (수정 가능)</div>
+          <label class="field"><span>주소</span>
+            <input class="input" name="address" placeholder="예) 서울 성동구 성수동"></label>
+
+          <div class="field">
+            <span>위치 * <small class="muted">(가져오기 또는 지도 클릭)</small></span>
+            <div class="loc-row">
+              <input class="input" name="lat" placeholder="위도" readonly required>
+              <input class="input" name="lng" placeholder="경도" readonly required>
+              <button type="button" class="btn btn--ghost" id="pickBtn">지도에서 선택</button>
+            </div>
+            <small class="muted" id="pickHint"></small>
+          </div>
+
+          <div class="field"><span>대표사진 * <small class="muted">(가져온 사진 선택 또는 파일 업로드)</small></span>
+            <input class="input" type="file" name="photo" accept="image/*">
+            <input type="hidden" name="photo_url">
+            <div class="photo-preview" id="photoPreview" hidden></div>
+          </div>
+
+          <div class="grid2">
+            <label class="field"><span>오픈 *</span>
+              <input class="input" type="time" name="open_time" value="09:00" required></label>
+            <label class="field"><span>마감 *</span>
+              <input class="input" type="time" name="close_time" value="22:00" required></label>
+            <label class="field"><span>아이스 아메리카노 가격(원) *</span>
+              <input class="input" type="number" name="iced_americano_price" min="0" step="100" value="4500" required></label>
+          </div>
+
+          <label class="field"><span>리뷰 AI 요약 <small class="muted">(수정 가능)</small></span>
+            <textarea class="input" name="review_summary" rows="3" placeholder="카카오 리뷰를 AI가 요약해줍니다."></textarea></label>
         </div>
 
-        <div class="grid2">
-          <label class="field"><span>층수 * (다층이면 2 이상)</span>
-            <input class="input" type="number" name="floors" min="1" value="1" required></label>
-          <label class="field"><span>면적 *</span>
-            <select class="input" name="size" required>
-              <option value="small">소형</option>
-              <option value="medium" selected>중형 (테이블 6–15)</option>
-              <option value="large">대형 (프랜차이즈급)</option>
-            </select></label>
-          <label class="field"><span>오픈 *</span>
-            <input class="input" type="time" name="open_time" value="09:00" required></label>
-          <label class="field"><span>마감 *</span>
-            <input class="input" type="time" name="close_time" value="22:00" required></label>
-          <label class="field"><span>콘센트 *</span>
-            <select class="input" name="outlets" required>
-              <option value="many">많음</option>
-              <option value="some" selected>보통</option>
-              <option value="few">적음</option>
-              <option value="none">없음</option>
-            </select></label>
-          <label class="field"><span>아이스 아메리카노 가격(원) *</span>
-            <input class="input" type="number" name="iced_americano_price" min="0" step="100" value="4500" required></label>
-        </div>
-
-        <label class="field checkline"><input type="checkbox" name="has_view"> <span>뷰가 좋은 편이에요 *</span></label>
-        <label class="field"><span>뷰 설명 (선택)</span>
-          <input class="input" name="view_note" placeholder="예) 2층 창가 한강 방향"></label>
-
-        <div class="grid2">
-          <label class="field"><span>네이버 지도 링크 *</span>
-            <input class="input" name="naver_url" placeholder="비우면 이름으로 자동 생성"></label>
-          <label class="field"><span>카카오 지도 링크 *</span>
-            <input class="input" name="kakao_url" placeholder="비우면 이름으로 자동 생성"></label>
+        <div class="formsec">
+          <div class="formsec__title">3. 직접 판단 (카공 핵심)</div>
+          <div class="grid2">
+            <label class="field"><span>층수 * (다층이면 2 이상)</span>
+              <input class="input" type="number" name="floors" min="1" value="1" required></label>
+            <label class="field"><span>면적 *</span>
+              <select class="input" name="size" required>
+                <option value="small">소형</option>
+                <option value="medium" selected>중형 (테이블 6–15)</option>
+                <option value="large">대형 (프랜차이즈급)</option>
+              </select></label>
+            <label class="field"><span>콘센트 *</span>
+              <select class="input" name="outlets" required>
+                <option value="many">많음</option>
+                <option value="some" selected>보통</option>
+                <option value="few">적음</option>
+                <option value="none">없음</option>
+              </select></label>
+          </div>
+          <label class="field checkline"><input type="checkbox" name="has_view"> <span>뷰가 좋은 편이에요</span></label>
+          <label class="field"><span>뷰 설명 (선택)</span>
+            <input class="input" name="view_note" placeholder="예) 2층 창가 한강 방향"></label>
         </div>
 
         <div class="modal__foot">
@@ -266,10 +286,7 @@ export function openAddCafeModal(opts) {
   const errEl = back.querySelector('#formErr');
   const preview = back.querySelector('#photoPreview');
 
-  const close = () => {
-    onCancelPick?.();
-    back.remove();
-  };
+  const close = () => { onCancelPick?.(); back.remove(); };
   back.querySelector('#mClose').onclick = close;
   back.addEventListener('mousedown', (e) => { if (e.target === back) close(); });
 
@@ -282,28 +299,77 @@ export function openAddCafeModal(opts) {
     });
   };
 
-  // uploading a file overrides any auto-filled photo URL
   form.photo.addEventListener('change', () => {
-    if (form.photo.files[0]) {
-      form.photo_url.value = '';
-      preview.hidden = true;
-    }
+    if (form.photo.files[0]) { form.photo_url.value = ''; preview.hidden = true; }
   });
 
   function setPhotoUrl(url) {
     form.photo_url.value = url;
     form.photo.value = '';
     preview.hidden = false;
-    preview.querySelectorAll('.photo-thumb').forEach((t) =>
-      t.classList.toggle('is-sel', t.dataset.url === url));
+    preview.querySelectorAll('.photo-thumb').forEach((t) => t.classList.toggle('is-sel', t.dataset.url === url));
   }
 
-  // ---- admin auto-fill ----
-  if (canAutofill) {
+  function applyFetched(data) {
+    const f = data.fetched || {};
+    form.kakao_place_id.value = data.placeId || '';
+    if (f.kakao_place_url) form.kakao_url.value = f.kakao_place_url; // canonical real link
+    if (f.address) form.address.value = f.address;
+    if (f.lat != null && f.lng != null) {
+      form.lat.value = Number(f.lat).toFixed(6);
+      form.lng.value = Number(f.lng).toFixed(6);
+      hint.textContent = `카카오에서 위치 가져옴: ${Number(f.lat).toFixed(5)}, ${Number(f.lng).toFixed(5)}`;
+    }
+    if (f.open_time) form.open_time.value = f.open_time;
+    if (f.close_time) form.close_time.value = f.close_time === '24:00' ? '00:00' : f.close_time;
+    if (f.iced_americano_price) form.iced_americano_price.value = f.iced_americano_price;
+    if (data.review_summary) form.review_summary.value = data.review_summary;
+
+    const photos = (f.photos || []).slice(0, 8);
+    preview.hidden = photos.length === 0;
+    preview.innerHTML = photos.map((u, i) =>
+      `<button type="button" class="photo-thumb ${i === 0 ? 'is-sel' : ''}" data-url="${esc(u)}" style="background-image:url('${esc(u)}')"></button>`).join('');
+    preview.querySelectorAll('.photo-thumb').forEach((t) => (t.onclick = () => setPhotoUrl(t.dataset.url)));
+    if (photos[0]) setPhotoUrl(photos[0]);
+
+    const st = back.querySelector('#fetchStatus');
+    st.hidden = false;
+    const km = f.iced_americano_price ? `${f.americano_menu_name || '아메리카노'} ${Number(f.iced_americano_price).toLocaleString('ko-KR')}원` : '';
+    st.innerHTML = `
+      <div class="ai-summary">💡 ${esc(data.review_summary || '리뷰 요약 없음')}</div>
+      ${(data.keywords||[]).length ? `<div class="kw">${data.keywords.map((k)=>`<span class="kw__t">#${esc(k)}</span>`).join('')}</div>` : ''}
+      <div class="muted">카카오 평점 ${f.rating ?? '?'} · 리뷰 ${f.review_count ?? 0}개 ${km ? '· '+esc(km) : ''}
+        ${(f.strengths||[]).slice(0,4).map((s)=>`${esc(s.name)}(${s.count})`).join(' ')}</div>
+      ${data.aiError ? `<div class="ai-note">AI 요약 실패: ${esc(data.aiError)}</div>` : ''}
+      <div class="ai-warn">⚠️ 가져온 값 확인 후 층수/면적/콘센트/뷰는 직접 채워주세요.</div>`;
+  }
+
+  if (canFetch) {
+    const fetchBtn = back.querySelector('#fetchBtn');
+    const statusEl = back.querySelector('#fetchStatus');
+    const doFetch = async () => {
+      const kakaoUrl = form.kakao_url.value.trim();
+      if (!kakaoUrl) { errEl.textContent = '카카오 지도 링크를 먼저 입력하세요.'; return; }
+      errEl.textContent = '';
+      fetchBtn.disabled = true;
+      statusEl.hidden = false;
+      statusEl.innerHTML = '<span class="muted">카카오 상세 + AI 요약 가져오는 중… (몇 초)</span>';
+      try {
+        const data = await onEnrich({ kakaoUrl });
+        applyFetched(data);
+      } catch (e) {
+        statusEl.innerHTML = `<span class="err">${esc(e.message)}</span>`;
+      } finally {
+        fetchBtn.disabled = false;
+      }
+    };
+    fetchBtn.onclick = doFetch;
+
+    // optional finder: search → pick to fill name + real kakao link
+    const finder = back.querySelector('#finder');
     const qEl = back.querySelector('#afQuery');
     const resultsEl = back.querySelector('#afResults');
-    const aiEl = back.querySelector('#afAi');
-
+    back.querySelector('#findLinkBtn').onclick = () => { finder.hidden = !finder.hidden; if (!finder.hidden) qEl.focus(); };
     const doSearch = async () => {
       const q = qEl.value.trim();
       if (!q) return;
@@ -312,59 +378,23 @@ export function openAddCafeModal(opts) {
         const { results } = await onSearch(q);
         resultsEl.innerHTML = results.length
           ? results.map((r) => `
-            <button type="button" class="af-result" data-id="${esc(r.id)}">
+            <button type="button" class="af-result" data-url="${esc(r.place_url)}" data-name="${esc(r.name)}">
               <b>${esc(r.name)}</b> ${r.isCafe ? '' : '<span class="muted">· 카페아님?</span>'}
               <div class="muted">${esc(r.address || '')} · ${esc(r.category || '')}</div>
             </button>`).join('')
           : '<span class="muted">결과 없음</span>';
         resultsEl.querySelectorAll('.af-result').forEach((b) => {
-          b.onclick = () => applyPrefill(b.dataset.id, b);
+          b.onclick = () => {
+            if (!form.name.value.trim()) form.name.value = b.dataset.name;
+            form.kakao_url.value = b.dataset.url;
+            finder.hidden = true;
+            doFetch();
+          };
         });
       } catch (e) {
         resultsEl.innerHTML = `<span class="err">${esc(e.message)}</span>`;
       }
     };
-
-    const applyPrefill = async (id, btn) => {
-      btn.classList.add('is-loading');
-      aiEl.hidden = false;
-      aiEl.innerHTML = '<span class="muted">카카오 상세 + AI 분석 중… (몇 초)</span>';
-      try {
-        const { suggested: s, kakao, ai, aiError } = await onPrefill(id);
-        // fill discrete/objective fields
-        form.name.value = s.name || '';
-        form.address.value = s.address || '';
-        if (s.lat != null && s.lng != null) {
-          form.lat.value = Number(s.lat).toFixed(6);
-          form.lng.value = Number(s.lng).toFixed(6);
-        }
-        form.open_time.value = s.open_time || form.open_time.value;
-        form.close_time.value = s.close_time || form.close_time.value;
-        form.size.value = s.size || 'medium';
-        form.outlets.value = s.outlets || 'some';
-        form.floors.value = s.floors || 1;
-        if (s.iced_americano_price) form.iced_americano_price.value = s.iced_americano_price;
-        form.naver_url.value = s.naver_url || '';
-        form.kakao_url.value = s.kakao_url || '';
-        form.has_view.checked = !!s.has_view;
-        form.view_note.value = s.view_note || '';
-
-        // photo chooser from kakao photos
-        const photos = (kakao?.photos || []).slice(0, 8);
-        preview.hidden = photos.length === 0;
-        preview.innerHTML = photos.map((u, i) =>
-          `<button type="button" class="photo-thumb ${i === 0 ? 'is-sel' : ''}" data-url="${esc(u)}" style="background-image:url('${esc(u)}')"></button>`).join('');
-        preview.querySelectorAll('.photo-thumb').forEach((t) => (t.onclick = () => setPhotoUrl(t.dataset.url)));
-        if (s.photo_url) setPhotoUrl(s.photo_url);
-
-        renderAiPanel(aiEl, ai, kakao, aiError);
-      } catch (e) {
-        aiEl.innerHTML = `<span class="err">${esc(e.message)}</span>`;
-      } finally {
-        btn.classList.remove('is-loading');
-      }
-    };
-
     back.querySelector('#afSearchBtn').onclick = doSearch;
     qEl.addEventListener('keydown', (e) => { if (e.key === 'Enter') { e.preventDefault(); doSearch(); } });
   }
@@ -372,15 +402,13 @@ export function openAddCafeModal(opts) {
   form.onsubmit = async (e) => {
     e.preventDefault();
     errEl.textContent = '';
-    const name = form.name.value.trim();
-    if (!form.naver_url.value.trim()) form.naver_url.value = `https://map.naver.com/v5/search/${encodeURIComponent(name)}`;
-    if (!form.kakao_url.value.trim()) form.kakao_url.value = `https://map.kakao.com/?q=${encodeURIComponent(name)}`;
-    if (!form.lat.value || !form.lng.value) { errEl.textContent = '지도에서 위치를 선택하세요.'; return; }
-    if (!form.photo.files[0] && !form.photo_url.value) { errEl.textContent = '대표사진(파일 또는 자동 채우기)이 필요합니다.'; return; }
+    if (!form.kakao_url.value.trim()) { errEl.textContent = '카카오 지도 링크는 필수입니다.'; return; }
+    if (!form.lat.value || !form.lng.value) { errEl.textContent = '위치를 가져오거나 지도에서 선택하세요.'; return; }
+    if (!form.photo.files[0] && !form.photo_url.value) { errEl.textContent = '대표사진(파일 또는 가져온 사진)이 필요합니다.'; return; }
 
     const fd = new FormData(form);
     fd.set('has_view', form.has_view.checked ? 'true' : 'false');
-    if (!form.photo.files[0]) fd.delete('photo'); // avoid empty file part
+    if (!form.photo.files[0]) fd.delete('photo');
     try {
       await onSubmit(fd);
       close();
@@ -390,30 +418,4 @@ export function openAddCafeModal(opts) {
   };
 
   return { close };
-}
-
-function pct(x) { return x == null ? '' : `${Math.round(x * 100)}%`; }
-
-function renderAiPanel(el, ai, kakao, aiError) {
-  if (!ai) {
-    el.innerHTML = `<div class="ai-note">AI 분석 없음${aiError ? ` (${esc(aiError)})` : ' (OPENAI_API_KEY 미설정)'}. 카카오 기본 정보만 채웠어요.</div>`;
-    return;
-  }
-  const conf = ai.confidence || {};
-  const ev = ai.evidence || {};
-  const row = (label, value, key) => `
-    <div class="ai-row">
-      <span class="ai-row__k">${label}</span>
-      <span class="ai-row__v">${esc(value)} ${conf[key] != null ? `<i class="ai-conf">신뢰도 ${pct(conf[key])}</i>` : ''}</span>
-      ${ev[key] ? `<div class="ai-ev">“${esc(ev[key])}”</div>` : ''}
-    </div>`;
-  el.innerHTML = `
-    <div class="ai-summary">💡 ${esc(ai.summary || '')}</div>
-    ${ai.study_fit != null ? `<div class="ai-fit">AI 카공적합도 추정 <b>${ai.study_fit}</b>/100</div>` : ''}
-    ${kakao?.rating ? `<div class="muted">카카오 평점 ${kakao.rating} · 리뷰 ${kakao.review_count}개 · ${(kakao.strengths||[]).map((s)=>`${esc(s.name)}(${s.count})`).join(' ')}</div>` : ''}
-    ${row('다층', ai.multi_floor == null ? '?' : (ai.multi_floor ? '예' : '아니오'), 'multi_floor')}
-    ${row('면적', ({small:'소형',medium:'중형',large:'대형'}[ai.size] || '?'), 'size')}
-    ${row('콘센트', ({many:'많음',some:'보통',few:'적음',none:'없음'}[ai.outlets] || '?'), 'outlets')}
-    ${row('뷰', ai.has_view == null ? '?' : (ai.has_view ? '좋음' : '보통'), 'has_view')}
-    <div class="ai-warn">⚠️ AI 추론값입니다. 저장 전에 확인/수정하세요.</div>`;
 }

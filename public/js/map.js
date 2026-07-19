@@ -135,8 +135,11 @@ export function initMap(containerId, { onCardClick }) {
     });
   }
 
-  map.on('move', scheduleRefresh);
-  map.on('zoom', scheduleRefresh);
+  // Declutter only when movement settles (not every frame). During a drag the
+  // markers still follow the map via MapLibre's own transform; we just re-resolve
+  // overlaps on release, which keeps panning smooth.
+  map.on('moveend', scheduleRefresh);
+  map.on('zoomend', scheduleRefresh);
   map.on('resize', scheduleRefresh);
   map.on('load', scheduleRefresh);
 

@@ -35,10 +35,10 @@ const myVotesStmt = db.prepare('SELECT category, score FROM votes WHERE cafe_id 
 const insertCafe = db.prepare(`
   INSERT INTO cafes (id, name, address, lat, lng, photo_url, floors, open_time, close_time,
                      size, naver_url, kakao_url, iced_americano_price, has_view, view_note,
-                     outlets, created_by)
+                     outlets, review_summary, kakao_place_id, created_by)
   VALUES (@id, @name, @address, @lat, @lng, @photo_url, @floors, @open_time, @close_time,
           @size, @naver_url, @kakao_url, @iced_americano_price, @has_view, @view_note,
-          @outlets, @created_by)
+          @outlets, @review_summary, @kakao_place_id, @created_by)
 `);
 
 // GET /api/cafes  — lightweight list for the map (each with score for declutter)
@@ -68,8 +68,9 @@ const TIME_RE = /^([01]?\d|2[0-3]):[0-5]\d$/;
 function validationError(body, hasPhoto) {
   const missing = [];
   const need = (k) => (body[k] === undefined || body[k] === null || String(body[k]).trim() === '') && missing.push(k);
+  // naver_url is optional (not everyone has a real Naver place link); kakao_url required.
   ['name', 'lat', 'lng', 'floors', 'open_time', 'close_time', 'size',
-   'naver_url', 'kakao_url', 'iced_americano_price', 'outlets'].forEach(need);
+   'kakao_url', 'iced_americano_price', 'outlets'].forEach(need);
   if (!hasPhoto) missing.push('photo');
   if (body.has_view === undefined || body.has_view === null || body.has_view === '') missing.push('has_view');
   if (missing.length) return `필수 항목 누락: ${missing.join(', ')}`;
@@ -106,12 +107,14 @@ router.post('/', requireAuth, upload.single('photo'), (req, res) => {
     open_time: b.open_time,
     close_time: b.close_time,
     size: b.size,
-    naver_url: b.naver_url.trim(),
+    naver_url: (b.naver_url || '').trim(),
     kakao_url: b.kakao_url.trim(),
     iced_americano_price: +b.iced_americano_price,
     has_view: toBool(b.has_view),
     view_note: (b.view_note || '').trim() || null,
     outlets: b.outlets,
+    review_summary: (b.review_summary || '').trim() || null,
+    kakao_place_id: (b.kakao_place_id || '').trim() || null,
     created_by: req.user.id,
   });
   res.status(201).json(decorate(getStmt.get(id)));

@@ -75,4 +75,13 @@ CREATE INDEX IF NOT EXISTS idx_votes_cafe    ON votes(cafe_id);
 CREATE INDEX IF NOT EXISTS idx_reviews_cafe  ON reviews(cafe_id);
 `);
 
+// --- lightweight migrations (add columns if an older DB is missing them) ---
+const cafeCols = new Set(db.prepare(`PRAGMA table_info(cafes)`).all().map((c) => c.name));
+if (!cafeCols.has('review_summary')) {
+  db.exec(`ALTER TABLE cafes ADD COLUMN review_summary TEXT`); // AI summary of external reviews
+}
+if (!cafeCols.has('kakao_place_id')) {
+  db.exec(`ALTER TABLE cafes ADD COLUMN kakao_place_id TEXT`); // source place id when imported from Kakao
+}
+
 module.exports = db;
