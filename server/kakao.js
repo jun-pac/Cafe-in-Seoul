@@ -52,18 +52,31 @@ async function resolvePlaceId(url) {
   return null;
 }
 
+const DOW = { '일': 0, '월': 1, '화': 2, '수': 3, '목': 4, '금': 5, '토': 6 };
 function parseHours(openHours) {
   const days = openHours?.week_from_today?.week_periods?.flatMap((p) => p.days || []) || [];
-  const weekly = [];
-  let open_time = null, close_time = null;
+  const byDow = {}; // dow -> {open,close} | {closed}
+  let todayEntry = null;
   for (const d of days) {
-    const desc = d?.on_days?.start_end_time_desc || d?.off_days?.desc || '휴무';
-    weekly.push({ day: d.day_of_the_week_desc, time: desc });
-    const m = /(\d{1,2}:\d{2})\s*~\s*(\d{1,2}:\d{2})/.exec(desc);
-    if (m && !open_time) { open_time = m[1].padStart(5, '0'); close_time = m[2].padStart(5, '0'); }
-    if (/24시간/.test(desc) && !open_time) { open_time = '00:00'; close_time = '24:00'; }
+    const dow = DOW[(d.day_of_the_week_desc || '')[0]];
+    if (dow == null || byDow[dow]) continue; // week can list today twice; keep first
+    const desc = d?.on_days?.start_end_time_desc || '';
+    let entry;
+    if (/24시간/.test(desc)) entry = { open: '00:00', close: '24:00' };
+    else {
+      const m = /(\d{1,2}:\d{2})\s*~\s*(\d{1,2}:\d{2})/.exec(desc);
+      entry = m ? { open: m[1].padStart(5, '0'), close: m[2].padStart(5, '0') } : { closed: true };
+    }
+    byDow[dow] = entry;
+    if (d.is_highlight && !todayEntry) todayEntry = entry; // today's row
   }
-  return { open_time, close_time, weekly };
+  const weekly = [];
+  for (let i = 0; i < 7; i++) weekly.push({ dow: i, ...(byDow[i] || { closed: true }) });
+  // representative single schedule: today's, else first open day
+  const rep = (todayEntry && !todayEntry.closed) ? todayEntry
+    : weekly.find((e) => !e.closed) || { open: null, close: null };
+  const hasHours = weekly.some((e) => !e.closed);
+  return { open_time: rep.open || null, close_time: rep.close || null, weekly, hasHours };
 }
 
 function pickAmericano(items = []) {

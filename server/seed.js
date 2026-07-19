@@ -19,23 +19,28 @@ const tx = db.transaction(() => {
 
   const insertCafe = db.prepare(`
     INSERT INTO cafes (id, name, address, lat, lng, photo_url, floors, open_time, close_time,
-                       size, naver_url, kakao_url, iced_americano_price, has_view, view_note,
+                       hours_json, size, naver_url, kakao_url, iced_americano_price, has_view, view_note,
                        outlets, review_summary, kakao_place_id, status, created_by)
     VALUES (@id,@name,@address,@lat,@lng,@photo_url,@floors,@open_time,@close_time,
-            @size,@naver_url,@kakao_url,@iced_americano_price,@has_view,@view_note,@outlets,
+            @hours_json,@size,@naver_url,@kakao_url,@iced_americano_price,@has_view,@view_note,@outlets,
             @review_summary,@kakao_place_id,'approved',@created_by)
   `);
+  const insertCafePhoto = db.prepare('INSERT INTO cafe_photos (id, cafe_id, url, ord) VALUES (?,?,?,?)');
 
   for (const c of CAFES) {
+    const id = crypto.randomUUID();
     insertCafe.run({
-      id: crypto.randomUUID(),
+      id,
       name: c.name, address: c.address, lat: c.lat, lng: c.lng, photo_url: c.photo_url,
-      floors: c.floors, open_time: c.open_time, close_time: c.close_time, size: c.size,
+      floors: c.floors, open_time: c.open_time, close_time: c.close_time,
+      hours_json: c.hours_json || null, size: c.size,
       naver_url: c.naver_url || '', kakao_url: c.kakao_url,
       iced_americano_price: c.iced_americano_price, has_view: c.has_view, view_note: c.view_note,
       outlets: c.outlets, review_summary: c.review_summary || null,
       kakao_place_id: c.kakao_place_id || null, created_by: adminId,
     });
+    const photos = (c.photos && c.photos.length) ? c.photos : [c.photo_url];
+    photos.forEach((url, i) => insertCafePhoto.run(crypto.randomUUID(), id, url, i));
   }
 });
 

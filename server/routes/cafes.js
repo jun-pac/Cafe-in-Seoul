@@ -39,10 +39,10 @@ const myVotesStmt = db.prepare('SELECT category, score FROM votes WHERE cafe_id 
 
 const insertCafe = db.prepare(`
   INSERT INTO cafes (id, name, address, lat, lng, photo_url, floors, open_time, close_time,
-                     size, naver_url, kakao_url, iced_americano_price, has_view, view_note,
+                     hours_json, size, naver_url, kakao_url, iced_americano_price, has_view, view_note,
                      outlets, review_summary, kakao_place_id, status, moderation_reason, created_by)
   VALUES (@id, @name, @address, @lat, @lng, @photo_url, @floors, @open_time, @close_time,
-          @size, @naver_url, @kakao_url, @iced_americano_price, @has_view, @view_note,
+          @hours_json, @size, @naver_url, @kakao_url, @iced_americano_price, @has_view, @view_note,
           @outlets, @review_summary, @kakao_place_id, @status, @moderation_reason, @created_by)
 `);
 
@@ -139,6 +139,7 @@ router.post('/', requireAuth, upload.array('photos', 10), async (req, res, next)
     floors: +b.floors,
     open_time: b.open_time,
     close_time: b.close_time,
+    hours_json: (b.hours_json || '').trim() || null,
     size: b.size,
     naver_url: (b.naver_url || '').trim(),
     kakao_url: b.kakao_url.trim(),

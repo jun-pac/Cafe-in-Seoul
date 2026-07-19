@@ -33,16 +33,8 @@ function parseList(text) {
   return pairs;
 }
 
-const viewHeuristic = (text) => (/한강|남산|전망|뷰|숲|루프탑|테라스/.test(text) ? 1 : 0);
-
-// top floor from an address like "...8 1-2층" / "2층" / "지하1층" (best-effort)
-function floorsFromAddress(addr) {
-  if (!addr) return 1;
-  const nums = [...addr.matchAll(/(\d+)\s*층/g)].map((m) => Number(m[1]));
-  return nums.length ? Math.max(1, ...nums) : 1;
-}
-const FRANCHISE = /스타벅스|할리스|투썸|이디야|커피빈|폴바셋|메가커피|메가엠지씨|컴포즈|빽다방|엔제리너스|파스쿠찌|탐앤탐스/;
-const sizeHeuristic = (name, floors) => (FRANCHISE.test(name) ? 'large' : (floors >= 2 ? 'medium' : 'medium'));
+// NOTE: floors / size / outlets / view are NOT inferred — Kakao doesn't provide
+// them and guesses are unreliable. They default to neutral for a human to set.
 
 (async () => {
   if (!kakao.HAS_KAKAO) { console.error('KAKAO_API_KEY 미설정 — 중단'); process.exit(1); }
@@ -59,26 +51,27 @@ const sizeHeuristic = (name, floors) => (FRANCHISE.test(name) ? 'large' : (floor
       try { summary = (await ai.summarize(d))?.summary || null; }
       catch (e) { console.error('  (AI 요약 실패):', label, e.message); }
 
-      const floors = floorsFromAddress(d.address);
       out.push({
         name: d.name || label,
         address: d.address,
         lat: d.lat, lng: d.lng,
         photo_url: d.photos[0] || d.roadview,
-        floors,
+        photos: d.photos.slice(0, 6),
+        floors: 1,
         open_time: d.open_time || '09:00',
         close_time: d.close_time || '22:00',
-        size: sizeHeuristic(d.name || label, floors),
+        hours_json: JSON.stringify(d.weekly || []),
+        size: 'medium',
         kakao_url: d.kakao_url,
         kakao_place_id: id,
         naver_url: '',
         iced_americano_price: d.iced_americano_price > 0 ? d.iced_americano_price : 4500,
-        has_view: viewHeuristic(`${d.name} ${summary || ''}`),
+        has_view: 0,
         view_note: null,
         outlets: 'some',
         review_summary: summary,
       });
-      console.error('✅', d.name || label, '| id', id, '| floors', floors, '| size', sizeHeuristic(d.name || label, floors), '|', d.open_time, d.close_time, '| 요약', summary ? 'O' : 'X');
+      console.error('✅', d.name || label, '| id', id, '|', d.open_time, d.close_time, '| 요약', summary ? 'O' : 'X');
     } catch (e) { console.error('❌ 오류', label, e.message); }
   }
 

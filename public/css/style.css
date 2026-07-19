@@ -222,6 +222,20 @@ input[type="checkbox"] { accent-color: #0a0a0a; width: 16px; height: 16px; }
 .detail__hours.is-open { border-color: var(--ink); color: var(--ink); }
 .detail__hours.is-open .dot { background: var(--ink); }
 .detail__hours.is-closed { color: var(--mute); }
+.detail__hours { background: transparent; cursor: pointer; }
+.detail__hours[disabled] { cursor: default; }
+.detail__hours .ic { margin-left: 2px; }
+.detail__hoursrow { display: flex; flex-direction: column; align-items: flex-start; }
+.weekhours { margin-top: 10px; border: 1px solid var(--hair); border-radius: var(--r-sm); padding: 8px 14px; min-width: 200px; }
+.weekhours__row { display: flex; justify-content: space-between; gap: 28px; font-size: 12.5px; padding: 3px 0; color: var(--ink-2); }
+.weekhours__row.is-today { font-weight: 700; color: var(--ink); }
+
+details.manual { margin-top: 8px; }
+details.manual summary { cursor: pointer; font-size: 11px; color: var(--mute); text-transform: uppercase; letter-spacing: 1px; list-style: none; }
+details.manual summary::-webkit-details-marker { display: none; }
+details.manual summary:hover { color: var(--ink); }
+details.manual[open] { display: flex; flex-direction: column; gap: 11px; }
+details.manual[open] summary { margin-bottom: 4px; }
 
 .chips { display: flex; flex-wrap: wrap; gap: 8px; margin-top: 20px; }
 .chip { border: 1px solid var(--hair-strong); color: var(--ink-2); border-radius: var(--pill); padding: 7px 13px; font-size: 12px; font-weight: 500; }

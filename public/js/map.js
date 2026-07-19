@@ -1,5 +1,5 @@
 import { declutter } from './declutter.js';
-import { esc } from './util.js';
+import { esc, img } from './util.js';
 
 // Minimal light OSM basemap: CARTO Positron (light_all) raster tiles — clean,
 // airy grayscale. No API key required.
@@ -42,7 +42,7 @@ export function initMap(containerId, { onCardClick }) {
     const el = document.createElement('div');
     el.className = 'cafe-card';
     el.innerHTML = `
-      <div class="cafe-card__photo" style="background-image:url('${esc(cafe.photo_url)}')">
+      <div class="cafe-card__photo" style="background-image:url('${esc(img(cafe.photo_url))}')">
         <span class="cafe-card__score">${cafe.score}</span>
         <span class="cafe-card__badge" hidden></span>
         <span class="cafe-card__pending">심사중</span>

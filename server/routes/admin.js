@@ -70,6 +70,7 @@ router.post('/enrich', requireAdmin, express.json(), async (req, res, next) => {
         open_time: detail.open_time,
         close_time: detail.close_time,
         weekly: detail.weekly,
+        hours_json: JSON.stringify(detail.weekly || []),
         iced_americano_price: detail.iced_americano_price,
         americano_menu_name: detail.americano_menu_name,
         photos: detail.photos,

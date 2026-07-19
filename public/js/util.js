@@ -6,7 +6,7 @@ export const OUTLET_RANK = { none: 0, few: 1, some: 2, many: 3 };
 
 // precise definitions surfaced as tooltips wherever these fields appear
 export const DEFS = {
-  size: '면적 — 소형: 테이블 5개 이하 / 중형: 6–15개 / 대형: 프랜차이즈급(16개 이상)',
+  size: '면적 — 소형: 테이블 5개 이하 / 중형: 6–15개 / 대형: 16개 이상',
   outlets: '콘센트 — 대부분 있음: 거의 모든 자리 / 일부 있음: 일부 자리 / 드물게 있음: 카운터 근처 등 소수 / 없음',
   floors: '층수 — 2층 이상이면 다층. 오래 머물러도 눈치가 덜 보임',
   view: '뷰 — 창밖 전망/경치가 특별히 좋은지',
@@ -22,31 +22,69 @@ export function toMinutes(hhmm) {
   const m = /^(\d{1,2}):(\d{2})$/.exec(hhmm || '');
   return m ? +m[1] * 60 + +m[2] : null;
 }
+export const DOW_LABEL = ['일', '월', '화', '수', '목', '금', '토'];
 
-// Is the cafe open at `date` (default now)? Handles past-midnight ranges.
-export function isOpenNow(cafe, date = new Date()) {
-  const o = toMinutes(cafe.open_time);
-  let c = toMinutes(cafe.close_time);
+// weekly hours array [{dow, open, close, closed}] or null (falls back to single open/close)
+export function getWeekly(cafe) {
+  try { return cafe.hours_json ? JSON.parse(cafe.hours_json) : null; } catch { return null; }
+}
+function entryFor(cafe, dow) {
+  const w = getWeekly(cafe);
+  if (w) return w[dow] || { closed: true };
+  return { open: cafe.open_time, close: cafe.close_time }; // single schedule → same every day
+}
+function is24(e) {
+  if (!e || e.closed) return false;
+  const o = toMinutes(e.open); let c = toMinutes(e.close);
+  return o === 0 && c === 24 * 60; // 00:00 ~ 24:00
+}
+// Is entry open at `now` minutes? spillover=true tests the past-midnight tail (belongs to prev day).
+function openInEntry(e, now, spillover) {
+  if (!e || e.closed) return false;
+  const o = toMinutes(e.open); let c = toMinutes(e.close);
   if (o == null || c == null) return false;
-  const now = date.getHours() * 60 + date.getMinutes();
-  if (c === 0) c = 24 * 60; // '24:00' means end of day
-  if (c <= o) return now >= o || now < c % (24 * 60); // wraps past midnight
-  return now >= o && now < c;
+  if (c === 0) c = 24 * 60;
+  if (c > o) return !spillover && now >= o && now < c;   // same-day range
+  if (c === o) return !spillover;                         // exactly 24h wrap → open
+  return spillover ? now < c : now >= o;                  // c<o: evening part today / early-morning next day
 }
 
-export function opensLate(cafe) {
-  const o = toMinutes(cafe.open_time);
-  let c = toMinutes(cafe.close_time);
+// Open now? Checks today's session + yesterday's past-midnight spillover. Handles 24h.
+export function isOpenNow(cafe, date = new Date()) {
+  const now = date.getHours() * 60 + date.getMinutes();
+  const today = date.getDay();
+  const yest = (today + 6) % 7;
+  return openInEntry(entryFor(cafe, today), now, false) || openInEntry(entryFor(cafe, yest), now, true);
+}
+
+// Does today's schedule run late (closes 22:00+, past midnight, or 24h)?
+export function opensLate(cafe, date = new Date()) {
+  const e = entryFor(cafe, date.getDay());
+  if (!e || e.closed) return false;
+  if (is24(e)) return true;
+  const o = toMinutes(e.open); let c = toMinutes(e.close);
   if (o == null || c == null) return false;
   if (c === 0) return true;
-  if (c <= o) return true; // past midnight / 24h
+  if (c <= o) return true;      // past midnight
   return c >= 22 * 60;
 }
 
-export function hoursText(cafe) {
-  const c = cafe.close_time === '00:00' ? '24:00' : cafe.close_time;
-  if (cafe.open_time === '00:00' && (c === '24:00')) return '24시간';
-  return `${cafe.open_time} – ${c}`;
+function entryText(e) {
+  if (!e || e.closed) return '휴무';
+  if (is24(e)) return '24시간';
+  const c = e.close === '00:00' ? '24:00' : e.close;
+  return `${e.open} – ${c}`;
+}
+// today's hours, for the header line
+export function hoursText(cafe, date = new Date()) {
+  return entryText(entryFor(cafe, date.getDay()));
+}
+// full week, for the detail breakdown
+export function weeklyHours(cafe, date = new Date()) {
+  const w = getWeekly(cafe);
+  const today = date.getDay();
+  if (!w) return null; // single schedule → no per-day breakdown
+  return w.map((e) => ({ label: DOW_LABEL[e.dow], text: entryText(e), isToday: e.dow === today }));
 }
 
 // filters: {
@@ -77,6 +115,18 @@ export function haversineKm(aLat, aLng, bLat, bLng) {
   const s = Math.sin(dLat / 2) ** 2 +
     Math.cos((aLat * Math.PI) / 180) * Math.cos((bLat * Math.PI) / 180) * Math.sin(dLng / 2) ** 2;
   return 2 * R * Math.asin(Math.sqrt(s));
+}
+
+// Route Kakao/Naver CDN photos through our proxy (they block hotlinking).
+// Local /uploads, blob:, data:, and other hosts are returned unchanged.
+const PROXY_HOSTS = /(^|\.)(kakaocdn\.net|daumcdn\.net|pstatic\.net)$/i;
+export function img(url) {
+  if (!url) return url;
+  try {
+    const h = new URL(url, window.location.href).hostname;
+    if (PROXY_HOSTS.test(h)) return '/api/img?u=' + encodeURIComponent(url);
+  } catch { /* not absolute */ }
+  return url;
 }
 
 export function esc(s) {

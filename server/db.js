@@ -125,6 +125,10 @@ if (!cafeCols.has('status')) {
 if (!cafeCols.has('moderation_reason')) {
   db.exec(`ALTER TABLE cafes ADD COLUMN moderation_reason TEXT`);
 }
+if (!cafeCols.has('hours_json')) {
+  // per-weekday hours: JSON array [{dow:0-6, open, close, closed?}] (dow 0=Sun)
+  db.exec(`ALTER TABLE cafes ADD COLUMN hours_json TEXT`);
+}
 
 const userCols = new Set(db.prepare(`PRAGMA table_info(users)`).all().map((c) => c.name));
 if (!userCols.has('password_hash')) {

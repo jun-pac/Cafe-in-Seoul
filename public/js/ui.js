@@ -1,5 +1,5 @@
 import {
-  SIZE_LABEL, OUTLET_LABEL, DEFS, won, hoursText, isOpenNow, esc, haversineKm,
+  SIZE_LABEL, OUTLET_LABEL, DEFS, won, hoursText, isOpenNow, weeklyHours, esc, img, haversineKm,
 } from './util.js';
 import { icon } from './icons.js';
 
@@ -131,8 +131,11 @@ export function renderDetail(el, cafe, { user, onVote, onAddReview, onClose, onE
         ${cafe.status === 'pending' ? `<div class="detail__pending">${icon('shield', 14)} 심사 대기중 <span class="muted">— ${esc(cafe.moderation_reason || '관리자 확인 필요')}</span></div>` : ''}
         ${user?.isAdmin ? `<div class="detail__adminrow"><button class="btn btn--ghost sm" id="editCafeBtn">${icon('edit', 14)} 수정</button>${cafe.status === 'pending' ? '<button class="btn btn--primary sm" id="approveCafeBtn">승인</button>' : ''}</div>` : ''}
 
-        <div class="detail__hours ${openNow ? 'is-open' : 'is-closed'}">
-          <span class="dot"></span>${openNow ? 'OPEN NOW' : 'CLOSED'} · ${esc(hoursText(cafe))}
+        <div class="detail__hoursrow">
+          <button class="detail__hours ${openNow ? 'is-open' : 'is-closed'}" id="hoursToggle" ${weeklyHours(cafe) ? '' : 'disabled'}>
+            <span class="dot"></span>${openNow ? 'OPEN NOW' : 'CLOSED'} · ${esc(hoursText(cafe))}${weeklyHours(cafe) ? ` ${icon('chevronDown', 12)}` : ''}
+          </button>
+          ${weeklyHours(cafe) ? `<div class="weekhours" id="weekHours" hidden>${weeklyHours(cafe).map((d) => `<div class="weekhours__row ${d.isToday ? 'is-today' : ''}"><span>${d.label}</span><span>${esc(d.text)}</span></div>`).join('')}</div>` : ''}
         </div>
 
         <div class="chips">
@@ -165,13 +168,16 @@ export function renderDetail(el, cafe, { user, onVote, onAddReview, onClose, onE
   el.querySelector('.detail__close').onclick = onClose;
   el.querySelector('#editCafeBtn')?.addEventListener('click', () => onEdit?.('edit'));
   el.querySelector('#approveCafeBtn')?.addEventListener('click', () => onEdit?.('approve'));
+  el.querySelector('#hoursToggle')?.addEventListener('click', () => {
+    const w = el.querySelector('#weekHours'); if (w) w.hidden = !w.hidden;
+  });
 
   // photo carousel (representative + all story photos)
   let ci = 0;
   const carImg = el.querySelector('#carImg');
   const carCount = el.querySelector('#carCount');
   const showImg = () => {
-    carImg.style.backgroundImage = `url('${esc(gallery[ci] || '')}')`;
+    carImg.style.backgroundImage = `url('${esc(img(gallery[ci] || ''))}')`;
     if (carCount) carCount.textContent = `${ci + 1} / ${gallery.length}`;
   };
   showImg();
@@ -403,7 +409,7 @@ export function renderStories(el, reviews) {
         <div class="story__head"><b>${esc(r.user_name)}</b>
           <span class="muted">${esc((r.created_at || '').slice(0, 10))}</span></div>
         ${r.body ? `<div class="story__body">${esc(r.body)}</div>` : ''}
-        ${photos.length ? `<div class="story__photos">${photos.map((u) => `<img class="story__photo" src="${esc(u)}" loading="lazy" alt="">`).join('')}</div>` : ''}
+        ${photos.length ? `<div class="story__photos">${photos.map((u) => `<img class="story__photo" src="${esc(img(u))}" loading="lazy" alt="">`).join('')}</div>` : ''}
       </div>`;
       }).join('')
     : `<p class="muted">아직 이야기가 없어요. 첫 이야기를 남겨보세요!</p>`;
@@ -416,7 +422,7 @@ export function createPhotoPicker(container, { onChange } = {}) {
   function render() {
     container.innerHTML = items.map((it, i) => `
       <div class="pp-item ${i === 0 ? 'is-cover' : ''}" data-i="${i}">
-        <div class="pp-img" style="background-image:url('${it.kind === 'url' ? esc(it.url) : it.obj}')"></div>
+        <div class="pp-img" style="background-image:url('${it.kind === 'url' ? esc(img(it.url)) : it.obj}')"></div>
         ${i === 0 ? '<span class="pp-cover">대표</span>' : ''}
         <div class="pp-ops">
           <button type="button" data-op="left" title="앞으로" ${i === 0 ? 'disabled' : ''}>${icon('chevronLeft', 12)}</button>
@@ -474,28 +480,31 @@ export function openAddCafeModal(opts) {
 
       <form class="cafeform" id="cafeForm">
         <div class="formsec">
-          <div class="formsec__title">1. 직접 입력</div>
-          <label class="field"><span>카페 이름 *</span>
-            <input class="input" name="name" required></label>
-          <label class="field"><span>네이버 지도 링크 <small class="muted">(선택 · 실제 장소 링크)</small></span>
-            <input class="input" name="naver_url" placeholder="https://naver.me/... 또는 map.naver.com 장소 링크"></label>
-          <label class="field"><span>카카오 지도 링크 * <small class="muted">(실제 장소 링크)</small></span>
-            <input class="input" name="kakao_url" placeholder="https://place.map.kakao.com/... 또는 공유 링크"></label>
+          <div class="formsec__title">1. 카페 찾기</div>
           <input type="hidden" name="kakao_place_id">
+          <input type="hidden" name="hours_json">
           ${canFetch ? `
-          <div class="fetch-row">
-            <button type="button" class="btn btn--primary" id="fetchBtn">${icon('ai', 14)} 카카오 링크로 정보 가져오기</button>
-            <button type="button" class="linkbtn" id="findLinkBtn">${icon('search', 13)} 검색으로 링크 찾기</button>
-          </div>
-          <div class="finder" id="finder" hidden>
+          <div class="field"><span>카페 이름으로 검색 <small class="muted">→ 후보 선택 시 AI가 자동으로 채웁니다</small></span>
             <div class="autofill__search">
-              <input class="input" id="afQuery" placeholder="카페 이름/지역 (예: 블루보틀 성수)">
-              <button type="button" class="btn btn--ghost" id="afSearchBtn">검색</button>
+              <input class="input" id="afQuery" placeholder="예) 블루보틀 성수" autocomplete="off">
+              <button type="button" class="btn btn--primary" id="afSearchBtn">${icon('search', 14)} 검색</button>
             </div>
-            <div class="autofill__results" id="afResults"></div>
           </div>
-          <div class="fetch-status" id="fetchStatus" hidden></div>` :
-          (user?.isAdmin ? '<div class="ai-note">KAKAO_API_KEY 미설정 — 링크 자동 가져오기 비활성화. 수동 입력만 가능.</div>' : '')}
+          <div class="autofill__results" id="afResults"></div>
+          <div class="fetch-status" id="fetchStatus" hidden></div>
+          <details class="manual">
+            <summary>직접 입력 / 링크 붙여넣기</summary>
+            <label class="field"><span>카페 이름 *</span><input class="input" name="name"></label>
+            <label class="field"><span>카카오 지도 링크 *</span>
+              <div class="autofill__search"><input class="input" name="kakao_url" placeholder="https://place.map.kakao.com/... 또는 공유 링크">
+                <button type="button" class="btn btn--ghost" id="fetchBtn">가져오기</button></div></label>
+            <label class="field"><span>네이버 지도 링크 <small class="muted">(선택)</small></span><input class="input" name="naver_url"></label>
+          </details>` : `
+          <label class="field"><span>카페 이름 *</span><input class="input" name="name" required></label>
+          <label class="field"><span>카카오 지도 링크 * <small class="muted">(실제 장소 링크)</small></span>
+            <input class="input" name="kakao_url" placeholder="https://place.map.kakao.com/..."></label>
+          <label class="field"><span>네이버 지도 링크 <small class="muted">(선택)</small></span>
+            <input class="input" name="naver_url"></label>`}
         </div>
 
         <div class="formsec">
@@ -539,7 +548,7 @@ export function openAddCafeModal(opts) {
               <select class="input" name="size" required>
                 <option value="small">소형 (테이블 5개 이하)</option>
                 <option value="medium" selected>중형 (테이블 6–15)</option>
-                <option value="large">대형 (프랜차이즈급 · 16+)</option>
+                <option value="large">대형 (16개 이상)</option>
               </select></label>
             <label class="field"><span>콘센트 * <span class="info" title="${esc(DEFS.outlets)}">${icon('info', 12)}</span></span>
               <select class="input" name="outlets" required>
@@ -592,6 +601,7 @@ export function openAddCafeModal(opts) {
     }
     if (f.open_time) form.elements.open_time.value = f.open_time;
     if (f.close_time) form.elements.close_time.value = f.close_time === '24:00' ? '00:00' : f.close_time;
+    if (f.hours_json) form.elements.hours_json.value = f.hours_json; // per-weekday schedule
     if (f.iced_americano_price) form.elements.iced_americano_price.value = f.iced_americano_price;
     if (data.review_summary) form.elements.review_summary.value = data.review_summary;
 
@@ -630,11 +640,9 @@ export function openAddCafeModal(opts) {
     };
     fetchBtn.onclick = doFetch;
 
-    // optional finder: search → pick to fill name + real kakao link
-    const finder = back.querySelector('#finder');
+    // primary flow: search by name → pick a candidate → fill name+link → AI enrich
     const qEl = back.querySelector('#afQuery');
     const resultsEl = back.querySelector('#afResults');
-    back.querySelector('#findLinkBtn').onclick = () => { finder.hidden = !finder.hidden; if (!finder.hidden) qEl.focus(); };
     const doSearch = async () => {
       const q = qEl.value.trim();
       if (!q) return;
@@ -650,9 +658,9 @@ export function openAddCafeModal(opts) {
           : '<span class="muted">결과 없음</span>';
         resultsEl.querySelectorAll('.af-result').forEach((b) => {
           b.onclick = () => {
-            if (!form.elements.name.value.trim()) form.elements.name.value = b.dataset.name;
+            form.elements.name.value = b.dataset.name;
             form.elements.kakao_url.value = b.dataset.url;
-            finder.hidden = true;
+            resultsEl.innerHTML = `<div class="muted">선택됨: <b>${esc(b.dataset.name)}</b> — 정보 가져오는 중…</div>`;
             doFetch();
           };
         });
@@ -667,6 +675,7 @@ export function openAddCafeModal(opts) {
   form.onsubmit = async (e) => {
     e.preventDefault();
     errEl.textContent = '';
+    if (!form.elements.name.value.trim()) { errEl.textContent = '카페를 검색해 선택하거나 이름을 입력하세요.'; return; }
     if (!form.elements.kakao_url.value.trim()) { errEl.textContent = '카카오 지도 링크는 필수입니다.'; return; }
     if (!form.elements.lat.value || !form.elements.lng.value) { errEl.textContent = '위치를 가져오거나 지도에서 선택하세요.'; return; }
     const { manifest, files, count } = picker.getManifest();
