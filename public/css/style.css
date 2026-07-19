@@ -58,6 +58,12 @@ body.detail-open #app { grid-template-columns: var(--side-w) 1fr var(--detail-w)
 .authbar { display: flex; align-items: center; justify-content: space-between; gap: 8px; }
 .authbar__who { font-weight: 600; font-size: 14px; }
 
+.loginbox { display: flex; flex-direction: column; gap: 8px; }
+.login-or { text-align: center; font-size: 11px; color: var(--muted); margin: 2px 0; }
+.loginform { display: flex; flex-direction: column; gap: 6px; }
+.loginform__row { display: grid; grid-template-columns: 1fr auto; gap: 6px; }
+.loginform .err { color: #b91c1c; font-size: 11px; min-height: 12px; }
+
 /* buttons */
 .btn {
   display: inline-flex; align-items: center; justify-content: center; gap: 6px;

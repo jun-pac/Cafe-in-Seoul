@@ -5,10 +5,16 @@
 // links — so the map isn't full of fake placeholders.
 const crypto = require('crypto');
 const db = require('./db');
+const { hashPassword } = require('./auth');
 const CAFES = require('./seed-data.json');
 
 const tx = db.transaction(() => {
   db.exec('DELETE FROM reviews; DELETE FROM votes; DELETE FROM cafes; DELETE FROM users;');
+
+  // admin account: username sejun / password chongchong
+  db.prepare(`INSERT INTO users (id, provider, provider_id, name, password_hash, is_admin)
+              VALUES (?,?,?,?,?,1)`)
+    .run(crypto.randomUUID(), 'local', 'sejun', 'sejun', hashPassword('chongchong'));
 
   const demoUsers = ['카공러', '노트북요정', '아메리카노프로', '카페탐험가'].map((name) => {
     const id = crypto.randomUUID();

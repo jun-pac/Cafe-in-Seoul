@@ -84,4 +84,12 @@ if (!cafeCols.has('kakao_place_id')) {
   db.exec(`ALTER TABLE cafes ADD COLUMN kakao_place_id TEXT`); // source place id when imported from Kakao
 }
 
+const userCols = new Set(db.prepare(`PRAGMA table_info(users)`).all().map((c) => c.name));
+if (!userCols.has('password_hash')) {
+  db.exec(`ALTER TABLE users ADD COLUMN password_hash TEXT`); // for provider='local' (id/pw) accounts
+}
+if (!userCols.has('is_admin')) {
+  db.exec(`ALTER TABLE users ADD COLUMN is_admin INTEGER NOT NULL DEFAULT 0`);
+}
+
 module.exports = db;

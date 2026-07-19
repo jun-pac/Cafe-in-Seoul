@@ -19,6 +19,16 @@ export const api = {
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ credential }),
     }).then(json),
+  register: (username, password) =>
+    fetch('/api/auth/register', {
+      method: 'POST', headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ username, password }),
+    }).then(json),
+  login: (username, password) =>
+    fetch('/api/auth/login', {
+      method: 'POST', headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ username, password }),
+    }).then(json),
   logout: () => fetch('/api/auth/logout', { method: 'POST' }).then(json),
 
   adminCapabilities: () => fetch('/api/admin/capabilities').then(json),

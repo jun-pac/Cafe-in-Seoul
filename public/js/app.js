@@ -134,7 +134,8 @@ async function refreshMe() {
       try { await api.googleVerify(credential); await afterAuthChange(); }
       catch (e) { alert('Google 로그인 실패: ' + e.message); }
     },
-    onDevLogin: async (name) => { await api.devLogin(name); await afterAuthChange(); },
+    onLocalLogin: async (u, p) => { await api.login(u, p); await afterAuthChange(); },
+    onRegister: async (u, p) => { await api.register(u, p); await afterAuthChange(); },
     onLogout: async () => { await api.logout(); await afterAuthChange(); },
   });
 }

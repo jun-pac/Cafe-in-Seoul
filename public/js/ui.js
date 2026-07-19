@@ -14,7 +14,7 @@ function stars(avg) {
 }
 
 // ---- Auth bar -------------------------------------------------------------
-export function renderAuth(el, me, { onDevLogin, onLogout, onGoogleCredential }) {
+export function renderAuth(el, me, { onLogout, onGoogleCredential, onLocalLogin, onRegister }) {
   el.innerHTML = '';
   if (me.user) {
     const wrap = document.createElement('div');
@@ -26,34 +26,60 @@ export function renderAuth(el, me, { onDevLogin, onLogout, onGoogleCredential })
     el.appendChild(wrap);
     return;
   }
+
+  const box = document.createElement('div');
+  box.className = 'loginbox';
+
   if (me.googleClientId) {
-    // Google Identity Services — needs only the public client ID (no secret).
     const holder = document.createElement('div');
     holder.id = 'gsiButton';
-    el.appendChild(holder);
+    box.appendChild(holder);
     const init = () => {
       if (!window.google?.accounts?.id) return false;
       window.google.accounts.id.initialize({
         client_id: me.googleClientId,
         callback: (resp) => onGoogleCredential(resp.credential),
       });
-      window.google.accounts.id.renderButton(holder, { theme: 'outline', size: 'large', text: 'signin_with' });
+      window.google.accounts.id.renderButton(holder, { theme: 'outline', size: 'large', text: 'signin_with', width: 260 });
       return true;
     };
     if (!init()) {
       const t = setInterval(() => { if (init()) clearInterval(t); }, 200);
       setTimeout(() => clearInterval(t), 6000);
     }
-  } else {
-    const wrap = document.createElement('div');
-    wrap.className = 'authbar';
-    wrap.innerHTML = `<button class="btn btn--primary" id="devLoginBtn">로그인 (SSO 미설정 · 데모)</button>`;
-    wrap.querySelector('#devLoginBtn').onclick = () => {
-      const name = prompt('닉네임을 입력하세요 (데모 로그인):', '카공러');
-      if (name != null) onDevLogin(name);
-    };
-    el.appendChild(wrap);
+    const or = document.createElement('div');
+    or.className = 'login-or';
+    or.textContent = '또는 아이디로 로그인';
+    box.appendChild(or);
   }
+
+  const form = document.createElement('form');
+  form.className = 'loginform';
+  form.innerHTML = `
+    <input class="input" name="username" placeholder="아이디" autocomplete="username">
+    <input class="input" name="password" type="password" placeholder="비밀번호" autocomplete="current-password">
+    <div class="loginform__row">
+      <button type="submit" class="btn btn--primary" id="loginBtn">로그인</button>
+      <button type="button" class="btn btn--ghost" id="registerBtn">회원가입</button>
+    </div>
+    <div class="err" id="loginErr"></div>`;
+  const errEl = form.querySelector('#loginErr');
+  const creds = () => ({ u: form.username.value.trim(), p: form.password.value });
+  form.onsubmit = async (e) => {
+    e.preventDefault();
+    errEl.textContent = '';
+    const { u, p } = creds();
+    if (!u || !p) { errEl.textContent = '아이디와 비밀번호를 입력하세요.'; return; }
+    try { await onLocalLogin(u, p); } catch (err) { errEl.textContent = err.message; }
+  };
+  form.querySelector('#registerBtn').onclick = async () => {
+    errEl.textContent = '';
+    const { u, p } = creds();
+    if (!u || !p) { errEl.textContent = '가입할 아이디와 비밀번호(4자+)를 입력하세요.'; return; }
+    try { await onRegister(u, p); } catch (err) { errEl.textContent = err.message; }
+  };
+  box.appendChild(form);
+  el.appendChild(box);
 }
 
 // ---- Detail panel ---------------------------------------------------------

@@ -8,7 +8,8 @@
     "start": "node server/index.js",
     "dev": "node --watch server/index.js",
     "seed": "node server/seed.js",
-    "reset": "rm -f data/app.db && node server/seed.js"
+    "import": "node server/import-kakao.js",
+    "reset": "rm -f data/app.db data/app.db-wal data/app.db-shm && node server/seed.js"
   },
   "engines": {
     "node": ">=18"

@@ -31,7 +31,7 @@ function extractPlaceId(url) {
   if (!url) return null;
   let m = url.match(/place\.map\.kakao\.com\/(?:m\/)?(\d{5,})/);
   if (m) return m[1];
-  m = url.match(/[?&]itemId=(\d{5,})/);
+  m = url.match(/[?&](?:itemId|id)=(\d{5,})/); // ?itemId= or applink ?id=
   if (m) return m[1];
   m = url.match(/\/(\d{6,})(?:[/?#]|$)/);
   if (m) return m[1];
@@ -71,7 +71,8 @@ function pickAmericano(items = []) {
   if (!cand.length) return null;
   const iced = cand.find((i) => /아이스|ice|ICE|콜드/i.test(i.name || ''));
   const chosen = iced || cand[0];
-  return { name: chosen.name, price: Number(chosen.price) || null };
+  const price = Number(chosen.price);
+  return { name: chosen.name, price: price > 0 ? price : null }; // Kakao uses -1 for "가격문의"
 }
 
 async function fetchDetail(id) {
