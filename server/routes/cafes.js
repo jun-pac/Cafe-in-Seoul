@@ -31,6 +31,8 @@ const reviewsStmt = db.prepare(`
   FROM reviews r JOIN users u ON u.id = r.user_id
   WHERE r.cafe_id = ? ORDER BY r.created_at DESC
 `);
+const reviewPhotosStmt = db.prepare('SELECT review_id, url FROM review_photos WHERE cafe_id = ? ORDER BY ord');
+const galleryStmt = db.prepare('SELECT url FROM review_photos WHERE cafe_id = ? ORDER BY rowid DESC');
 const myVotesStmt = db.prepare('SELECT category, score FROM votes WHERE cafe_id = ? AND user_id = ?');
 
 const insertCafe = db.prepare(`
@@ -60,6 +62,11 @@ router.get('/:id', (req, res) => {
   if (!cafe) return res.status(404).json({ error: 'not found' });
   const detail = decorate(cafe);
   detail.reviews = reviewsStmt.all(cafe.id);
+  const photosByReview = {};
+  for (const p of reviewPhotosStmt.all(cafe.id)) (photosByReview[p.review_id] ||= []).push(p.url);
+  for (const r of detail.reviews) r.photos = photosByReview[r.id] || (r.photo_url ? [r.photo_url] : []);
+  // carousel gallery: representative photo + all story photos (newest first)
+  detail.gallery = [detail.photo_url, ...galleryStmt.all(cafe.id).map((p) => p.url)].filter(Boolean);
   detail.myVotes = {};
   if (req.user) {
     for (const v of myVotesStmt.all(cafe.id, req.user.id)) detail.myVotes[v.category] = v.score;

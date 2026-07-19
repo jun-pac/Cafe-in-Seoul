@@ -110,50 +110,71 @@ export function renderDetail(el, cafe, { user, onVote, onAddReview, onClose, onE
   const floorTxt = cafe.multi_floor ? `${cafe.floors}층 (다층)` : '단층';
   const viewTxt = cafe.has_view ? (cafe.view_note ? `뷰 좋음 · ${esc(cafe.view_note)}` : '뷰 좋음') : '뷰 별로';
 
+  const gallery = (cafe.gallery && cafe.gallery.length) ? cafe.gallery : [cafe.photo_url].filter(Boolean);
+
   el.innerHTML = `
     <button class="detail__close" title="닫기">✕</button>
-    <div class="detail__hero" style="background-image:url('${esc(cafe.photo_url)}')">
-      <div class="detail__scorebig" title="카공 종합점수">${cafe.score}<small>점</small></div>
-    </div>
-    <div class="detail__body">
-      <h2 class="detail__name">${esc(cafe.name)}</h2>
-      <div class="detail__addr">${esc(cafe.address || '')}</div>
-      ${cafe.status === 'pending' ? `<div class="detail__pending">🛡️ 심사 대기중 <span class="muted">— ${esc(cafe.moderation_reason || '관리자 확인 필요')}</span></div>` : ''}
-      ${user?.isAdmin ? `<div class="detail__adminrow"><button class="btn btn--ghost sm" id="editCafeBtn">✎ 수정</button>${cafe.status === 'pending' ? '<button class="btn btn--primary sm" id="approveCafeBtn">승인</button>' : ''}</div>` : ''}
-
-      <div class="detail__hours ${openNow ? 'is-open' : 'is-closed'}">
-        <span class="dot"></span>${openNow ? '영업중' : '영업종료'} · ${esc(hoursText(cafe))}
+    <div class="detail__scroll">
+      <div class="detail__hero">
+        <div class="carousel__img" id="carImg"></div>
+        ${gallery.length > 1 ? `
+          <button class="carousel__nav prev" id="carPrev" aria-label="이전">‹</button>
+          <button class="carousel__nav next" id="carNext" aria-label="다음">›</button>
+          <div class="carousel__count" id="carCount"></div>` : ''}
+        <div class="detail__scorebig" title="카공 종합점수">${cafe.score}<small>SCORE</small></div>
       </div>
+      <div class="detail__body">
+        <h2 class="detail__name">${esc(cafe.name)}</h2>
+        <div class="detail__addr">${esc(cafe.address || '')}</div>
+        ${cafe.status === 'pending' ? `<div class="detail__pending">🛡️ 심사 대기중 <span class="muted">— ${esc(cafe.moderation_reason || '관리자 확인 필요')}</span></div>` : ''}
+        ${user?.isAdmin ? `<div class="detail__adminrow"><button class="btn btn--ghost sm" id="editCafeBtn">✎ 수정</button>${cafe.status === 'pending' ? '<button class="btn btn--primary sm" id="approveCafeBtn">승인</button>' : ''}</div>` : ''}
 
-      <div class="chips">
-        <span class="chip">🏢 ${esc(floorTxt)}</span>
-        <span class="chip">📐 ${SIZE_LABEL[cafe.size] || cafe.size}</span>
-        <span class="chip">🔌 ${OUTLET_LABEL[cafe.outlets] || cafe.outlets}</span>
-        <span class="chip">🪟 ${esc(viewTxt)}</span>
-        <span class="chip">🧊 아메리카노 ${won(cafe.iced_americano_price)}</span>
+        <div class="detail__hours ${openNow ? 'is-open' : 'is-closed'}">
+          <span class="dot"></span>${openNow ? 'OPEN NOW' : 'CLOSED'} · ${esc(hoursText(cafe))}
+        </div>
+
+        <div class="chips">
+          <span class="chip">🏢 ${esc(floorTxt)}</span>
+          <span class="chip">📐 ${SIZE_LABEL[cafe.size] || cafe.size}</span>
+          <span class="chip">🔌 ${OUTLET_LABEL[cafe.outlets] || cafe.outlets}</span>
+          <span class="chip">🪟 ${esc(viewTxt)}</span>
+          <span class="chip">🧊 아메리카노 ${won(cafe.iced_americano_price)}</span>
+        </div>
+
+        <div class="detail__links">
+          ${cafe.naver_url ? `<a class="btn btn--map naver" href="${esc(cafe.naver_url)}" target="_blank" rel="noopener">네이버 지도</a>` : ''}
+          ${cafe.kakao_url ? `<a class="btn btn--map kakao" href="${esc(cafe.kakao_url)}" target="_blank" rel="noopener">카카오 지도</a>` : ''}
+        </div>
+
+        ${cafe.review_summary ? `<div class="detail__aisum">🤖 <b>리뷰 요약</b><p>${esc(cafe.review_summary)}</p></div>` : ''}
+
+        <h3 class="detail__h3">집단지성 평가 <small>1–5</small></h3>
+        <div class="votes"></div>
+
+        <h3 class="detail__h3">이야기 <small class="muted" id="revCount"></small></h3>
+        <div class="storyform" id="storyform"></div>
+        <div class="stories"></div>
+
+        <h3 class="detail__h3">동네 토크 <small>📍 GPS 1KM 이내만 참여</small></h3>
+        <div class="chat" id="chatBox"></div>
       </div>
-
-      <div class="detail__links">
-        ${cafe.naver_url ? `<a class="btn btn--map naver" href="${esc(cafe.naver_url)}" target="_blank" rel="noopener">네이버 지도</a>` : ''}
-        ${cafe.kakao_url ? `<a class="btn btn--map kakao" href="${esc(cafe.kakao_url)}" target="_blank" rel="noopener">카카오 지도</a>` : ''}
-      </div>
-
-      ${cafe.review_summary ? `<div class="detail__aisum">🤖 <b>리뷰 요약</b><p>${esc(cafe.review_summary)}</p></div>` : ''}
-
-      <h3 class="detail__h3">집단지성 평가 <small>1–5 투표</small></h3>
-      <div class="votes"></div>
-
-      <h3 class="detail__h3">후기 <small class="muted" id="revCount"></small></h3>
-      <div class="reviews"></div>
-      <div class="reviewform"></div>
-
-      <h3 class="detail__h3">동네 토크 <small>📍 GPS 1KM 이내만 참여</small></h3>
-      <div class="chat" id="chatBox"></div>
     </div>`;
 
   el.querySelector('.detail__close').onclick = onClose;
   el.querySelector('#editCafeBtn')?.addEventListener('click', () => onEdit?.('edit'));
   el.querySelector('#approveCafeBtn')?.addEventListener('click', () => onEdit?.('approve'));
+
+  // photo carousel (representative + all story photos)
+  let ci = 0;
+  const carImg = el.querySelector('#carImg');
+  const carCount = el.querySelector('#carCount');
+  const showImg = () => {
+    carImg.style.backgroundImage = `url('${esc(gallery[ci] || '')}')`;
+    if (carCount) carCount.textContent = `${ci + 1} / ${gallery.length}`;
+  };
+  showImg();
+  el.querySelector('#carPrev')?.addEventListener('click', () => { ci = (ci - 1 + gallery.length) % gallery.length; showImg(); });
+  el.querySelector('#carNext')?.addEventListener('click', () => { ci = (ci + 1) % gallery.length; showImg(); });
 
   // votes
   const votesEl = el.querySelector('.votes');
@@ -181,37 +202,42 @@ export function renderDetail(el, cafe, { user, onVote, onAddReview, onClose, onE
     votesEl.appendChild(row);
   }
 
-  // reviews
+  // stories (Instagram-style: text + multiple photos)
   const reviews = cafe.reviews || [];
-  el.querySelector('#revCount').textContent = reviews.length ? `${reviews.length}개` : '';
-  const revEl = el.querySelector('.reviews');
-  renderReviews(revEl, reviews);
+  el.querySelector('#revCount').textContent = reviews.length ? `${reviews.length}` : '';
+  renderStories(el.querySelector('.stories'), reviews);
 
-  // review form
-  const formEl = el.querySelector('.reviewform');
+  // story composer
+  const formEl = el.querySelector('#storyform');
   if (user) {
     formEl.innerHTML = `
-      <textarea class="input" id="revBody" rows="2" placeholder="커피맛, 분위기, 콘센트 자리 등 자유롭게..."></textarea>
-      <div class="reviewform__row">
-        <label class="btn btn--ghost filepick">📷 사진<input type="file" id="revPhoto" accept="image/*" hidden></label>
-        <span class="muted" id="revFileName"></span>
-        <button class="btn btn--primary" id="revSubmit">후기 등록</button>
+      <textarea class="input" id="stBody" rows="3" placeholder="이 카페에 얽힌 이야기를 자유롭게 남겨보세요. 사진도 여러 장 올릴 수 있어요."></textarea>
+      <div class="storyform__photos" id="stPreview"></div>
+      <div class="storyform__row">
+        <label class="btn btn--ghost sm filepick">＋ 사진<input type="file" id="stPhotos" accept="image/*" multiple hidden></label>
+        <span class="muted" id="stCount"></span>
+        <button class="btn btn--primary sm" id="stSubmit">올리기</button>
       </div>`;
-    const fileInput = formEl.querySelector('#revPhoto');
+    const fileInput = formEl.querySelector('#stPhotos');
+    const preview = formEl.querySelector('#stPreview');
+    let picked = [];
     fileInput.onchange = () => {
-      formEl.querySelector('#revFileName').textContent = fileInput.files[0]?.name || '';
+      picked = [...fileInput.files].slice(0, 10);
+      preview.innerHTML = picked.map((f) => `<div class="st-thumb" style="background-image:url('${URL.createObjectURL(f)}')"></div>`).join('');
+      formEl.querySelector('#stCount').textContent = picked.length ? `사진 ${picked.length}장` : '';
     };
-    formEl.querySelector('#revSubmit').onclick = async () => {
-      const body = formEl.querySelector('#revBody').value.trim();
-      const file = fileInput.files[0];
-      if (!body && !file) return alert('후기 내용이나 사진을 입력하세요.');
+    formEl.querySelector('#stSubmit').onclick = async () => {
+      const body = formEl.querySelector('#stBody').value.trim();
+      if (!body && !picked.length) return alert('이야기나 사진을 올려주세요.');
       const fd = new FormData();
       fd.append('body', body);
-      if (file) fd.append('photo', file);
-      await onAddReview(fd);
+      picked.forEach((f) => fd.append('photos', f));
+      const btn = formEl.querySelector('#stSubmit');
+      btn.disabled = true; btn.textContent = '올리는 중…';
+      try { await onAddReview(fd); } finally { btn.disabled = false; btn.textContent = '올리기'; }
     };
   } else {
-    formEl.innerHTML = `<p class="muted">후기를 남기려면 로그인하세요.</p>`;
+    formEl.innerHTML = `<p class="muted">이야기를 남기려면 로그인하세요.</p>`;
   }
 }
 
@@ -364,16 +390,19 @@ export function initChat(root, cafe, { user, api }) {
   return () => { stopped = true; clearInterval(timer); };
 }
 
-export function renderReviews(revEl, reviews) {
-  revEl.innerHTML = reviews.length
-    ? reviews.map((r) => `
-      <div class="review">
-        <div class="review__head"><b>${esc(r.user_name)}</b>
+export function renderStories(el, reviews) {
+  el.innerHTML = reviews.length
+    ? reviews.map((r) => {
+        const photos = r.photos && r.photos.length ? r.photos : (r.photo_url ? [r.photo_url] : []);
+        return `
+      <div class="story">
+        <div class="story__head"><b>${esc(r.user_name)}</b>
           <span class="muted">${esc((r.created_at || '').slice(0, 10))}</span></div>
-        ${r.body ? `<div class="review__body">${esc(r.body)}</div>` : ''}
-        ${r.photo_url ? `<img class="review__photo" src="${esc(r.photo_url)}" alt="">` : ''}
-      </div>`).join('')
-    : `<p class="muted">아직 후기가 없어요. 첫 후기를 남겨보세요!</p>`;
+        ${r.body ? `<div class="story__body">${esc(r.body)}</div>` : ''}
+        ${photos.length ? `<div class="story__photos">${photos.map((u) => `<img class="story__photo" src="${esc(u)}" loading="lazy" alt="">`).join('')}</div>` : ''}
+      </div>`;
+      }).join('')
+    : `<p class="muted">아직 이야기가 없어요. 첫 이야기를 남겨보세요!</p>`;
 }
 
 // ---- Add-cafe modal -------------------------------------------------------

@@ -65,10 +65,21 @@ CREATE TABLE IF NOT EXISTS reviews (
   cafe_id    TEXT NOT NULL,
   user_id    TEXT NOT NULL,
   body       TEXT NOT NULL,
-  photo_url  TEXT,
+  photo_url  TEXT,                        -- legacy single photo (kept for compat)
   created_at TEXT NOT NULL DEFAULT (datetime('now')),
   FOREIGN KEY (cafe_id) REFERENCES cafes(id) ON DELETE CASCADE,
   FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE CASCADE
+);
+
+-- multiple photos per story/review (Instagram-style)
+CREATE TABLE IF NOT EXISTS review_photos (
+  id         TEXT PRIMARY KEY,
+  review_id  TEXT NOT NULL,
+  cafe_id    TEXT NOT NULL,
+  url        TEXT NOT NULL,
+  ord        INTEGER NOT NULL DEFAULT 0,
+  FOREIGN KEY (review_id) REFERENCES reviews(id) ON DELETE CASCADE,
+  FOREIGN KEY (cafe_id) REFERENCES cafes(id) ON DELETE CASCADE
 );
 
 -- per-cafe chat; posting is gated on GPS proximity (<=1km) server-side
@@ -85,6 +96,8 @@ CREATE TABLE IF NOT EXISTS messages (
 CREATE INDEX IF NOT EXISTS idx_votes_cafe    ON votes(cafe_id);
 CREATE INDEX IF NOT EXISTS idx_reviews_cafe  ON reviews(cafe_id);
 CREATE INDEX IF NOT EXISTS idx_messages_cafe ON messages(cafe_id, created_at);
+CREATE INDEX IF NOT EXISTS idx_rphotos_cafe  ON review_photos(cafe_id);
+CREATE INDEX IF NOT EXISTS idx_rphotos_rev   ON review_photos(review_id, ord);
 `);
 
 // --- lightweight migrations (add columns if an older DB is missing them) ---
