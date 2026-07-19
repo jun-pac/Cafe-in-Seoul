@@ -2,6 +2,7 @@ import { api } from './api.js';
 import { initMap } from './map.js';
 import { renderAuth, renderDetail, openAddCafeModal, openEditCafeModal, renderPendingQueue, initChat } from './ui.js';
 import { passesFilters } from './util.js';
+import { icon } from './icons.js';
 
 const $ = (sel) => document.querySelector(sel);
 
@@ -119,14 +120,12 @@ function closeDetail() {
   map.setSelected(null);
 }
 
+// returns the new aggregate so the vote row updates IN PLACE (no panel reload).
+// markers refresh silently in the background.
 async function handleVote(id, category, score) {
-  try {
-    await api.vote(id, category, score);
-    await loadCafes();       // refresh scores/markers
-    await openDetail(id);    // re-render detail with new averages + my vote
-  } catch (e) {
-    alert(e.message);
-  }
+  const agg = await api.vote(id, category, score);
+  loadCafes(); // fire-and-forget: updates card scores without touching the open panel
+  return agg;
 }
 
 async function handleAdminEdit(id, cafe, action) {
@@ -172,6 +171,12 @@ async function refreshMe() {
     onLocalLogin: async (u, p) => { await api.login(u, p); await afterAuthChange(); },
     onRegister: async (u, p) => { await api.register(u, p); await afterAuthChange(); },
     onLogout: async () => { await api.logout(); await afterAuthChange(); },
+    onEditName: async () => {
+      const name = prompt('표시할 닉네임을 입력하세요', state.me.user?.name || '');
+      if (name == null || !name.trim()) return;
+      try { await api.updateName(name.trim()); await afterAuthChange(); }
+      catch (e) { alert(e.message); }
+    },
   });
 }
 
@@ -194,7 +199,7 @@ function wireAddCafe() {
         map.disablePick();
         await loadCafes();
         if (created.status === 'pending') {
-          alert(`🤖 AI 심사: 관리자 승인 대기\n\n사유: ${created.moderation?.reason || '특별함 확인 필요'}\n\n승인 전까지는 나에게만 보여요.`);
+          alert(`AI 심사 결과: 관리자 승인 대기\n\n사유: ${created.moderation?.reason || '특별함 확인 필요'}\n\n승인 전까지는 나에게만 보여요.`);
         }
         openDetail(created.id);
       },
@@ -204,6 +209,7 @@ function wireAddCafe() {
 
 // ---------- boot ----------
 async function boot() {
+  document.getElementById('addCafeBtn').innerHTML = `${icon('plus', 15)} 카페 등록`;
   wireFilters();
   wireAddCafe();
   await refreshMe();

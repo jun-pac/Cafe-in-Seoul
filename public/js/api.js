@@ -29,6 +29,11 @@ export const api = {
       method: 'POST', headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ username, password }),
     }).then(json),
+  updateName: (name) =>
+    fetch('/api/auth/me', {
+      method: 'PATCH', headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ name }),
+    }).then(json),
   logout: () => fetch('/api/auth/logout', { method: 'POST' }).then(json),
 
   adminCapabilities: () => fetch('/api/admin/capabilities').then(json),

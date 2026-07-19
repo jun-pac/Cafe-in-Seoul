@@ -71,6 +71,15 @@ CREATE TABLE IF NOT EXISTS reviews (
   FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE CASCADE
 );
 
+-- cafe-level photos (representative = ord 0), set at registration/edit
+CREATE TABLE IF NOT EXISTS cafe_photos (
+  id       TEXT PRIMARY KEY,
+  cafe_id  TEXT NOT NULL,
+  url      TEXT NOT NULL,
+  ord      INTEGER NOT NULL DEFAULT 0,
+  FOREIGN KEY (cafe_id) REFERENCES cafes(id) ON DELETE CASCADE
+);
+
 -- multiple photos per story/review (Instagram-style)
 CREATE TABLE IF NOT EXISTS review_photos (
   id         TEXT PRIMARY KEY,
@@ -98,6 +107,7 @@ CREATE INDEX IF NOT EXISTS idx_reviews_cafe  ON reviews(cafe_id);
 CREATE INDEX IF NOT EXISTS idx_messages_cafe ON messages(cafe_id, created_at);
 CREATE INDEX IF NOT EXISTS idx_rphotos_cafe  ON review_photos(cafe_id);
 CREATE INDEX IF NOT EXISTS idx_rphotos_rev   ON review_photos(review_id, ord);
+CREATE INDEX IF NOT EXISTS idx_cphotos_cafe  ON cafe_photos(cafe_id, ord);
 `);
 
 // --- lightweight migrations (add columns if an older DB is missing them) ---

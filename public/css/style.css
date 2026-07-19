@@ -308,6 +308,35 @@ input[type="checkbox"] { accent-color: #0a0a0a; width: 16px; height: 16px; }
 .photo-thumb { width: 66px; height: 48px; border-radius: var(--r-xs); background-size: cover; background-position: center; border: 2px solid transparent; cursor: pointer; padding: 0; background-color: #eee; }
 .photo-thumb.is-sel { border-color: var(--ink); }
 
+/* reorderable photo picker (first = cover) */
+.photo-picker { display: flex; flex-wrap: wrap; gap: 8px; }
+.pp-item { position: relative; width: 78px; height: 78px; border-radius: var(--r-sm); overflow: hidden; border: 1px solid var(--hair-strong); }
+.pp-item.is-cover { border: 2px solid var(--ink); }
+.pp-img { width: 100%; height: 100%; background-size: cover; background-position: center; background-color: #eee; }
+.pp-cover { position: absolute; top: 0; left: 0; background: var(--ink); color: #fff; font-family: var(--font-display); font-size: 9px; font-weight: 800; letter-spacing: 1px; padding: 1px 6px; border-bottom-right-radius: 6px; }
+.pp-ops { position: absolute; left: 0; right: 0; bottom: 0; display: flex; justify-content: center; gap: 1px; background: rgba(255,255,255,.9); padding: 2px 0; }
+.pp-ops button { border: 0; background: none; cursor: pointer; color: var(--ink); padding: 2px; display: grid; place-items: center; border-radius: 4px; }
+.pp-ops button:hover:not(:disabled) { background: var(--cool); }
+.pp-ops button:disabled { opacity: .28; cursor: default; }
+.pp-add { width: 78px; height: 78px; border-radius: var(--r-sm); border: 1.5px dashed var(--hair-strong); display: grid; place-items: center; cursor: pointer; color: var(--mute); }
+.pp-add:hover { border-color: var(--ink); color: var(--ink); }
+
+/* ---------- Icons ---------- */
+.ic { display: inline-block; vertical-align: -0.18em; flex: none; }
+.btn .ic, .linkbtn .ic { vertical-align: -0.2em; }
+.chip { display: inline-flex; align-items: center; gap: 6px; }
+.chip .ic { color: var(--mute); }
+.vote__label { display: inline-flex; align-items: center; gap: 6px; }
+.info { display: inline-flex; align-items: center; color: var(--mute); cursor: help; margin-left: 1px; }
+.info:hover { color: var(--ink); }
+.detail__aisum-h { display: flex; align-items: center; gap: 7px; }
+.star { display: inline-flex; align-items: center; padding: 0 1px; }
+.authbar__who { display: inline-flex; align-items: center; gap: 7px; }
+.authbar__name { cursor: pointer; border-bottom: 1px dashed var(--hair-strong); }
+.authbar__name:hover { border-color: var(--ink); }
+.authbar .btn--ghost { padding: 9px 11px; }
+.brand__logo .ic, .brand__logo svg { display: block; }
+
 /* ---------- Responsive ---------- */
 @media (max-width: 860px) {
   #app { grid-template-columns: 1fr; grid-template-rows: auto 1fr; }

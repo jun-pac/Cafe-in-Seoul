@@ -33,6 +33,8 @@ const reviewsStmt = db.prepare(`
 `);
 const reviewPhotosStmt = db.prepare('SELECT review_id, url FROM review_photos WHERE cafe_id = ? ORDER BY ord');
 const galleryStmt = db.prepare('SELECT url FROM review_photos WHERE cafe_id = ? ORDER BY rowid DESC');
+const cafePhotosStmt = db.prepare('SELECT url FROM cafe_photos WHERE cafe_id = ? ORDER BY ord');
+const insertCafePhoto = db.prepare('INSERT INTO cafe_photos (id, cafe_id, url, ord) VALUES (?,?,?,?)');
 const myVotesStmt = db.prepare('SELECT category, score FROM votes WHERE cafe_id = ? AND user_id = ?');
 
 const insertCafe = db.prepare(`
@@ -65,8 +67,10 @@ router.get('/:id', (req, res) => {
   const photosByReview = {};
   for (const p of reviewPhotosStmt.all(cafe.id)) (photosByReview[p.review_id] ||= []).push(p.url);
   for (const r of detail.reviews) r.photos = photosByReview[r.id] || (r.photo_url ? [r.photo_url] : []);
-  // carousel gallery: representative photo + all story photos (newest first)
-  detail.gallery = [detail.photo_url, ...galleryStmt.all(cafe.id).map((p) => p.url)].filter(Boolean);
+  // carousel gallery: cafe photos (ordered, representative first) + story photos
+  const cp = cafePhotosStmt.all(cafe.id).map((p) => p.url);
+  const base = cp.length ? cp : (detail.photo_url ? [detail.photo_url] : []);
+  detail.gallery = [...base, ...galleryStmt.all(cafe.id).map((p) => p.url)].filter(Boolean);
   detail.myVotes = {};
   if (req.user) {
     for (const v of myVotesStmt.all(cafe.id, req.user.id)) detail.myVotes[v.category] = v.score;
@@ -97,16 +101,32 @@ function validationError(body, hasPhoto) {
   return null;
 }
 
-// POST /api/cafes — register a cafe (auth required). multipart/form-data with `photo`.
-// Admins auto-publish; others go through AI moderation → approved or pending.
-router.post('/', requireAuth, upload.single('photo'), async (req, res, next) => {
+// POST /api/cafes — register a cafe (auth required). multipart with `photos` (many)
+// + `photo_manifest` (JSON array of 'file' | 'url:<url>') defining order; the first
+// photo is the representative. Admins auto-publish; others go through AI moderation.
+router.post('/', requireAuth, upload.array('photos', 10), async (req, res, next) => {
   const b = req.body || {};
-  const photoUrl = req.file ? `/uploads/${req.file.filename}` : (b.photo_url || '').trim();
-  const err = validationError(b, !!photoUrl);
-  if (err) {
-    if (req.file) fs.unlink(req.file.path, () => {}); // don't keep orphaned upload
-    return res.status(400).json({ error: err });
+  const files = req.files || [];
+  const cleanup = () => files.forEach((f) => fs.unlink(f.path, () => {}));
+
+  let manifest = [];
+  try { manifest = JSON.parse(b.photo_manifest || '[]'); } catch { manifest = []; }
+  let fi = 0;
+  let ordered = [];
+  if (manifest.length) {
+    for (const t of manifest) {
+      if (t === 'file') { if (files[fi]) ordered.push(`/uploads/${files[fi++].filename}`); }
+      else if (typeof t === 'string' && t.startsWith('url:')) ordered.push(t.slice(4));
+    }
+  } else if (files.length) {
+    ordered = files.map((f) => `/uploads/${f.filename}`);
+  } else if ((b.photo_url || '').trim()) {
+    ordered = [b.photo_url.trim()];
   }
+  ordered = ordered.filter(Boolean);
+
+  const err = validationError(b, ordered.length > 0);
+  if (err) { cleanup(); return res.status(400).json({ error: err }); }
 
   const toBool = (v) => (v === true || v === 'true' || v === '1' || v === 1 ? 1 : 0);
   const cafe = {
@@ -115,7 +135,7 @@ router.post('/', requireAuth, upload.single('photo'), async (req, res, next) => 
     address: (b.address || '').trim() || null,
     lat: +b.lat,
     lng: +b.lng,
-    photo_url: photoUrl,
+    photo_url: ordered[0],
     floors: +b.floors,
     open_time: b.open_time,
     close_time: b.close_time,
@@ -133,10 +153,13 @@ router.post('/', requireAuth, upload.single('photo'), async (req, res, next) => 
 
   try {
     const verdict = await moderate(cafe, { isAdmin: isAdmin(req.user) });
-    insertCafe.run({ ...cafe, status: verdict.status, moderation_reason: verdict.reason });
+    db.transaction(() => {
+      insertCafe.run({ ...cafe, status: verdict.status, moderation_reason: verdict.reason });
+      ordered.forEach((url, i) => insertCafePhoto.run(crypto.randomUUID(), cafe.id, url, i));
+    })();
     res.status(201).json({ ...decorate(getStmt.get(cafe.id)), moderation: verdict });
   } catch (e) {
-    if (req.file) fs.unlink(req.file.path, () => {});
+    cleanup();
     next(e);
   }
 });

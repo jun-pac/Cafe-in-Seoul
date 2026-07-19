@@ -146,6 +146,16 @@ router.post('/dev-login', express.json(), (req, res, next) => {
   });
 });
 
+// change display name (nickname). Doesn't change the login id for local accounts.
+const updateName = db.prepare('UPDATE users SET name = ? WHERE id = ?');
+router.patch('/me', express.json(), (req, res) => {
+  if (!req.user) return res.status(401).json({ error: '로그인이 필요합니다.' });
+  const name = (req.body?.name || '').trim();
+  if (name.length < 1 || name.length > 20) return res.status(400).json({ error: '닉네임은 1~20자여야 합니다.' });
+  updateName.run(name, req.user.id);
+  res.json({ user: { id: req.user.id, name, isAdmin: isAdmin(req.user) } });
+});
+
 router.post('/logout', (req, res, next) => {
   req.logout((err) => (err ? next(err) : res.json({ ok: true })));
 });

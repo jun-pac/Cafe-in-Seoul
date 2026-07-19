@@ -1,11 +1,12 @@
 import {
-  SIZE_LABEL, OUTLET_LABEL, won, hoursText, isOpenNow, esc, haversineKm,
+  SIZE_LABEL, OUTLET_LABEL, DEFS, won, hoursText, isOpenNow, esc, haversineKm,
 } from './util.js';
+import { icon } from './icons.js';
 
 const VOTE_CATS = [
-  { key: 'coffee', label: '커피맛', icon: '☕' },
-  { key: 'quiet', label: '조용함', icon: '🔇' },
-  { key: 'restroom', label: '화장실 청결', icon: '🚻' },
+  { key: 'coffee', label: '커피맛', icon: 'coffee', def: DEFS.coffee },
+  { key: 'quiet', label: '조용함', icon: 'quiet', def: DEFS.quiet },
+  { key: 'restroom', label: '화장실 청결', icon: 'clean', def: DEFS.restroom },
 ];
 
 function stars(avg) {
@@ -14,15 +15,16 @@ function stars(avg) {
 }
 
 // ---- Auth bar -------------------------------------------------------------
-export function renderAuth(el, me, { onLogout, onGoogleCredential, onLocalLogin, onRegister }) {
+export function renderAuth(el, me, { onLogout, onGoogleCredential, onLocalLogin, onRegister, onEditName }) {
   el.innerHTML = '';
   if (me.user) {
     const wrap = document.createElement('div');
     wrap.className = 'authbar';
     const badge = me.user.isAdmin ? '<span class="admin-badge">관리자</span>' : '';
-    wrap.innerHTML = `<span class="authbar__who">👤 ${esc(me.user.name)} ${badge}</span>
-      <button class="btn btn--ghost" id="logoutBtn">로그아웃</button>`;
+    wrap.innerHTML = `<span class="authbar__who">${icon('user', 15)} <span class="authbar__name" id="editNameBtn" title="닉네임 변경">${esc(me.user.name)}</span> ${badge}</span>
+      <button class="btn btn--ghost" id="logoutBtn" title="로그아웃">${icon('logout', 15)}</button>`;
     wrap.querySelector('#logoutBtn').onclick = onLogout;
+    wrap.querySelector('#editNameBtn').onclick = onEditName;
     el.appendChild(wrap);
     return;
   }
@@ -86,7 +88,7 @@ export function renderAuth(el, me, { onLogout, onGoogleCredential, onLocalLogin,
 export function renderPendingQueue(el, cafes, { onApprove, onReject, onOpen }) {
   if (!cafes.length) { el.hidden = true; el.innerHTML = ''; return; }
   el.hidden = false;
-  el.innerHTML = `<div class="pending-queue__title">🛡️ 심사 대기 <b>${cafes.length}</b></div>`;
+  el.innerHTML = `<div class="pending-queue__title">${icon('shield', 14)} 심사 대기 <b>${cafes.length}</b></div>`;
   for (const c of cafes) {
     const row = document.createElement('div');
     row.className = 'pending-item';
@@ -113,32 +115,32 @@ export function renderDetail(el, cafe, { user, onVote, onAddReview, onClose, onE
   const gallery = (cafe.gallery && cafe.gallery.length) ? cafe.gallery : [cafe.photo_url].filter(Boolean);
 
   el.innerHTML = `
-    <button class="detail__close" title="닫기">✕</button>
+    <button class="detail__close" title="닫기">${icon('x', 16)}</button>
     <div class="detail__scroll">
       <div class="detail__hero">
         <div class="carousel__img" id="carImg"></div>
         ${gallery.length > 1 ? `
-          <button class="carousel__nav prev" id="carPrev" aria-label="이전">‹</button>
-          <button class="carousel__nav next" id="carNext" aria-label="다음">›</button>
+          <button class="carousel__nav prev" id="carPrev" aria-label="이전">${icon('chevronLeft', 22)}</button>
+          <button class="carousel__nav next" id="carNext" aria-label="다음">${icon('chevronRight', 22)}</button>
           <div class="carousel__count" id="carCount"></div>` : ''}
         <div class="detail__scorebig" title="카공 종합점수">${cafe.score}<small>SCORE</small></div>
       </div>
       <div class="detail__body">
         <h2 class="detail__name">${esc(cafe.name)}</h2>
         <div class="detail__addr">${esc(cafe.address || '')}</div>
-        ${cafe.status === 'pending' ? `<div class="detail__pending">🛡️ 심사 대기중 <span class="muted">— ${esc(cafe.moderation_reason || '관리자 확인 필요')}</span></div>` : ''}
-        ${user?.isAdmin ? `<div class="detail__adminrow"><button class="btn btn--ghost sm" id="editCafeBtn">✎ 수정</button>${cafe.status === 'pending' ? '<button class="btn btn--primary sm" id="approveCafeBtn">승인</button>' : ''}</div>` : ''}
+        ${cafe.status === 'pending' ? `<div class="detail__pending">${icon('shield', 14)} 심사 대기중 <span class="muted">— ${esc(cafe.moderation_reason || '관리자 확인 필요')}</span></div>` : ''}
+        ${user?.isAdmin ? `<div class="detail__adminrow"><button class="btn btn--ghost sm" id="editCafeBtn">${icon('edit', 14)} 수정</button>${cafe.status === 'pending' ? '<button class="btn btn--primary sm" id="approveCafeBtn">승인</button>' : ''}</div>` : ''}
 
         <div class="detail__hours ${openNow ? 'is-open' : 'is-closed'}">
           <span class="dot"></span>${openNow ? 'OPEN NOW' : 'CLOSED'} · ${esc(hoursText(cafe))}
         </div>
 
         <div class="chips">
-          <span class="chip">🏢 ${esc(floorTxt)}</span>
-          <span class="chip">📐 ${SIZE_LABEL[cafe.size] || cafe.size}</span>
-          <span class="chip">🔌 ${OUTLET_LABEL[cafe.outlets] || cafe.outlets}</span>
-          <span class="chip">🪟 ${esc(viewTxt)}</span>
-          <span class="chip">🧊 아메리카노 ${won(cafe.iced_americano_price)}</span>
+          <span class="chip" title="${esc(DEFS.floors)}">${icon('floors', 14)} ${esc(floorTxt)}</span>
+          <span class="chip" title="${esc(DEFS.size)}">${icon('size', 14)} ${SIZE_LABEL[cafe.size] || cafe.size}</span>
+          <span class="chip" title="${esc(DEFS.outlets)}">${icon('outlet', 14)} 콘센트 ${OUTLET_LABEL[cafe.outlets] || cafe.outlets}</span>
+          <span class="chip" title="${esc(DEFS.view)}">${icon('view', 14)} ${esc(viewTxt)}</span>
+          <span class="chip" title="${esc(DEFS.price)}">${icon('price', 14)} 아메리카노 ${won(cafe.iced_americano_price)}</span>
         </div>
 
         <div class="detail__links">
@@ -146,7 +148,7 @@ export function renderDetail(el, cafe, { user, onVote, onAddReview, onClose, onE
           ${cafe.kakao_url ? `<a class="btn btn--map kakao" href="${esc(cafe.kakao_url)}" target="_blank" rel="noopener">카카오 지도</a>` : ''}
         </div>
 
-        ${cafe.review_summary ? `<div class="detail__aisum">🤖 <b>리뷰 요약</b><p>${esc(cafe.review_summary)}</p></div>` : ''}
+        ${cafe.review_summary ? `<div class="detail__aisum"><div class="detail__aisum-h">${icon('ai', 15)} <b>리뷰 요약</b></div><p>${esc(cafe.review_summary)}</p></div>` : ''}
 
         <h3 class="detail__h3">집단지성 평가 <small>1–5</small></h3>
         <div class="votes"></div>
@@ -155,7 +157,7 @@ export function renderDetail(el, cafe, { user, onVote, onAddReview, onClose, onE
         <div class="storyform" id="storyform"></div>
         <div class="stories"></div>
 
-        <h3 class="detail__h3">동네 토크 <small>📍 GPS 1KM 이내만 참여</small></h3>
+        <h3 class="detail__h3">동네 토크 <small>${icon('gps', 12)} GPS 1KM 이내만 참여</small></h3>
         <div class="chat" id="chatBox"></div>
       </div>
     </div>`;
@@ -176,29 +178,39 @@ export function renderDetail(el, cafe, { user, onVote, onAddReview, onClose, onE
   el.querySelector('#carPrev')?.addEventListener('click', () => { ci = (ci - 1 + gallery.length) % gallery.length; showImg(); });
   el.querySelector('#carNext')?.addEventListener('click', () => { ci = (ci + 1) % gallery.length; showImg(); });
 
-  // votes
+  // votes — update the row in place on click (no full panel reload)
   const votesEl = el.querySelector('.votes');
   for (const cat of VOTE_CATS) {
-    const avg = cafe.votes.averages[cat.key];
-    const n = cafe.votes.counts[cat.key] || 0;
-    const mine = cafe.myVotes?.[cat.key] || 0;
     const row = document.createElement('div');
     row.className = 'vote';
-    row.innerHTML = `
-      <div class="vote__head">
-        <span class="vote__label">${cat.icon} ${cat.label}</span>
-        <span class="vote__avg">${stars(avg)} <span class="muted">(${n})</span></span>
-      </div>
-      <div class="vote__stars" role="group" aria-label="${cat.label} 투표">
-        ${[1, 2, 3, 4, 5].map((v) =>
-          `<button class="star ${mine >= v ? 'on' : ''}" data-v="${v}">${mine >= v ? '★' : '☆'}</button>`).join('')}
-      </div>`;
-    row.querySelectorAll('.star').forEach((b) => {
-      b.onclick = () => {
-        if (!user) return alert('투표하려면 로그인이 필요합니다.');
-        onVote(cat.key, Number(b.dataset.v));
-      };
-    });
+    const paint = () => {
+      const avg = cafe.votes.averages[cat.key];
+      const n = cafe.votes.counts[cat.key] || 0;
+      const mine = cafe.myVotes?.[cat.key] || 0;
+      row.innerHTML = `
+        <div class="vote__head">
+          <span class="vote__label">${icon(cat.icon)} ${cat.label}
+            <span class="info" title="${esc(cat.def)}">${icon('info', 13)}</span></span>
+          <span class="vote__avg">${stars(avg)} <span class="muted">(${n})</span></span>
+        </div>
+        <div class="vote__stars" role="group" aria-label="${cat.label} 투표">
+          ${[1, 2, 3, 4, 5].map((v) =>
+            `<button class="star ${mine >= v ? 'on' : ''}" data-v="${v}" aria-label="${v}점">${icon('star', 22)}</button>`).join('')}
+        </div>`;
+      row.querySelectorAll('.star').forEach((b) => {
+        b.onclick = async () => {
+          if (!user) return alert('투표하려면 로그인이 필요합니다.');
+          try {
+            const v = Number(b.dataset.v);
+            const agg = await onVote(cat.key, v);      // { averages, counts }
+            if (agg) cafe.votes = agg;
+            cafe.myVotes = { ...(cafe.myVotes || {}), [cat.key]: v };
+            paint();
+          } catch (e) { alert(e.message); }
+        };
+      });
+    };
+    paint();
     votesEl.appendChild(row);
   }
 
@@ -212,26 +224,18 @@ export function renderDetail(el, cafe, { user, onVote, onAddReview, onClose, onE
   if (user) {
     formEl.innerHTML = `
       <textarea class="input" id="stBody" rows="3" placeholder="이 카페에 얽힌 이야기를 자유롭게 남겨보세요. 사진도 여러 장 올릴 수 있어요."></textarea>
-      <div class="storyform__photos" id="stPreview"></div>
+      <div class="photo-picker" id="stPicker"></div>
       <div class="storyform__row">
-        <label class="btn btn--ghost sm filepick">＋ 사진<input type="file" id="stPhotos" accept="image/*" multiple hidden></label>
-        <span class="muted" id="stCount"></span>
         <button class="btn btn--primary sm" id="stSubmit">올리기</button>
       </div>`;
-    const fileInput = formEl.querySelector('#stPhotos');
-    const preview = formEl.querySelector('#stPreview');
-    let picked = [];
-    fileInput.onchange = () => {
-      picked = [...fileInput.files].slice(0, 10);
-      preview.innerHTML = picked.map((f) => `<div class="st-thumb" style="background-image:url('${URL.createObjectURL(f)}')"></div>`).join('');
-      formEl.querySelector('#stCount').textContent = picked.length ? `사진 ${picked.length}장` : '';
-    };
+    const stPicker = createPhotoPicker(formEl.querySelector('#stPicker'), {});
     formEl.querySelector('#stSubmit').onclick = async () => {
       const body = formEl.querySelector('#stBody').value.trim();
-      if (!body && !picked.length) return alert('이야기나 사진을 올려주세요.');
+      const { files, count } = stPicker.getManifest();
+      if (!body && !count) return alert('이야기나 사진을 올려주세요.');
       const fd = new FormData();
       fd.append('body', body);
-      picked.forEach((f) => fd.append('photos', f));
+      files.forEach((f) => fd.append('photos', f));
       const btn = formEl.querySelector('#stSubmit');
       btn.disabled = true; btn.textContent = '올리는 중…';
       try { await onAddReview(fd); } finally { btn.disabled = false; btn.textContent = '올리기'; }
@@ -248,21 +252,21 @@ export function openEditCafeModal(cafe, { onSave }) {
   const sel = (v, o) => (v === o ? 'selected' : '');
   back.innerHTML = `
     <div class="modal" role="dialog" aria-modal="true">
-      <div class="modal__head"><h2>카페 수정</h2><button class="detail__close" id="eClose">✕</button></div>
+      <div class="modal__head"><h2>카페 수정</h2><button class="detail__close" id="eClose">${icon('x', 16)}</button></div>
       <form class="cafeform" id="editForm">
         <label class="field"><span>이름</span><input class="input" name="name" value="${esc(cafe.name)}"></label>
         <label class="field"><span>주소</span><input class="input" name="address" value="${esc(cafe.address || '')}"></label>
         <label class="field"><span>대표사진 URL</span><input class="input" name="photo_url" value="${esc(cafe.photo_url || '')}"></label>
         <div class="grid2">
-          <label class="field"><span>층수 (다층이면 2+)</span><input class="input" type="number" min="1" name="floors" value="${esc(cafe.floors)}"></label>
-          <label class="field"><span>면적</span><select class="input" name="size">
-            <option value="small" ${sel(cafe.size, 'small')}>소형</option>
-            <option value="medium" ${sel(cafe.size, 'medium')}>중형</option>
-            <option value="large" ${sel(cafe.size, 'large')}>대형</option></select></label>
-          <label class="field"><span>콘센트</span><select class="input" name="outlets">
-            <option value="many" ${sel(cafe.outlets, 'many')}>많음</option>
-            <option value="some" ${sel(cafe.outlets, 'some')}>보통</option>
-            <option value="few" ${sel(cafe.outlets, 'few')}>적음</option>
+          <label class="field"><span>층수 (다층이면 2+) <span class="info" title="${esc(DEFS.floors)}">${icon('info', 12)}</span></span><input class="input" type="number" min="1" name="floors" value="${esc(cafe.floors)}"></label>
+          <label class="field"><span>면적 <span class="info" title="${esc(DEFS.size)}">${icon('info', 12)}</span></span><select class="input" name="size">
+            <option value="small" ${sel(cafe.size, 'small')}>소형 (5개 이하)</option>
+            <option value="medium" ${sel(cafe.size, 'medium')}>중형 (6–15)</option>
+            <option value="large" ${sel(cafe.size, 'large')}>대형 (16+)</option></select></label>
+          <label class="field"><span>콘센트 <span class="info" title="${esc(DEFS.outlets)}">${icon('info', 12)}</span></span><select class="input" name="outlets">
+            <option value="many" ${sel(cafe.outlets, 'many')}>대부분 있음</option>
+            <option value="some" ${sel(cafe.outlets, 'some')}>일부 있음</option>
+            <option value="few" ${sel(cafe.outlets, 'few')}>드물게 있음</option>
             <option value="none" ${sel(cafe.outlets, 'none')}>없음</option></select></label>
           <label class="field"><span>아이스아메리카노(원)</span><input class="input" type="number" min="0" step="100" name="iced_americano_price" value="${esc(cafe.iced_americano_price)}"></label>
           <label class="field"><span>오픈</span><input class="input" type="time" name="open_time" value="${esc(cafe.open_time)}"></label>
@@ -339,7 +343,7 @@ export function initChat(root, cafe, { user, api }) {
     if (verified) {
       gateEl.innerHTML = `
         <div class="chat__input">
-          <input class="input" id="chatInput" placeholder="메시지 입력 (📍 1km 인증됨)" maxlength="500">
+          <input class="input" id="chatInput" placeholder="메시지 입력 (1km 인증됨)" maxlength="500">
           <button class="btn btn--primary pill sm" id="chatSend">전송</button>
         </div>
         <div class="chat__err" id="chatErr"></div>`;
@@ -362,7 +366,7 @@ export function initChat(root, cafe, { user, api }) {
       input.addEventListener('keydown', (e) => { if (e.key === 'Enter') { e.preventDefault(); send(); } });
     } else {
       gateEl.innerHTML = `
-        <button class="btn btn--ghost pill sm" id="chatVerify">📍 1km 이내 인증하고 참여</button>
+        <button class="btn btn--ghost pill sm" id="chatVerify">${icon('gps', 14)} 1km 이내 인증하고 참여</button>
         <div class="chat__err" id="chatErr"></div>`;
       gateEl.querySelector('#chatVerify').onclick = verify;
     }
@@ -405,6 +409,52 @@ export function renderStories(el, reviews) {
     : `<p class="muted">아직 이야기가 없어요. 첫 이야기를 남겨보세요!</p>`;
 }
 
+// ---- Reusable photo picker (reorderable; first = cover/representative) -----
+export function createPhotoPicker(container, { onChange } = {}) {
+  let items = []; // { kind:'file'|'url', file?, url?, obj? }
+  const MAX = 10;
+  function render() {
+    container.innerHTML = items.map((it, i) => `
+      <div class="pp-item ${i === 0 ? 'is-cover' : ''}" data-i="${i}">
+        <div class="pp-img" style="background-image:url('${it.kind === 'url' ? esc(it.url) : it.obj}')"></div>
+        ${i === 0 ? '<span class="pp-cover">대표</span>' : ''}
+        <div class="pp-ops">
+          <button type="button" data-op="left" title="앞으로" ${i === 0 ? 'disabled' : ''}>${icon('chevronLeft', 12)}</button>
+          <button type="button" data-op="right" title="뒤로" ${i === items.length - 1 ? 'disabled' : ''}>${icon('chevronRight', 12)}</button>
+          <button type="button" data-op="del" title="삭제">${icon('x', 12)}</button>
+        </div>
+      </div>`).join('') +
+      (items.length < MAX ? `<label class="pp-add" title="사진 추가">${icon('plus', 20)}<input type="file" accept="image/*" multiple hidden></label>` : '');
+
+    const addInput = container.querySelector('.pp-add input');
+    if (addInput) addInput.onchange = (e) => { addFiles(e.target.files); e.target.value = ''; };
+    container.querySelectorAll('.pp-item').forEach((el) => {
+      const i = +el.dataset.i;
+      el.querySelector('[data-op="left"]').onclick = () => { if (i > 0) { [items[i - 1], items[i]] = [items[i], items[i - 1]]; render(); } };
+      el.querySelector('[data-op="right"]').onclick = () => { if (i < items.length - 1) { [items[i + 1], items[i]] = [items[i], items[i + 1]]; render(); } };
+      el.querySelector('[data-op="del"]').onclick = () => { items.splice(i, 1); render(); };
+    });
+    onChange?.(items.length);
+  }
+  function addFiles(fileList) {
+    for (const f of [...fileList]) { if (items.length >= MAX) break; items.push({ kind: 'file', file: f, obj: URL.createObjectURL(f) }); }
+    render();
+  }
+  function addUrls(urls) {
+    for (const u of urls || []) { if (items.length >= MAX) break; if (!items.some((it) => it.kind === 'url' && it.url === u)) items.push({ kind: 'url', url: u }); }
+    render();
+  }
+  function getManifest() {
+    return {
+      manifest: items.map((it) => (it.kind === 'file' ? 'file' : `url:${it.url}`)),
+      files: items.filter((it) => it.kind === 'file').map((it) => it.file),
+      count: items.length,
+    };
+  }
+  render();
+  return { addFiles, addUrls, getManifest, get count() { return items.length; } };
+}
+
 // ---- Add-cafe modal -------------------------------------------------------
 // Flow: human enters name + Naver/Kakao links → "카카오 링크로 가져오기" fetches
 // location / photos / hours / americano price / AI review summary → human edits
@@ -419,7 +469,7 @@ export function openAddCafeModal(opts) {
     <div class="modal" role="dialog" aria-modal="true">
       <div class="modal__head">
         <h2>카페 등록</h2>
-        <button class="detail__close" id="mClose">✕</button>
+        <button class="detail__close" id="mClose">${icon('x', 16)}</button>
       </div>
 
       <form class="cafeform" id="cafeForm">
@@ -434,8 +484,8 @@ export function openAddCafeModal(opts) {
           <input type="hidden" name="kakao_place_id">
           ${canFetch ? `
           <div class="fetch-row">
-            <button type="button" class="btn btn--primary" id="fetchBtn">🤖 카카오 링크로 정보 가져오기</button>
-            <button type="button" class="linkbtn" id="findLinkBtn">🔎 검색으로 링크 찾기</button>
+            <button type="button" class="btn btn--primary" id="fetchBtn">${icon('ai', 14)} 카카오 링크로 정보 가져오기</button>
+            <button type="button" class="linkbtn" id="findLinkBtn">${icon('search', 13)} 검색으로 링크 찾기</button>
           </div>
           <div class="finder" id="finder" hidden>
             <div class="autofill__search">
@@ -463,10 +513,8 @@ export function openAddCafeModal(opts) {
             <small class="muted" id="pickHint"></small>
           </div>
 
-          <div class="field"><span>대표사진 * <small class="muted">(가져온 사진 선택 또는 파일 업로드)</small></span>
-            <input class="input" type="file" name="photo" accept="image/*">
-            <input type="hidden" name="photo_url">
-            <div class="photo-preview" id="photoPreview" hidden></div>
+          <div class="field"><span>사진 * <small class="muted">(첫 번째가 대표사진 · 화살표로 순서 변경)</small></span>
+            <div class="photo-picker" id="photoPicker"></div>
           </div>
 
           <div class="grid2">
@@ -485,23 +533,23 @@ export function openAddCafeModal(opts) {
         <div class="formsec">
           <div class="formsec__title">3. 직접 판단 (카공 핵심)</div>
           <div class="grid2">
-            <label class="field"><span>층수 * (다층이면 2 이상)</span>
+            <label class="field"><span>층수 * <span class="info" title="${esc(DEFS.floors)}">${icon('info', 12)}</span></span>
               <input class="input" type="number" name="floors" min="1" value="1" required></label>
-            <label class="field"><span>면적 *</span>
+            <label class="field"><span>면적 * <span class="info" title="${esc(DEFS.size)}">${icon('info', 12)}</span></span>
               <select class="input" name="size" required>
-                <option value="small">소형</option>
+                <option value="small">소형 (테이블 5개 이하)</option>
                 <option value="medium" selected>중형 (테이블 6–15)</option>
-                <option value="large">대형 (프랜차이즈급)</option>
+                <option value="large">대형 (프랜차이즈급 · 16+)</option>
               </select></label>
-            <label class="field"><span>콘센트 *</span>
+            <label class="field"><span>콘센트 * <span class="info" title="${esc(DEFS.outlets)}">${icon('info', 12)}</span></span>
               <select class="input" name="outlets" required>
-                <option value="many">많음</option>
-                <option value="some" selected>보통</option>
-                <option value="few">적음</option>
+                <option value="many">대부분 있음</option>
+                <option value="some" selected>일부 있음</option>
+                <option value="few">드물게 있음</option>
                 <option value="none">없음</option>
               </select></label>
           </div>
-          <label class="field checkline"><input type="checkbox" name="has_view"> <span>뷰가 좋은 편이에요</span></label>
+          <label class="field checkline"><input type="checkbox" name="has_view"> <span>뷰가 좋은 편이에요 <span class="info" title="${esc(DEFS.view)}">${icon('info', 12)}</span></span></label>
           <label class="field"><span>뷰 설명 (선택)</span>
             <input class="input" name="view_note" placeholder="예) 2층 창가 한강 방향"></label>
         </div>
@@ -517,7 +565,7 @@ export function openAddCafeModal(opts) {
   const form = back.querySelector('#cafeForm');
   const hint = back.querySelector('#pickHint');
   const errEl = back.querySelector('#formErr');
-  const preview = back.querySelector('#photoPreview');
+  const picker = createPhotoPicker(back.querySelector('#photoPicker'), {});
 
   const close = () => { onCancelPick?.(); back.remove(); };
   back.querySelector('#mClose').onclick = close;
@@ -531,17 +579,6 @@ export function openAddCafeModal(opts) {
       hint.textContent = `선택됨: ${lat.toFixed(5)}, ${lng.toFixed(5)}`;
     });
   };
-
-  form.elements.photo.addEventListener('change', () => {
-    if (form.elements.photo.files[0]) { form.elements.photo_url.value = ''; preview.hidden = true; }
-  });
-
-  function setPhotoUrl(url) {
-    form.elements.photo_url.value = url;
-    form.elements.photo.value = '';
-    preview.hidden = false;
-    preview.querySelectorAll('.photo-thumb').forEach((t) => t.classList.toggle('is-sel', t.dataset.url === url));
-  }
 
   function applyFetched(data) {
     const f = data.fetched || {};
@@ -558,23 +595,18 @@ export function openAddCafeModal(opts) {
     if (f.iced_americano_price) form.elements.iced_americano_price.value = f.iced_americano_price;
     if (data.review_summary) form.elements.review_summary.value = data.review_summary;
 
-    const photos = (f.photos || []).slice(0, 8);
-    preview.hidden = photos.length === 0;
-    preview.innerHTML = photos.map((u, i) =>
-      `<button type="button" class="photo-thumb ${i === 0 ? 'is-sel' : ''}" data-url="${esc(u)}" style="background-image:url('${esc(u)}')"></button>`).join('');
-    preview.querySelectorAll('.photo-thumb').forEach((t) => (t.onclick = () => setPhotoUrl(t.dataset.url)));
-    if (photos[0]) setPhotoUrl(photos[0]);
+    picker.addUrls((f.photos || []).slice(0, 8)); // add fetched photos to the picker (reorderable)
 
     const st = back.querySelector('#fetchStatus');
     st.hidden = false;
     const km = f.iced_americano_price ? `${f.americano_menu_name || '아메리카노'} ${Number(f.iced_americano_price).toLocaleString('ko-KR')}원` : '';
     st.innerHTML = `
-      <div class="ai-summary">💡 ${esc(data.review_summary || '리뷰 요약 없음')}</div>
+      <div class="ai-summary">${icon('ai', 14)} ${esc(data.review_summary || '리뷰 요약 없음')}</div>
       ${(data.keywords||[]).length ? `<div class="kw">${data.keywords.map((k)=>`<span class="kw__t">#${esc(k)}</span>`).join('')}</div>` : ''}
       <div class="muted">카카오 평점 ${f.rating ?? '?'} · 리뷰 ${f.review_count ?? 0}개 ${km ? '· '+esc(km) : ''}
         ${(f.strengths||[]).slice(0,4).map((s)=>`${esc(s.name)}(${s.count})`).join(' ')}</div>
       ${data.aiError ? `<div class="ai-note">AI 요약 실패: ${esc(data.aiError)}</div>` : ''}
-      <div class="ai-warn">⚠️ 가져온 값 확인 후 층수/면적/콘센트/뷰는 직접 채워주세요.</div>`;
+      <div class="ai-warn">${icon('info', 13)} 가져온 값 확인 후 층수/면적/콘센트/뷰는 직접 채워주세요.</div>`;
   }
 
   if (canFetch) {
@@ -637,11 +669,13 @@ export function openAddCafeModal(opts) {
     errEl.textContent = '';
     if (!form.elements.kakao_url.value.trim()) { errEl.textContent = '카카오 지도 링크는 필수입니다.'; return; }
     if (!form.elements.lat.value || !form.elements.lng.value) { errEl.textContent = '위치를 가져오거나 지도에서 선택하세요.'; return; }
-    if (!form.elements.photo.files[0] && !form.elements.photo_url.value) { errEl.textContent = '대표사진(파일 또는 가져온 사진)이 필요합니다.'; return; }
+    const { manifest, files, count } = picker.getManifest();
+    if (!count) { errEl.textContent = '사진을 한 장 이상 추가하세요 (첫 번째가 대표).'; return; }
 
     const fd = new FormData(form);
     fd.set('has_view', form.elements.has_view.checked ? 'true' : 'false');
-    if (!form.elements.photo.files[0]) fd.delete('photo');
+    fd.set('photo_manifest', JSON.stringify(manifest));
+    files.forEach((f) => fd.append('photos', f));
     try {
       await onSubmit(fd);
       close();

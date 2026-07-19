@@ -1,8 +1,20 @@
 // Formatting + filter helpers shared by the map cards and the detail panel.
 
 export const SIZE_LABEL = { small: '소형', medium: '중형', large: '대형' };
-export const OUTLET_LABEL = { many: '콘센트 많음', some: '콘센트 보통', few: '콘센트 적음', none: '콘센트 없음' };
+export const OUTLET_LABEL = { many: '대부분 있음', some: '일부 있음', few: '드물게 있음', none: '없음' };
 export const OUTLET_RANK = { none: 0, few: 1, some: 2, many: 3 };
+
+// precise definitions surfaced as tooltips wherever these fields appear
+export const DEFS = {
+  size: '면적 — 소형: 테이블 5개 이하 / 중형: 6–15개 / 대형: 프랜차이즈급(16개 이상)',
+  outlets: '콘센트 — 대부분 있음: 거의 모든 자리 / 일부 있음: 일부 자리 / 드물게 있음: 카운터 근처 등 소수 / 없음',
+  floors: '층수 — 2층 이상이면 다층. 오래 머물러도 눈치가 덜 보임',
+  view: '뷰 — 창밖 전망/경치가 특별히 좋은지',
+  coffee: '커피맛 — 1(별로) ~ 5(훌륭)',
+  quiet: '조용함 — 1(시끄러움) ~ 5(매우 조용)',
+  restroom: '화장실 청결 — 1(별로) ~ 5(매우 깨끗)',
+  price: '아이스 아메리카노 한 잔 가격',
+};
 
 export const won = (n) => `${Number(n).toLocaleString('ko-KR')}원`;
 
