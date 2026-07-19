@@ -108,7 +108,8 @@ export function initMap(containerId, { onCardClick }) {
         continue;
       }
       const p = map.project([ent.item.lng, ent.item.lat]);
-      items.push({ id, score: ent.item.score, x: p.x, y: p.y });
+      // cafes always outrank view-spots in overlaps (big offset), then by score
+      items.push({ id, score: (ent.kind === 'cafe' ? 100000 : 0) + ent.item.score, x: p.x, y: p.y });
     }
     const decision = declutter(items, { width: size.width, height: size.height }, CARD_W * cardScale, CARD_H * cardScale);
     for (const [id, ent] of entries) {

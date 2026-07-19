@@ -67,11 +67,11 @@ router.get('/:id', (req, res) => {
   const photosByReview = {};
   for (const p of reviewPhotosStmt.all(cafe.id)) (photosByReview[p.review_id] ||= []).push(p.url);
   for (const r of detail.reviews) r.photos = photosByReview[r.id] || (r.photo_url ? [r.photo_url] : []);
-  // carousel gallery: cafe photos (ordered, representative first) + story photos
+  // carousel gallery: cafe photos (ordered, representative first) + story photos, deduped
   const cp = cafePhotosStmt.all(cafe.id).map((p) => p.url);
   const base = cp.length ? cp : (detail.photo_url ? [detail.photo_url] : []);
-  detail.photos = base;                 // cafe-level photos (for admin edit)
-  detail.gallery = [...base, ...galleryStmt.all(cafe.id).map((p) => p.url)].filter(Boolean);
+  detail.photos = base;                 // cafe-level photos
+  detail.gallery = [...new Set([...base, ...galleryStmt.all(cafe.id).map((p) => p.url)].filter(Boolean))];
   detail.myVotes = {};
   if (req.user) {
     for (const v of myVotesStmt.all(cafe.id, req.user.id)) detail.myVotes[v.category] = v.score;

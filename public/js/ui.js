@@ -323,7 +323,11 @@ export function openEditCafeModal(cafe, { onSave }) {
   document.body.appendChild(back);
   const form = back.querySelector('#editForm');
   const picker = createPhotoPicker(back.querySelector('#editPhotoPicker'), {});
-  picker.addUrls((cafe.photos && cafe.photos.length) ? cafe.photos : [cafe.photo_url].filter(Boolean));
+  // load ALL of the cafe's photos (representative set + user story photos) so any
+  // can be picked as the cover — not just the imported cafe_photos.
+  const editPhotos = (cafe.gallery && cafe.gallery.length) ? cafe.gallery
+    : (cafe.photos && cafe.photos.length) ? cafe.photos : [cafe.photo_url].filter(Boolean);
+  picker.addUrls(editPhotos);
   const close = () => back.remove();
   back.querySelector('#eClose').onclick = close;
   back.addEventListener('mousedown', (e) => { if (e.target === back) close(); });
@@ -513,23 +517,30 @@ export function renderViewDetail(el, spot, { user, onAddComment, onEdit, onDelet
 }
 
 // ---- View-spot create/edit modal ------------------------------------------
-export function openViewModal({ mode = 'create', spot, onPickLocation, onCancelPick, onSubmit }) {
+export function openViewModal({ mode = 'create', spot, onSearch, onPickLocation, onCancelPick, onSubmit }) {
   const back = document.createElement('div');
   back.className = 'modal-back';
+  const locSet = spot && spot.lat != null;
   back.innerHTML = `
     <div class="modal" role="dialog" aria-modal="true">
       <div class="modal__head"><h2>${mode === 'edit' ? t('modal.editView') : t('modal.addView')}</h2>
         <button class="detail__close" id="vClose">${icon('x', 16)}</button></div>
       <p class="muted">${t('modal.viewIntro')}</p>
       <form class="cafeform" id="viewForm">
-        <label class="field"><span>${t('modal.placeName')} *</span>
-          <input class="input" name="name" value="${esc(spot?.name || '')}"></label>
+        <div class="field"><span>${t('modal.placeName')} * <small class="muted">${t('view.nameHint')}</small></span>
+          <div class="autofill__search">
+            <input class="input" name="name" id="vName" placeholder="${t('view.namePlaceholder')}" value="${esc(spot?.name || '')}" autocomplete="off">
+            <button type="button" class="btn btn--ghost" id="vSearchBtn">${icon('search', 14)} ${t('modal.search')}</button>
+          </div></div>
+        <div class="autofill__results" id="vResults"></div>
         <div class="field"><span>${t('modal.location')} *</span>
-          <div class="loc-row">
-            <input class="input" name="lat" readonly value="${spot ? esc(spot.lat) : ''}">
-            <input class="input" name="lng" readonly value="${spot ? esc(spot.lng) : ''}">
-            <button type="button" class="btn btn--ghost" id="vPick">${t('modal.pickOnMap')}</button>
-          </div><small class="muted" id="vHint"></small></div>
+          <div class="viewloc">
+            <span class="viewloc__status ${locSet ? 'is-set' : ''}" id="vLocStatus">${locSet ? t('view.locSet') : t('view.locNone')}</span>
+            <button type="button" class="btn btn--ghost sm" id="vPick">${t('modal.pickOnMap')}</button>
+          </div>
+          <small class="muted" id="vHint"></small>
+          <input type="hidden" name="lat" value="${spot ? esc(spot.lat) : ''}">
+          <input type="hidden" name="lng" value="${spot ? esc(spot.lng) : ''}"></div>
         <div class="field"><span>${t('modal.photo')} * <small class="muted">${t('modal.photoHint')}</small></span>
           <div class="photo-picker" id="vPicker"></div></div>
         <div class="modal__foot"><span class="err" id="vErr"></span>
@@ -540,26 +551,56 @@ export function openViewModal({ mode = 'create', spot, onPickLocation, onCancelP
   const form = back.querySelector('#viewForm');
   const hint = back.querySelector('#vHint');
   const errEl = back.querySelector('#vErr');
+  const resultsEl = back.querySelector('#vResults');
+  const locStatus = back.querySelector('#vLocStatus');
   const picker = createPhotoPicker(back.querySelector('#vPicker'), {});
   if (spot?.photos?.length) picker.addUrls(spot.photos);
   const close = () => { onCancelPick?.(); back.remove(); };
   back.querySelector('#vClose').onclick = close;
   back.addEventListener('mousedown', (e) => { if (e.target === back) close(); });
-  back.querySelector('#vPick').onclick = () => {
-    hint.textContent = '지도를 클릭해 위치를 지정하세요...';
-    onPickLocation((lng, lat) => {
-      form.elements.lat.value = lat.toFixed(6);
-      form.elements.lng.value = lng.toFixed(6);
-      hint.textContent = `선택됨: ${lat.toFixed(5)}, ${lng.toFixed(5)}`;
-    });
+
+  const setLoc = (lat, lng, label) => {
+    form.elements.lat.value = Number(lat).toFixed(6);
+    form.elements.lng.value = Number(lng).toFixed(6);
+    locStatus.textContent = label || t('view.locSet');
+    locStatus.classList.add('is-set');
   };
+
+  const doSearch = async () => {
+    const q = form.elements.name.value.trim();
+    if (!q) { errEl.textContent = t('view.needName'); return; }
+    errEl.textContent = '';
+    resultsEl.innerHTML = `<span class="muted">${t('modal.searching')}</span>`;
+    try {
+      const { results } = await onSearch(q);
+      resultsEl.innerHTML = results.length
+        ? results.map((r) => `<button type="button" class="af-result" data-lat="${r.lat}" data-lng="${r.lng}" data-name="${esc(r.name)}">
+            <b>${esc(r.name)}</b><div class="muted">${esc(r.address || '')} · ${esc(r.category || '')}</div></button>`).join('')
+        : `<span class="muted">${t('modal.noResult')}</span>`;
+      resultsEl.querySelectorAll('.af-result').forEach((b) => {
+        b.onclick = () => {
+          form.elements.name.value = b.dataset.name;
+          setLoc(b.dataset.lat, b.dataset.lng, b.dataset.name);
+          resultsEl.innerHTML = '';
+        };
+      });
+    } catch (e) { resultsEl.innerHTML = `<span class="err">${esc(e.message)}</span>`; }
+  };
+  back.querySelector('#vSearchBtn').onclick = doSearch;
+  back.querySelector('#vName').addEventListener('keydown', (e) => { if (e.key === 'Enter') { e.preventDefault(); doSearch(); } });
+
+  back.querySelector('#vPick').onclick = () => {
+    hint.textContent = t('view.clickMap');
+    onPickLocation((lng, lat) => { setLoc(lat, lng); hint.textContent = ''; });
+  };
+
   form.onsubmit = async (e) => {
     e.preventDefault();
     errEl.textContent = '';
-    if (!form.elements.name.value.trim()) { errEl.textContent = '장소 이름을 입력하세요.'; return; }
-    if (!form.elements.lat.value || !form.elements.lng.value) { errEl.textContent = '위치를 지정하세요.'; return; }
+    if (!form.elements.name.value.trim()) { errEl.textContent = t('view.needName'); return; }
+    if (!form.elements.lat.value || !form.elements.lng.value) { errEl.textContent = t('view.needLoc'); return; }
     const { manifest, files, count } = picker.getManifest();
-    if (!count) { errEl.textContent = '사진을 한 장 이상 올려주세요.'; return; }
+    if (!count) { errEl.textContent = t('view.needPhoto'); return; }
     const fd = new FormData();
     fd.set('name', form.elements.name.value);
     fd.set('lat', form.elements.lat.value);

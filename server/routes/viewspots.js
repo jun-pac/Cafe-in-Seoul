@@ -6,9 +6,19 @@ const path = require('path');
 const express = require('express');
 const multer = require('multer');
 const db = require('../db');
+const kakao = require('../kakao');
 const { requireAuth, isAdmin } = require('../auth');
 
 const router = express.Router();
+
+// place search by name → coordinates (any logged-in user; view-spots aren't admin-only)
+router.get('/search', requireAuth, async (req, res, next) => {
+  const q = (req.query.q || '').trim();
+  if (!q) return res.status(400).json({ error: '검색어가 필요합니다.' });
+  if (!kakao.HAS_KAKAO) return res.status(503).json({ error: '검색이 설정되지 않았습니다. 지도에서 위치를 선택하세요.' });
+  try { res.json({ results: await kakao.searchPlaces(q) }); }
+  catch (e) { next(e); }
+});
 
 const upload = multer({
   storage: multer.diskStorage({

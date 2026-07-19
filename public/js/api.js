@@ -66,6 +66,7 @@ export const api = {
     fetch(`/api/cafes/${id}/reviews`, { method: 'POST', body: formData }).then(json),
 
   listViewspots: () => fetch('/api/viewspots').then(json),
+  viewSearch: (q) => fetch(`/api/viewspots/search?q=${encodeURIComponent(q)}`).then(json),
   getViewspot: (id) => fetch(`/api/viewspots/${id}`).then(json),
   createViewspot: (formData) => fetch('/api/viewspots', { method: 'POST', body: formData }).then(json),
   updateViewspot: (id, formData) => fetch(`/api/viewspots/${id}`, { method: 'PATCH', body: formData }).then(json),

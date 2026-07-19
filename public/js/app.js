@@ -181,6 +181,7 @@ async function handleViewComment(id, body) {
 function handleViewEdit(id, spot) {
   openViewModal({
     mode: 'edit', spot,
+    onSearch: (q) => api.viewSearch(q),
     onPickLocation: (cb) => map.enablePick(({ lng, lat }) => cb(lng, lat)),
     onCancelPick: () => map.disablePick(),
     onSubmit: async (fd) => { await api.updateViewspot(id, fd); map.disablePick(); await loadCafes(); await openViewDetail(id); },
@@ -197,6 +198,7 @@ function wireAddView() {
     if (!state.me.user) { alert('뷰 맛집을 등록하려면 로그인이 필요합니다.'); return; }
     openViewModal({
       mode: 'create',
+      onSearch: (q) => api.viewSearch(q),
       onPickLocation: (cb) => map.enablePick(({ lng, lat }) => cb(lng, lat)),
       onCancelPick: () => map.disablePick(),
       onSubmit: async (fd) => { const created = await api.createViewspot(fd); map.disablePick(); await loadCafes(); openViewDetail(created.id); },

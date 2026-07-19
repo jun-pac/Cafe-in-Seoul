@@ -198,6 +198,9 @@ input[type="checkbox"] { accent-color: #0a0a0a; width: 16px; height: 16px; }
 .detail__hero--view::after { display: none; }
 .detail__viewtag { position: absolute; left: 16px; bottom: 14px; z-index: 2; background: var(--view); color: #fff; font-family: var(--font-display); font-size: 12px; font-weight: 800; letter-spacing: 1.5px; padding: 6px 12px; border-radius: var(--r-sm); display: inline-flex; align-items: center; gap: 5px; }
 .commentform { display: flex; flex-direction: column; gap: 8px; margin-bottom: 10px; }
+.viewloc { display: flex; align-items: center; gap: 10px; }
+.viewloc__status { font-size: 13px; color: var(--mute); }
+.viewloc__status.is-set { color: var(--ink); font-weight: 600; }
 
 /* pending queue */
 .pending-queue { display: flex; flex-direction: column; gap: 10px; }
