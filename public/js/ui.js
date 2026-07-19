@@ -576,6 +576,8 @@ export function createPhotoPicker(container, { onChange } = {}) {
   let items = []; // { kind:'file'|'url', file?, url?, obj? }
   let dragFrom = null;
   const MAX = 10;
+  container.classList.add('photo-picker');
+
   function move(from, to) {
     if (from == null || from === to || to < 0 || to >= items.length) return;
     const [m] = items.splice(from, 1);
@@ -583,37 +585,33 @@ export function createPhotoPicker(container, { onChange } = {}) {
     render();
   }
   function render() {
-    container.innerHTML = items.map((it, i) => `
-      <div class="pp-item ${i === 0 ? 'is-cover' : ''}" data-i="${i}" draggable="true">
+    const tiles = items.map((it, i) => `
+      <div class="pp-item ${i === 0 ? 'is-cover' : ''}" data-i="${i}" draggable="true" title="${i === 0 ? t('pp.isCover') : t('pp.makeCover')}">
         <div class="pp-img" style="background-image:url('${it.kind === 'url' ? esc(img(it.url)) : it.obj}')"></div>
-        ${i === 0 ? '<span class="pp-cover">대표</span>' : `<button type="button" class="pp-setcover" data-op="cover" title="대표로 설정">${icon('star', 12)}</button>`}
-        <div class="pp-ops">
-          <button type="button" data-op="left" title="앞으로" ${i === 0 ? 'disabled' : ''}>${icon('chevronLeft', 12)}</button>
-          <button type="button" data-op="right" title="뒤로" ${i === items.length - 1 ? 'disabled' : ''}>${icon('chevronRight', 12)}</button>
-          <button type="button" data-op="del" title="삭제">${icon('x', 12)}</button>
-        </div>
-      </div>`).join('') +
-      (items.length < MAX ? `<label class="pp-add" title="사진 추가">${icon('plus', 20)}<input type="file" accept="image/*" multiple hidden></label>` : '');
+        ${i === 0 ? `<span class="pp-cover">${icon('star', 11)} ${t('pp.cover')}</span>` : `<span class="pp-hovercover">${t('pp.makeCoverShort')}</span>`}
+        <button type="button" class="pp-del" title="${t('detail.delete')}">${icon('x', 12)}</button>
+      </div>`).join('');
+    const addTile = items.length < MAX
+      ? `<label class="pp-add" title="${t('pp.add')}">${icon('plus', 20)}<input type="file" accept="image/*" multiple hidden></label>`
+      : '';
+    container.innerHTML = tiles + addTile + `<div class="pp-hint">${items.length ? t('pp.hint') : t('pp.hintEmpty')}</div>`;
 
     const addInput = container.querySelector('.pp-add input');
     if (addInput) addInput.onchange = (e) => { addFiles(e.target.files); e.target.value = ''; };
     container.querySelectorAll('.pp-item').forEach((el) => {
       const i = +el.dataset.i;
-      el.querySelector('[data-op="left"]').onclick = () => move(i, i - 1);
-      el.querySelector('[data-op="right"]').onclick = () => move(i, i + 1);
-      el.querySelector('[data-op="del"]').onclick = () => { items.splice(i, 1); render(); };
-      el.querySelector('[data-op="cover"]')?.addEventListener('click', () => move(i, 0));
-      // drag to reorder
-      el.addEventListener('dragstart', (e) => { dragFrom = i; el.classList.add('dragging'); e.dataTransfer.effectAllowed = 'move'; });
+      el.querySelector('.pp-del').onclick = (e) => { e.stopPropagation(); items.splice(i, 1); render(); };
+      el.addEventListener('click', () => move(i, 0)); // click a photo → make it the cover
+      el.addEventListener('dragstart', (e) => { dragFrom = i; el.classList.add('dragging'); e.dataTransfer.effectAllowed = 'move'; try { e.dataTransfer.setData('text/plain', String(i)); } catch { /* */ } });
       el.addEventListener('dragend', () => { el.classList.remove('dragging'); dragFrom = null; });
-      el.addEventListener('dragover', (e) => { e.preventDefault(); e.dataTransfer.dropEffect = 'move'; el.classList.add('drop-target'); });
+      el.addEventListener('dragover', (e) => { if (dragFrom != null) { e.preventDefault(); el.classList.add('drop-target'); } });
       el.addEventListener('dragleave', () => el.classList.remove('drop-target'));
-      el.addEventListener('drop', (e) => { e.preventDefault(); el.classList.remove('drop-target'); move(dragFrom, i); });
+      el.addEventListener('drop', (e) => { if (dragFrom != null) { e.preventDefault(); e.stopPropagation(); el.classList.remove('drop-target'); move(dragFrom, i); } });
     });
     onChange?.(items.length);
   }
   function addFiles(fileList) {
-    for (const f of [...fileList]) { if (items.length >= MAX) break; items.push({ kind: 'file', file: f, obj: URL.createObjectURL(f) }); }
+    for (const f of [...fileList]) { if (items.length >= MAX) break; if (!/^image\//.test(f.type)) continue; items.push({ kind: 'file', file: f, obj: URL.createObjectURL(f) }); }
     render();
   }
   function addUrls(urls) {
@@ -627,6 +625,17 @@ export function createPhotoPicker(container, { onChange } = {}) {
       count: items.length,
     };
   }
+
+  // drag image FILES from the desktop onto the whole picker
+  container.addEventListener('dragover', (e) => {
+    if (e.dataTransfer && [...e.dataTransfer.types].includes('Files')) { e.preventDefault(); container.classList.add('pp-filedrop'); }
+  });
+  container.addEventListener('dragleave', (e) => { if (e.target === container) container.classList.remove('pp-filedrop'); });
+  container.addEventListener('drop', (e) => {
+    container.classList.remove('pp-filedrop');
+    if (e.dataTransfer?.files?.length) { e.preventDefault(); addFiles(e.dataTransfer.files); }
+  });
+
   render();
   return { addFiles, addUrls, getManifest, get count() { return items.length; } };
 }

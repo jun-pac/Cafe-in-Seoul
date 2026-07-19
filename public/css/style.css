@@ -353,23 +353,24 @@ details.manual[open] summary { margin-bottom: 4px; }
 .photo-thumb { width: 66px; height: 48px; border-radius: var(--r-xs); background-size: cover; background-position: center; border: 2px solid transparent; cursor: pointer; padding: 0; background-color: #eee; }
 .photo-thumb.is-sel { border-color: var(--ink); }
 
-/* reorderable photo picker (first = cover) */
-.photo-picker { display: flex; flex-wrap: wrap; gap: 8px; }
-.pp-item { position: relative; width: 78px; height: 78px; border-radius: var(--r-sm); overflow: hidden; border: 1px solid var(--hair-strong); cursor: grab; }
+/* photo picker: click a photo → cover (first). drag files from desktop to add. */
+.photo-picker { display: flex; flex-wrap: wrap; gap: 8px; border-radius: var(--r-sm); padding: 2px; transition: background .12s, outline-color .12s; outline: 2px dashed transparent; outline-offset: 2px; }
+.photo-picker.pp-filedrop { outline-color: var(--ink); background: var(--cool); }
+.pp-item { position: relative; width: 84px; height: 84px; border-radius: var(--r-sm); overflow: hidden; border: 1px solid var(--hair-strong); cursor: pointer; }
 .pp-item:active { cursor: grabbing; }
 .pp-item.dragging { opacity: .4; }
-.pp-item.drop-target { outline: 2px dashed var(--ink); outline-offset: 1px; }
-.pp-item.is-cover { border: 2px solid var(--ink); }
+.pp-item.drop-target { outline: 2px solid var(--ink); outline-offset: -2px; }
+.pp-item.is-cover { border: 2.5px solid var(--ink); }
 .pp-img { width: 100%; height: 100%; background-size: cover; background-position: center; background-color: #eee; }
-.pp-cover { position: absolute; top: 0; left: 0; background: var(--ink); color: #fff; font-family: var(--font-display); font-size: 9px; font-weight: 800; letter-spacing: 1px; padding: 1px 6px; border-bottom-right-radius: 6px; }
-.pp-ops { position: absolute; left: 0; right: 0; bottom: 0; display: flex; justify-content: center; gap: 1px; background: rgba(255,255,255,.9); padding: 2px 0; }
-.pp-ops button { border: 0; background: none; cursor: pointer; color: var(--ink); padding: 2px; display: grid; place-items: center; border-radius: 4px; }
-.pp-ops button:hover:not(:disabled) { background: var(--cool); }
-.pp-ops button:disabled { opacity: .28; cursor: default; }
-.pp-add { width: 78px; height: 78px; border-radius: var(--r-sm); border: 1.5px dashed var(--hair-strong); display: grid; place-items: center; cursor: pointer; color: var(--mute); }
+.pp-cover { position: absolute; top: 0; left: 0; background: var(--ink); color: #fff; font-family: var(--font-display); font-size: 9px; font-weight: 800; letter-spacing: .6px; padding: 2px 7px 2px 5px; border-bottom-right-radius: 8px; display: inline-flex; align-items: center; gap: 3px; }
+.pp-hovercover { position: absolute; left: 0; right: 0; bottom: 0; background: rgba(10,10,10,.72); color: #fff; font-size: 10px; font-weight: 700; text-align: center; padding: 3px 0; opacity: 0; transition: opacity .12s; pointer-events: none; }
+.pp-item:not(.is-cover):hover .pp-hovercover { opacity: 1; }
+.pp-del { position: absolute; top: 3px; right: 3px; width: 20px; height: 20px; border-radius: 50%; border: 0; background: rgba(255,255,255,.9); color: var(--ink); cursor: pointer; display: grid; place-items: center; opacity: 0; transition: opacity .12s; }
+.pp-item:hover .pp-del { opacity: 1; }
+.pp-del:hover { background: #fff; }
+.pp-add { width: 84px; height: 84px; border-radius: var(--r-sm); border: 1.5px dashed var(--hair-strong); display: grid; place-items: center; cursor: pointer; color: var(--mute); }
 .pp-add:hover { border-color: var(--ink); color: var(--ink); }
-.pp-setcover { position: absolute; top: 0; left: 0; background: rgba(255,255,255,.92); border: 0; border-bottom-right-radius: 6px; padding: 3px 5px; cursor: pointer; color: var(--mute); display: grid; place-items: center; z-index: 2; }
-.pp-setcover:hover { background: #fff; color: var(--ink); }
+.pp-hint { flex-basis: 100%; font-size: 11px; color: var(--mute); margin-top: 2px; letter-spacing: 0.2px; }
 
 /* photo grid + lightbox */
 .photo-grid { display: grid; grid-template-columns: repeat(3, 1fr); gap: 6px; }
