@@ -198,6 +198,15 @@ input[type="checkbox"] { accent-color: #0a0a0a; width: 16px; height: 16px; }
 .detail__hero--view::after { display: none; }
 .detail__viewtag { position: absolute; left: 16px; bottom: 14px; z-index: 2; background: var(--view); color: #fff; font-family: var(--font-display); font-size: 12px; font-weight: 800; letter-spacing: 1.5px; padding: 6px 12px; border-radius: var(--r-sm); display: inline-flex; align-items: center; gap: 5px; }
 .commentform { display: flex; flex-direction: column; gap: 8px; margin-bottom: 10px; }
+.pickbanner {
+  position: fixed; top: 18px; left: 50%; transform: translateX(-50%); z-index: 1100;
+  background: var(--ink); color: #fff; padding: 10px 12px 10px 16px; border-radius: var(--pill);
+  font-size: 13px; font-weight: 600; display: flex; align-items: center; gap: 14px; box-shadow: var(--shadow-soft);
+}
+.pickbanner span { display: inline-flex; align-items: center; gap: 7px; }
+.pickbanner button { border: 1px solid rgba(255,255,255,.5); background: transparent; color: #fff; cursor: pointer;
+  font-family: var(--font-display); text-transform: uppercase; letter-spacing: 1px; font-size: 11px; font-weight: 700; padding: 5px 12px; border-radius: var(--pill); }
+.pickbanner button:hover { background: rgba(255,255,255,.15); }
 .viewloc { display: flex; align-items: center; gap: 10px; }
 .viewloc__status { font-size: 13px; color: var(--mute); }
 .viewloc__status.is-set { color: var(--ink); font-weight: 600; }

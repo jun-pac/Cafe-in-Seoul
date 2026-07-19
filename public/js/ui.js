@@ -107,6 +107,19 @@ export function renderPendingQueue(el, cafes, { onApprove, onReject, onOpen }) {
   }
 }
 
+// The modal overlay covers the map, so "pick on map" must temporarily hide the
+// modal, show a banner, let the user click the map, then restore the modal.
+function pickLocationFlow(back, { onPickLocation, onCancelPick, onPicked }) {
+  back.style.display = 'none';
+  const banner = document.createElement('div');
+  banner.className = 'pickbanner';
+  banner.innerHTML = `<span>${icon('gps', 15)} ${t('view.clickMap')}</span><button type="button" id="pickCancel">${t('common.cancel')}</button>`;
+  document.body.appendChild(banner);
+  const done = () => { banner.remove(); back.style.display = ''; };
+  banner.querySelector('#pickCancel').onclick = () => { onCancelPick?.(); done(); };
+  onPickLocation((lng, lat) => { onPicked(lng, lat); onCancelPick?.(); done(); });
+}
+
 // ---- Lightbox (full-screen photo viewer) ----------------------------------
 export function openLightbox(photos, start = 0) {
   if (!photos || !photos.length) return;
@@ -590,8 +603,7 @@ export function openViewModal({ mode = 'create', spot, onSearch, onPickLocation,
   back.querySelector('#vName').addEventListener('keydown', (e) => { if (e.key === 'Enter') { e.preventDefault(); doSearch(); } });
 
   back.querySelector('#vPick').onclick = () => {
-    hint.textContent = t('view.clickMap');
-    onPickLocation((lng, lat) => { setLoc(lat, lng); hint.textContent = ''; });
+    pickLocationFlow(back, { onPickLocation, onCancelPick, onPicked: (lng, lat) => setLoc(lat, lng) });
   };
 
   form.onsubmit = async (e) => {
@@ -801,11 +813,13 @@ export function openAddCafeModal(opts) {
   back.addEventListener('mousedown', (e) => { if (e.target === back) close(); });
 
   back.querySelector('#pickBtn').onclick = () => {
-    hint.textContent = '지도를 클릭해 위치를 지정하세요...';
-    onPickLocation((lng, lat) => {
-      form.elements.lat.value = lat.toFixed(6);
-      form.elements.lng.value = lng.toFixed(6);
-      hint.textContent = `선택됨: ${lat.toFixed(5)}, ${lng.toFixed(5)}`;
+    pickLocationFlow(back, {
+      onPickLocation, onCancelPick,
+      onPicked: (lng, lat) => {
+        form.elements.lat.value = lat.toFixed(6);
+        form.elements.lng.value = lng.toFixed(6);
+        hint.textContent = `${lat.toFixed(5)}, ${lng.toFixed(5)}`;
+      },
     });
   };
 
