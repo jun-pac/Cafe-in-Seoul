@@ -262,7 +262,8 @@ export function openEditCafeModal(cafe, { onSave }) {
       <form class="cafeform" id="editForm">
         <label class="field"><span>이름</span><input class="input" name="name" value="${esc(cafe.name)}"></label>
         <label class="field"><span>주소</span><input class="input" name="address" value="${esc(cafe.address || '')}"></label>
-        <label class="field"><span>대표사진 URL</span><input class="input" name="photo_url" value="${esc(cafe.photo_url || '')}"></label>
+        <div class="field"><span>사진 <small class="muted">(드래그로 순서 변경 · 첫 번째가 대표사진)</small></span>
+          <div class="photo-picker" id="editPhotoPicker"></div></div>
         <div class="grid2">
           <label class="field"><span>층수 (다층이면 2+) <span class="info" title="${esc(DEFS.floors)}">${icon('info', 12)}</span></span><input class="input" type="number" min="1" name="floors" value="${esc(cafe.floors)}"></label>
           <label class="field"><span>면적 <span class="info" title="${esc(DEFS.size)}">${icon('info', 12)}</span></span><select class="input" name="size">
@@ -290,20 +291,33 @@ export function openEditCafeModal(cafe, { onSave }) {
     </div>`;
   document.body.appendChild(back);
   const form = back.querySelector('#editForm');
+  const picker = createPhotoPicker(back.querySelector('#editPhotoPicker'), {});
+  picker.addUrls((cafe.photos && cafe.photos.length) ? cafe.photos : [cafe.photo_url].filter(Boolean));
   const close = () => back.remove();
   back.querySelector('#eClose').onclick = close;
   back.addEventListener('mousedown', (e) => { if (e.target === back) close(); });
   form.onsubmit = async (e) => {
     e.preventDefault();
-    const patch = {
-      name: form.elements.name.value, address: form.elements.address.value, photo_url: form.elements.photo_url.value,
-      floors: form.elements.floors.value, size: form.elements.size.value, outlets: form.elements.outlets.value,
-      iced_americano_price: form.elements.iced_americano_price.value, open_time: form.elements.open_time.value,
-      close_time: form.elements.close_time.value, has_view: form.elements.has_view.checked,
-      view_note: form.elements.view_note.value, naver_url: form.elements.naver_url.value,
-      kakao_url: form.elements.kakao_url.value, review_summary: form.elements.review_summary.value,
-    };
-    try { await onSave(patch); close(); }
+    const { manifest, files, count } = picker.getManifest();
+    if (!count) { back.querySelector('#eErr').textContent = '사진을 한 장 이상 남겨주세요.'; return; }
+    const fd = new FormData();
+    const setF = (k, v) => fd.set(k, v);
+    setF('name', form.elements.name.value);
+    setF('address', form.elements.address.value);
+    setF('floors', form.elements.floors.value);
+    setF('size', form.elements.size.value);
+    setF('outlets', form.elements.outlets.value);
+    setF('iced_americano_price', form.elements.iced_americano_price.value);
+    setF('open_time', form.elements.open_time.value);
+    setF('close_time', form.elements.close_time.value);
+    setF('has_view', form.elements.has_view.checked ? 'true' : 'false');
+    setF('view_note', form.elements.view_note.value);
+    setF('naver_url', form.elements.naver_url.value);
+    setF('kakao_url', form.elements.kakao_url.value);
+    setF('review_summary', form.elements.review_summary.value);
+    setF('photo_manifest', JSON.stringify(manifest));
+    files.forEach((f) => fd.append('photos', f));
+    try { await onSave(fd); close(); }
     catch (err) { back.querySelector('#eErr').textContent = err.message || '저장 실패'; }
   };
   return { close };
@@ -418,10 +432,17 @@ export function renderStories(el, reviews) {
 // ---- Reusable photo picker (reorderable; first = cover/representative) -----
 export function createPhotoPicker(container, { onChange } = {}) {
   let items = []; // { kind:'file'|'url', file?, url?, obj? }
+  let dragFrom = null;
   const MAX = 10;
+  function move(from, to) {
+    if (from == null || from === to || to < 0 || to >= items.length) return;
+    const [m] = items.splice(from, 1);
+    items.splice(to, 0, m);
+    render();
+  }
   function render() {
     container.innerHTML = items.map((it, i) => `
-      <div class="pp-item ${i === 0 ? 'is-cover' : ''}" data-i="${i}">
+      <div class="pp-item ${i === 0 ? 'is-cover' : ''}" data-i="${i}" draggable="true">
         <div class="pp-img" style="background-image:url('${it.kind === 'url' ? esc(img(it.url)) : it.obj}')"></div>
         ${i === 0 ? '<span class="pp-cover">대표</span>' : ''}
         <div class="pp-ops">
@@ -436,9 +457,15 @@ export function createPhotoPicker(container, { onChange } = {}) {
     if (addInput) addInput.onchange = (e) => { addFiles(e.target.files); e.target.value = ''; };
     container.querySelectorAll('.pp-item').forEach((el) => {
       const i = +el.dataset.i;
-      el.querySelector('[data-op="left"]').onclick = () => { if (i > 0) { [items[i - 1], items[i]] = [items[i], items[i - 1]]; render(); } };
-      el.querySelector('[data-op="right"]').onclick = () => { if (i < items.length - 1) { [items[i + 1], items[i]] = [items[i], items[i + 1]]; render(); } };
+      el.querySelector('[data-op="left"]').onclick = () => move(i, i - 1);
+      el.querySelector('[data-op="right"]').onclick = () => move(i, i + 1);
       el.querySelector('[data-op="del"]').onclick = () => { items.splice(i, 1); render(); };
+      // drag to reorder
+      el.addEventListener('dragstart', (e) => { dragFrom = i; el.classList.add('dragging'); e.dataTransfer.effectAllowed = 'move'; });
+      el.addEventListener('dragend', () => { el.classList.remove('dragging'); dragFrom = null; });
+      el.addEventListener('dragover', (e) => { e.preventDefault(); e.dataTransfer.dropEffect = 'move'; el.classList.add('drop-target'); });
+      el.addEventListener('dragleave', () => el.classList.remove('drop-target'));
+      el.addEventListener('drop', (e) => { e.preventDefault(); el.classList.remove('drop-target'); move(dragFrom, i); });
     });
     onChange?.(items.length);
   }

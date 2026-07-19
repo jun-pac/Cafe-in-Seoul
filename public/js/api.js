@@ -52,11 +52,8 @@ export const api = {
   getCafe: (id) => fetch(`/api/cafes/${id}`).then(json),
   createCafe: (formData) =>
     fetch('/api/cafes', { method: 'POST', body: formData }).then(json),
-  updateCafe: (id, patch) =>
-    fetch(`/api/cafes/${id}`, {
-      method: 'PATCH', headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify(patch),
-    }).then(json),
+  updateCafe: (id, formData) =>
+    fetch(`/api/cafes/${id}`, { method: 'PATCH', body: formData }).then(json),
 
   vote: (id, category, score) =>
     fetch(`/api/cafes/${id}/vote`, {

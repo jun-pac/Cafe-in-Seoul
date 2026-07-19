@@ -70,6 +70,7 @@ router.get('/:id', (req, res) => {
   // carousel gallery: cafe photos (ordered, representative first) + story photos
   const cp = cafePhotosStmt.all(cafe.id).map((p) => p.url);
   const base = cp.length ? cp : (detail.photo_url ? [detail.photo_url] : []);
+  detail.photos = base;                 // cafe-level photos (for admin edit)
   detail.gallery = [...base, ...galleryStmt.all(cafe.id).map((p) => p.url)].filter(Boolean);
   detail.myVotes = {};
   if (req.user) {
@@ -165,33 +166,61 @@ router.post('/', requireAuth, upload.array('photos', 10), async (req, res, next)
   }
 });
 
-// PATCH /api/cafes/:id — admin edits (curate the discrete/core fields).
+// PATCH /api/cafes/:id — admin edits. multipart: editable fields + optional
+// `photo_manifest` (['file'|'url:...']) + `photos` files to rebuild cafe photos.
 const EDITABLE = {
   name: 'text', address: 'text', floors: 'int', size: 'size', outlets: 'outlets',
   has_view: 'bool', view_note: 'text', open_time: 'time', close_time: 'time',
-  iced_americano_price: 'int', naver_url: 'text', kakao_url: 'text',
-  photo_url: 'text', review_summary: 'text',
+  iced_americano_price: 'int', naver_url: 'text', kakao_url: 'text', review_summary: 'text',
 };
-router.patch('/:id', requireAdmin, express.json(), (req, res) => {
+const delCafePhotos = db.prepare('DELETE FROM cafe_photos WHERE cafe_id = ?');
+router.patch('/:id', requireAdmin, upload.array('photos', 10), (req, res) => {
   const cafe = getStmt.get(req.params.id);
-  if (!cafe) return res.status(404).json({ error: 'not found' });
+  const files = req.files || [];
+  const cleanup = () => files.forEach((f) => fs.unlink(f.path, () => {}));
+  if (!cafe) { cleanup(); return res.status(404).json({ error: 'not found' }); }
   const b = req.body || {};
   const sets = [];
   const params = { id: req.params.id };
+  const bail = (m) => { cleanup(); res.status(400).json({ error: m }); return true; };
   for (const [k, type] of Object.entries(EDITABLE)) {
     if (!(k in b)) continue;
     let v = b[k];
-    if (type === 'int') { v = Number(v); if (!Number.isInteger(v) || v < 0) return res.status(400).json({ error: `${k} 값이 올바르지 않습니다.` }); }
+    if (type === 'int') { v = Number(v); if (!Number.isInteger(v) || v < 0) { if (bail(`${k} 값이 올바르지 않습니다.`)) return; } }
     else if (type === 'bool') { v = (v === true || v === 'true' || v === 1 || v === '1') ? 1 : 0; }
-    else if (type === 'time') { if (!TIME_RE.test(v)) return res.status(400).json({ error: '시간 형식은 HH:MM' }); }
-    else if (type === 'size') { if (!SIZES.has(v)) return res.status(400).json({ error: 'size 값 오류' }); }
-    else if (type === 'outlets') { if (!OUTLETS.has(v)) return res.status(400).json({ error: 'outlets 값 오류' }); }
-    else { v = (v == null ? '' : String(v).trim()) || null; if (k === 'name' && !v) return res.status(400).json({ error: '이름은 비울 수 없습니다.' }); }
+    else if (type === 'time') { if (!TIME_RE.test(v)) { if (bail('시간 형식은 HH:MM')) return; } }
+    else if (type === 'size') { if (!SIZES.has(v)) { if (bail('size 값 오류')) return; } }
+    else if (type === 'outlets') { if (!OUTLETS.has(v)) { if (bail('outlets 값 오류')) return; } }
+    else { v = (v == null ? '' : String(v).trim()) || null; if (k === 'name' && !v) { if (bail('이름은 비울 수 없습니다.')) return; } }
     sets.push(`${k} = @${k}`);
     params[k] = v;
   }
-  if (!sets.length) return res.status(400).json({ error: '변경할 항목이 없습니다.' });
-  db.prepare(`UPDATE cafes SET ${sets.join(', ')} WHERE id = @id`).run(params);
+
+  // rebuild cafe photos from manifest (if provided)
+  let ordered = null;
+  if (b.photo_manifest) {
+    try {
+      const manifest = JSON.parse(b.photo_manifest);
+      let fi = 0; ordered = [];
+      for (const t of manifest) {
+        if (t === 'file') { if (files[fi]) ordered.push(`/uploads/${files[fi++].filename}`); }
+        else if (typeof t === 'string' && t.startsWith('url:')) ordered.push(t.slice(4));
+      }
+      ordered = ordered.filter(Boolean);
+    } catch { ordered = null; }
+    if (ordered && !ordered.length) { if (bail('사진을 한 장 이상 남겨주세요.')) return; }
+  }
+  if (ordered && ordered.length) { sets.push('photo_url = @photo_url'); params.photo_url = ordered[0]; }
+
+  if (!sets.length && !ordered) { cleanup(); return res.status(400).json({ error: '변경할 항목이 없습니다.' }); }
+
+  db.transaction(() => {
+    if (sets.length) db.prepare(`UPDATE cafes SET ${sets.join(', ')} WHERE id = @id`).run(params);
+    if (ordered && ordered.length) {
+      delCafePhotos.run(req.params.id);
+      ordered.forEach((url, i) => insertCafePhoto.run(crypto.randomUUID(), req.params.id, url, i));
+    }
+  })();
   res.json(decorate(getStmt.get(req.params.id)));
 });
 
