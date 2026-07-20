@@ -177,7 +177,7 @@ export function renderDetail(el, cafe, { user, onVote, onAddReview, onClose, onE
         <h2 class="detail__name">${esc(cafe.name)}</h2>
         <div class="detail__addr">${esc(cafe.address || '')}</div>
         ${cafe.status === 'pending' ? `<div class="detail__pending">${icon('shield', 14)} ${t('detail.pending')} <span class="muted">${cafe.moderation_reason ? '- ' + esc(cafe.moderation_reason) : ''}</span></div>` : ''}
-        ${user?.isAdmin ? `<div class="detail__adminrow"><button class="btn btn--ghost sm" id="editCafeBtn">${icon('edit', 14)} ${t('detail.edit')}</button>${cafe.status === 'pending' ? `<button class="btn btn--primary sm" id="approveCafeBtn">${t('detail.approve')}</button>` : ''}</div>` : ''}
+        ${user?.isAdmin ? `<div class="detail__adminrow"><button class="btn btn--ghost sm" id="editCafeBtn">${icon('edit', 14)} ${t('detail.edit')}</button>${cafe.status === 'pending' ? `<button class="btn btn--primary sm" id="approveCafeBtn">${t('detail.approve')}</button>` : ''}<button class="btn btn--ghost sm btn--danger" id="removeCafeBtn">${icon('minus', 14)} ${t('detail.remove')}</button></div>` : ''}
 
         <div class="detail__hoursrow">
           <button class="detail__hours ${openNow ? 'is-open' : 'is-closed'}" id="hoursToggle" ${weeklyHours(cafe) ? '' : 'disabled'}>
@@ -222,6 +222,9 @@ export function renderDetail(el, cafe, { user, onVote, onAddReview, onClose, onE
   el.querySelector('.detail__close').onclick = onClose;
   el.querySelector('#editCafeBtn')?.addEventListener('click', () => onEdit?.('edit'));
   el.querySelector('#approveCafeBtn')?.addEventListener('click', () => onEdit?.('approve'));
+  el.querySelector('#removeCafeBtn')?.addEventListener('click', () => {
+    if (confirm(`'${cafe.name}'${t('detail.removeAsk')}`)) onEdit?.('remove');
+  });
   el.querySelector('#hoursToggle')?.addEventListener('click', () => {
     const w = el.querySelector('#weekHours'); if (w) w.hidden = !w.hidden;
   });
@@ -572,7 +575,7 @@ export function renderStories(el, reviews, { user, onDelete, onEdit } = {}) {
 }
 
 // ---- View-spot detail (lighter: name + photos + comments) -----------------
-export function renderViewDetail(el, spot, { user, onAddComment, onEdit, onDelete, onClose, onAddPhotos }) {
+export function renderViewDetail(el, spot, { user, onAddComment, onEdit, onDelete, onClose, onAddPhotos, onLike }) {
   const gallery = (spot.photos && spot.photos.length) ? spot.photos : [spot.photo_url].filter(Boolean);
   el.innerHTML = `
     <div class="detail__grip"></div>
@@ -587,6 +590,7 @@ export function renderViewDetail(el, spot, { user, onAddComment, onEdit, onDelet
       <div class="detail__body">
         <h2 class="detail__name">${esc(spot.name)}</h2>
         ${spot.creator_name ? `<div class="detail__by">${icon('user', 12)} ${t('view.addedBy')} <b>${esc(spot.creator_name)}</b></div>` : ''}
+        <button type="button" class="like-btn ${spot.liked ? 'is-liked' : ''}" id="vLike">${icon('thumbsUp', 15)} <span id="vLikeN">${spot.likes || 0}</span></button>
         ${spot.canEdit ? `<div class="detail__adminrow"><button class="btn btn--ghost sm" id="vEdit">${icon('edit', 14)} ${t('detail.edit')}</button><button class="btn btn--ghost sm" id="vDel">${t('detail.delete')}</button></div>` : ''}
         ${gallery.length ? `<h3 class="detail__h3">${t('detail.photos')} <small class="muted">${gallery.length}</small></h3><div class="photo-grid" id="photoGrid"></div>` : ''}
         ${user ? `<div class="viewadd">
@@ -604,6 +608,16 @@ export function renderViewDetail(el, spot, { user, onAddComment, onEdit, onDelet
   el.querySelector('.detail__close').onclick = onClose;
   el.querySelector('#vEdit')?.addEventListener('click', onEdit);
   el.querySelector('#vDel')?.addEventListener('click', onDelete);
+  const likeBtn = el.querySelector('#vLike');
+  if (likeBtn) likeBtn.onclick = async () => {
+    if (!user) return alert(t('vote.loginNeeded'));
+    if (!onLike) return;
+    try {
+      const r = await onLike();
+      likeBtn.classList.toggle('is-liked', r.liked);
+      el.querySelector('#vLikeN').textContent = r.likes;
+    } catch (e) { alert(e.message); }
+  };
 
   const byUrl = {};
   (spot.photoMeta || []).forEach((m) => { if (m.uploader) byUrl[m.url] = m.uploader; });

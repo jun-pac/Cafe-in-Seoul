@@ -1,5 +1,6 @@
 import { declutter, CARD_W, CARD_H } from './declutter.js';
 import { esc, img, thumb } from './util.js';
+import { icon } from './icons.js';
 
 // Minimal light OSM basemap: CARTO Positron (light_all) raster tiles - clean,
 // airy grayscale. No API key required.
@@ -62,7 +63,7 @@ export function initMap(containerId, { onCardClick }) {
     const el = document.createElement('div');
     el.className = 'cafe-card' + (kind === 'view' ? ' cafe-card--view' : '');
     const scoreHtml = kind === 'view'
-      ? '<span class="cafe-card__tag">VIEW</span>'
+      ? `<span class="cafe-card__tag">VIEW</span><span class="cafe-card__likes" title="따봉">${icon('thumbsUp', 10)} <b>${item.likes || 0}</b></span>`
       : `<span class="cafe-card__score" title="카공 종합점수 (0-100): 다층·콘센트·면적·뷰·영업시간 + 집단지성 투표">${item.score}</span>`;
     el.innerHTML = `
       <div class="cafe-card__photo" style="background-image:url('${esc(img(thumb(item.photo_url)))}')">
@@ -101,6 +102,8 @@ export function initMap(containerId, { onCardClick }) {
         existing.item = item;
         const sc = existing.el.querySelector('.cafe-card__score');
         if (sc) sc.textContent = item.score;
+        const lk = existing.el.querySelector('.cafe-card__likes b');
+        if (lk) lk.textContent = item.likes || 0;
         // reflect edits to the representative photo / name without a full reload
         existing.el.querySelector('.cafe-card__photo').style.backgroundImage = `url('${esc(img(thumb(item.photo_url)))}')`;
         existing.el.querySelector('.cafe-card__name').textContent = item.name;
@@ -115,7 +118,8 @@ export function initMap(containerId, { onCardClick }) {
     scheduleRefresh();
   }
   const setCafes = (cafes) => setItems(cafes, 'cafe');
-  const setViewspots = (spots) => setItems(spots.map((s) => ({ ...s, score: s.score ?? 55 })), 'view');
+  // view-spots survive overlaps by 따봉(like) count (cafes still always outrank them)
+  const setViewspots = (spots) => setItems(spots.map((s) => ({ ...s, score: s.likes ?? 0 })), 'view');
 
   function setFiltered(ids) {
     visibleSet = ids; // Set or null

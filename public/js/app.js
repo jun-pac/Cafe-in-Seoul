@@ -192,6 +192,7 @@ async function openViewDetail(id) {
     onEdit: () => handleViewEdit(id, spot),
     onDelete: () => handleViewDelete(id),
     onAddPhotos: async (fd) => { await api.addViewspotPhotos(id, fd); await loadCafes(); await openViewDetail(id); },
+    onLike: async () => { const r = await api.likeViewspot(id); loadCafes(); return r; }, // refresh card/declutter in bg
     onClose: closeDetail,
   });
   document.body.classList.add('detail-open');
@@ -247,6 +248,11 @@ async function handleVote(id, category, score) {
 async function handleAdminEdit(id, cafe, action) {
   if (action === 'approve') {
     try { await api.adminApprove(id); await loadCafes(); await openDetail(id); }
+    catch (e) { alert(e.message); }
+    return;
+  }
+  if (action === 'remove') { // soft-delete: status→rejected, hidden from map but row kept
+    try { await api.adminReject(id); await loadCafes(); closeDetail(); }
     catch (e) { alert(e.message); }
     return;
   }
@@ -500,9 +506,13 @@ function wireChrome() {
 function initInstallPrompt() {
   try {
     if (window.matchMedia?.('(display-mode: standalone)')?.matches || window.navigator.standalone) return; // already installed
-    if (localStorage.getItem('installDismissed')) return;
+    if (localStorage.getItem('installDismissed')) return; // dismissed → never again
+    const last = Number(localStorage.getItem('installShownAt') || 0); // else at most once / 14 days
+    if (last && Date.now() - last < 14 * 864e5) return;
   } catch { return; }
+  const markShown = () => { try { localStorage.setItem('installShownAt', String(Date.now())); } catch { /* */ } };
   const banner = (inner) => {
+    markShown();
     const bar = document.createElement('div');
     bar.className = 'install-banner';
     bar.innerHTML = `<div class="install-msg">${icon('coffee', 16)} ${inner}</div><button class="install-x" aria-label="닫기">${icon('x', 15)}</button>`;

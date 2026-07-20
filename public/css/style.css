@@ -152,6 +152,7 @@ b { font-weight: 700; }
 
 /* login */
 .loginbox { display: flex; flex-direction: column; gap: 12px; }
+#gsiButton { display: flex; justify-content: center; } /* center the "Sign in with Google" button */
 .login-or { text-align: center; font-size: 10px; color: var(--mute); text-transform: uppercase; letter-spacing: 1.5px; }
 .loginform { display: flex; flex-direction: column; gap: 8px; }
 .loginform__row { display: grid; grid-template-columns: 1fr auto; gap: 8px; }
@@ -284,6 +285,13 @@ input[type="checkbox"] { accent-color: #0a0a0a; width: 16px; height: 16px; }
 .cafe-card--view .cafe-card__tip { border-top-color: var(--view); }
 .cafe-card--view.is-selected .cafe-card__photo { border-color: var(--view); box-shadow: 0 0 0 2px var(--view); }
 .cafe-card__tag { position: absolute; top: 6px; left: 6px; background: var(--view); color: #fff; font-family: var(--font-display); font-size: 10px; font-weight: 800; letter-spacing: 1px; padding: 2px 7px; border-radius: var(--pill); }
+.cafe-card__likes { position: absolute; bottom: 6px; left: 6px; display: inline-flex; align-items: center; gap: 3px; background: rgba(10,10,10,.72); color: #fff; font-size: 10px; font-weight: 700; padding: 2px 7px 2px 5px; border-radius: var(--pill); }
+.cafe-card__likes .ic { color: #fff; }
+/* 따봉 button in the view-spot detail */
+.like-btn { display: inline-flex; align-items: center; gap: 6px; margin-top: 12px; padding: 8px 15px; border: 1px solid var(--hair-strong); background: var(--surface); border-radius: var(--pill); font-size: 13.5px; font-weight: 700; color: var(--ink-2); cursor: pointer; }
+.like-btn:hover { border-color: var(--ink); color: var(--ink); }
+.like-btn.is-liked { background: var(--view); border-color: var(--view); color: #fff; }
+.like-btn.is-liked .ic { color: #fff; }
 .pilltog--view input:checked + span { background: var(--view); color: #fff; border-color: var(--view); }
 .detail__hero--view::after { display: none; }
 .detail__viewtag { position: absolute; left: 16px; bottom: 14px; z-index: 2; background: var(--view); color: #fff; font-family: var(--font-display); font-size: 12px; font-weight: 800; letter-spacing: 1.5px; padding: 6px 12px; border-radius: var(--r-sm); display: inline-flex; align-items: center; gap: 5px; }
@@ -359,6 +367,8 @@ body.detail-resizing { cursor: ew-resize; user-select: none; }
 .detail__addr { color: var(--mute); font-size: 12.5px; margin-top: 7px; letter-spacing: 0.2px; }
 .detail__pending { margin-top: 12px; border: 1px dashed var(--ink); color: var(--ink); border-radius: var(--r-sm); padding: 8px 12px; font-size: 12px; font-weight: 600; }
 .detail__adminrow { display: flex; gap: 8px; margin-top: 12px; }
+.btn--danger { margin-left: auto; color: #c0392b; }
+.btn--danger:hover { border-color: #c0392b; background: #fdecea; color: #a5281a; }
 
 .detail__hours {
   display: inline-flex; align-items: center; gap: 9px; margin-top: 18px;

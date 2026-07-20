@@ -47,11 +47,17 @@ app.use('/api', (req, res, next) => { res.setHeader('Cache-Control', 'no-store')
 // once per visitor session per day, and never count admins (so dev refreshes don't inflate it).
 const db = require('./db');
 const bumpVisit = db.prepare(`INSERT INTO daily_visits (day, n) VALUES (?, 1) ON CONFLICT(day) DO UPDATE SET n = n + 1`);
+// crawlers/monitors/link-preview fetchers hit "/" without keeping cookies, so the
+// per-session guard below never catches them — every hit would look like a new visitor.
+// Drop known automated user-agents (and empty UAs) so the tally reflects real people.
+const BOT_UA = /bot|crawler|spider|crawling|slurp|mediapartners|bingpreview|facebookexternalhit|facebot|ia_archiver|embedly|quora link|pinterest|vkshare|whatsapp|telegram|discordbot|slackbot|twitterbot|linkedinbot|petalbot|yandex|baiduspider|duckduckbot|applebot|semrush|ahrefs|mj12bot|dotbot|curl|wget|python-requests|go-http|java\/|okhttp|axios|node-fetch|headless|phantomjs|puppeteer|playwright|lighthouse|gtmetrix|pingdom|uptime|statuscake|monitor|healthcheck|cloudflare|preview/i;
 app.use((req, res, next) => {
   try {
     const isPageLoad = req.method === 'GET' && (req.path === '/' || req.path === '/index.html');
+    const ua = req.get('user-agent') || '';
+    const isBot = !ua || BOT_UA.test(ua);
     const today = new Date().toISOString().slice(0, 10);
-    if (isPageLoad && !req.user?.is_admin && req.session && req.session.visitDay !== today) {
+    if (isPageLoad && !isBot && !req.user?.is_admin && req.session && req.session.visitDay !== today) {
       req.session.visitDay = today;
       bumpVisit.run(today);
     }

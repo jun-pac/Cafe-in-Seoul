@@ -54,6 +54,11 @@ const listComments = db.prepare(`
   WHERE c.viewspot_id = ? ORDER BY c.created_at DESC
 `);
 const insertComment = db.prepare('INSERT INTO viewspot_comments (id, viewspot_id, user_id, body) VALUES (?,?,?,?)');
+const likeCountStmt = db.prepare('SELECT COUNT(*) AS n FROM viewspot_likes WHERE viewspot_id = ?');
+const likedStmt = db.prepare('SELECT 1 FROM viewspot_likes WHERE viewspot_id = ? AND user_id = ?');
+const insertLike = db.prepare('INSERT OR IGNORE INTO viewspot_likes (viewspot_id, user_id) VALUES (?, ?)');
+const deleteLike = db.prepare('DELETE FROM viewspot_likes WHERE viewspot_id = ? AND user_id = ?');
+const allLikeCounts = db.prepare('SELECT viewspot_id, COUNT(*) AS n FROM viewspot_likes GROUP BY viewspot_id');
 
 // Build ordered photo urls from a manifest (['file'|'url:...']) + uploaded files.
 function orderedPhotos(body, files) {
@@ -75,9 +80,11 @@ function orderedPhotos(body, files) {
 router.get('/', (req, res) => {
   const uid = req.user?.id;
   const admin = isAdmin(req.user);
+  const likes = {};
+  allLikeCounts.all().forEach((r) => { likes[r.viewspot_id] = r.n; });
   res.json(listStmt.all().filter((v) =>
     v.status !== 'rejected' && (v.status === 'approved' || admin || (uid && v.created_by === uid))
-  ));
+  ).map((v) => ({ ...v, likes: likes[v.id] || 0 })));
 });
 
 router.get('/:id', (req, res) => {
@@ -90,6 +97,8 @@ router.get('/:id', (req, res) => {
     photoMeta: meta,
     creator_name: spot.created_by ? (userNameStmt.get(spot.created_by)?.name || null) : null,
     comments: listComments.all(spot.id),
+    likes: likeCountStmt.get(spot.id).n,
+    liked: !!(req.user && likedStmt.get(spot.id, req.user.id)),
     canEdit: !!req.user && (req.user.id === spot.created_by || isAdmin(req.user)),
   });
 });
@@ -190,6 +199,15 @@ router.delete('/:id', requireAuth, (req, res) => {
   if (req.user.id !== spot.created_by && !isAdmin(req.user)) return res.status(403).json({ error: '삭제 권한이 없습니다.' });
   delSpot.run(spot.id);
   res.json({ ok: true });
+});
+
+// toggle 따봉 (like). The like count decides which view-spot survives on overlap.
+router.post('/:id/like', requireAuth, express.json(), (req, res) => {
+  if (!getStmt.get(req.params.id)) return res.status(404).json({ error: 'not found' });
+  const liked = !!likedStmt.get(req.params.id, req.user.id);
+  if (liked) deleteLike.run(req.params.id, req.user.id);
+  else insertLike.run(req.params.id, req.user.id);
+  res.json({ liked: !liked, likes: likeCountStmt.get(req.params.id).n });
 });
 
 router.post('/:id/comments', requireAuth, express.json(), (req, res) => {

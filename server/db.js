@@ -191,6 +191,14 @@ if (!vsCols.has('status')) {
 // daily unique-visitor tally (one bump per visitor session per day)
 db.exec(`CREATE TABLE IF NOT EXISTS daily_visits (day TEXT PRIMARY KEY, n INTEGER NOT NULL DEFAULT 0)`);
 
+// 따봉(likes) on view-spots — the count decides which survives when cards overlap
+db.exec(`CREATE TABLE IF NOT EXISTS viewspot_likes (
+  viewspot_id TEXT NOT NULL,
+  user_id     TEXT NOT NULL,
+  created_at  TEXT NOT NULL DEFAULT (datetime('now')),
+  PRIMARY KEY (viewspot_id, user_id)
+)`);
+
 // --- safety net: timestamped DB backups (keep last 60) ---
 // So no operation is ever irreversible: if data is lost, restore from data/backups/.
 const backupsDir = path.join(DATA_DIR, 'backups');

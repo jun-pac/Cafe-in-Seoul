@@ -91,6 +91,7 @@ export const api = {
   viewspotPending: () => fetch('/api/viewspots/pending/list').then(json),
   approveViewspot: (id) => fetch(`/api/viewspots/${id}/approve`, { method: 'POST' }).then(json),
   rejectViewspot: (id) => fetch(`/api/viewspots/${id}/reject`, { method: 'POST' }).then(json),
+  likeViewspot: (id) => fetch(`/api/viewspots/${id}/like`, { method: 'POST' }).then(json),
   addViewComment: (id, body) =>
     fetch(`/api/viewspots/${id}/comments`, {
       method: 'POST', headers: { 'Content-Type': 'application/json' },
