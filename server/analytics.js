@@ -8,9 +8,10 @@ const BOT_UA = /bot|crawler|spider|crawling|slurp|mediapartners|bingpreview|face
 
 const isBotUA = (ua) => !ua || BOT_UA.test(ua);
 
+// store ts as UTC explicitly (container TZ is UTC); analytics queries convert to KST (+9h)
 const insertEvent = db.prepare(`INSERT INTO events
-  (day, session_id, user_id, type, target, label, ip, country, ua, is_bot, is_admin)
-  VALUES (@day,@session_id,@user_id,@type,@target,@label,@ip,@country,@ua,@is_bot,@is_admin)`);
+  (ts, day, session_id, user_id, type, target, label, ip, country, ua, is_bot, is_admin)
+  VALUES (datetime('now'),@day,@session_id,@user_id,@type,@target,@label,@ip,@country,@ua,@is_bot,@is_admin)`);
 
 // Record one event from an Express request. type is required; target/label optional.
 function recordEvent(req, { type, target = null, label = null }) {
@@ -54,7 +55,7 @@ function analytics(day = new Date().toISOString().slice(0, 10)) {
     topSearches: many(`SELECT label, COUNT(*) AS n FROM events WHERE day=? AND type='search' AND ${HUMAN} AND label IS NOT NULL GROUP BY label ORDER BY n DESC LIMIT 12`, day),
     // per-visitor sessions today: how many did each session do, where from (spot one-person vs many)
     sessions: many(`SELECT session_id,
-        MIN(ts) AS first_seen, MAX(ts) AS last_seen,
+        datetime(MIN(ts),'+9 hours') AS first_seen, datetime(MAX(ts),'+9 hours') AS last_seen,
         COUNT(*) AS events,
         SUM(CASE WHEN type='pageview' THEN 1 ELSE 0 END) AS pageviews,
         MAX(ip) AS ip, MAX(country) AS country, MAX(ua) AS ua,
@@ -62,7 +63,7 @@ function analytics(day = new Date().toISOString().slice(0, 10)) {
       FROM events WHERE day=? AND ${HUMAN}
       GROUP BY session_id ORDER BY events DESC LIMIT 40`, day),
     // recent raw feed (all, incl. bots, so nothing is hidden)
-    recent: many(`SELECT ts, type, label, target, ip, country, is_bot, is_admin, session_id, user_id
+    recent: many(`SELECT datetime(ts,'+9 hours') AS ts, type, label, target, ip, country, is_bot, is_admin, session_id, user_id
       FROM events WHERE day=? ORDER BY id DESC LIMIT 60`, day),
   };
 }
