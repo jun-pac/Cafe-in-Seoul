@@ -46,24 +46,22 @@ app.use('/api', (req, res, next) => { res.setHeader('Cache-Control', 'no-store')
 // daily visitor tally: count only real PAGE loads (not API/asset/script traffic),
 // once per visitor session per day, and never count admins (so dev refreshes don't inflate it).
 const db = require('./db');
+const { recordEvent, isBotUA } = require('./analytics');
 const bumpVisit = db.prepare(`INSERT INTO daily_visits (day, n) VALUES (?, 1) ON CONFLICT(day) DO UPDATE SET n = n + 1`);
-// crawlers/monitors/link-preview fetchers hit "/" without keeping cookies, so the
-// per-session guard below never catches them — every hit would look like a new visitor.
-// Drop known automated user-agents (and empty UAs) so the tally reflects real people.
-const BOT_UA = /bot|crawler|spider|crawling|slurp|mediapartners|bingpreview|facebookexternalhit|facebot|ia_archiver|embedly|quora link|pinterest|vkshare|whatsapp|telegram|discordbot|slackbot|twitterbot|linkedinbot|petalbot|yandex|baiduspider|duckduckbot|applebot|semrush|ahrefs|mj12bot|dotbot|curl|wget|python-requests|go-http|java\/|okhttp|axios|node-fetch|headless|phantomjs|puppeteer|playwright|lighthouse|gtmetrix|pingdom|uptime|statuscake|monitor|healthcheck|cloudflare|preview/i;
 app.use((req, res, next) => {
   try {
     const isPageLoad = req.method === 'GET' && (req.path === '/' || req.path === '/index.html');
     if (isPageLoad) {
       const ua = req.get('user-agent') || '';
-      const isBot = !ua || BOT_UA.test(ua);
+      const isBot = isBotUA(ua);
       const today = new Date().toISOString().slice(0, 10);
       const reason = req.user?.is_admin ? 'admin'
         : isBot ? 'bot'
         : (req.session && req.session.visitDay === today) ? 'dupe'
         : 'counted';
-      // Cloudflare passes the real client IP + country; log every homepage load with why it
-      // did/didn't count, so we can see exactly who is bumping the number.
+      // record EVERY homepage load as a pageview event (session id distinguishes visitors;
+      // is_bot/is_admin flags let analysis exclude noise). Console line stays for tailing.
+      recordEvent(req, { type: 'pageview', label: reason });
       const ip = req.headers['cf-connecting-ip'] || req.ip || '?';
       const country = req.headers['cf-ipcountry'] || '?';
       console.log(`[PAGELOAD ${reason}] ip=${ip} ${country} ua=${JSON.stringify(ua).slice(0, 150)}`);
@@ -74,6 +72,15 @@ app.use((req, res, next) => {
     }
   } catch { /* ignore */ }
   next();
+});
+
+// client-side event beacon: the frontend posts {type,target,label} on meaningful actions
+// (opening a cafe/view, filtering, searching, liking, ...) so we can see what people do.
+const TRACK_TYPES = new Set(['open_cafe', 'open_view', 'filter', 'search', 'like', 'add_cafe', 'add_view', 'lang', 'install', 'locate']);
+app.post('/api/track', express.json({ limit: '4kb' }), (req, res) => {
+  const { type, target, label } = req.body || {};
+  if (TRACK_TYPES.has(type)) recordEvent(req, { type, target, label });
+  res.json({ ok: true });
 });
 const todayVisits = db.prepare('SELECT n FROM daily_visits WHERE day = ?');
 const totalVisits = db.prepare('SELECT COALESCE(SUM(n), 0) AS t FROM daily_visits');

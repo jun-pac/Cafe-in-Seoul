@@ -191,6 +191,28 @@ if (!vsCols.has('status')) {
 // daily unique-visitor tally (one bump per visitor session per day)
 db.exec(`CREATE TABLE IF NOT EXISTS daily_visits (day TEXT PRIMARY KEY, n INTEGER NOT NULL DEFAULT 0)`);
 
+// Per-action analytics: one row per tracked event (page view, opening a cafe/view-spot,
+// applying a filter, searching, liking, ...). session_id (the express-session id) tells
+// apart distinct visitors; user_id links logged-in users. Query this to analyze traffic.
+db.exec(`CREATE TABLE IF NOT EXISTS events (
+  id         INTEGER PRIMARY KEY AUTOINCREMENT,
+  ts         TEXT NOT NULL DEFAULT (datetime('now','localtime')),
+  day        TEXT NOT NULL,
+  session_id TEXT,
+  user_id    TEXT,
+  type       TEXT NOT NULL,
+  target     TEXT,
+  label      TEXT,
+  ip         TEXT,
+  country    TEXT,
+  ua         TEXT,
+  is_bot     INTEGER NOT NULL DEFAULT 0,
+  is_admin   INTEGER NOT NULL DEFAULT 0
+)`);
+db.exec(`CREATE INDEX IF NOT EXISTS idx_events_day ON events(day)`);
+db.exec(`CREATE INDEX IF NOT EXISTS idx_events_type ON events(type)`);
+db.exec(`CREATE INDEX IF NOT EXISTS idx_events_session ON events(session_id)`);
+
 // 따봉(likes) on view-spots — the count decides which survives when cards overlap
 db.exec(`CREATE TABLE IF NOT EXISTS viewspot_likes (
   viewspot_id TEXT NOT NULL,

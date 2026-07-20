@@ -133,4 +133,11 @@ router.get('/insights', requireAdmin, (req, res) => {
   });
 });
 
+// Per-action analytics: unique visitors, what they clicked, per-session breakdown, raw feed.
+const { analytics } = require('../analytics');
+router.get('/analytics', requireAdmin, (req, res) => {
+  const day = /^\d{4}-\d{2}-\d{2}$/.test(req.query.day || '') ? req.query.day : undefined;
+  res.json(analytics(day));
+});
+
 module.exports = router;

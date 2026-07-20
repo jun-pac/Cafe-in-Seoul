@@ -8,6 +8,15 @@ const json = async (res) => {
 export const api = {
   me: () => fetch('/api/auth/me').then(json),
   stats: () => fetch('/api/stats').then(json),
+  adminAnalytics: (day) => fetch('/api/admin/analytics' + (day ? `?day=${encodeURIComponent(day)}` : '')).then(json),
+  // fire-and-forget event beacon — survives navigation via sendBeacon, cookie sent automatically
+  track: (type, target, label) => {
+    try {
+      const body = JSON.stringify({ type, target: target ?? null, label: label ?? null });
+      if (navigator.sendBeacon) navigator.sendBeacon('/api/track', new Blob([body], { type: 'application/json' }));
+      else fetch('/api/track', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body, keepalive: true });
+    } catch { /* analytics must never break the app */ }
+  },
   devLogin: (name) =>
     fetch('/api/auth/dev-login', {
       method: 'POST',

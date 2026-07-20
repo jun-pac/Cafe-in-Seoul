@@ -93,7 +93,10 @@ function applyFilters() {
 function wireFilters() {
   const ids = ['show-cafes', 'show-views', 'f-multifloor', 'f-view', 'f-rainok', 'f-opennow', 'f-openlate',
     'f-size-small', 'f-size-medium', 'f-size-large', 'f-outlet'];
-  ids.forEach((id) => $(`#${id}`).addEventListener('change', applyFilters));
+  ids.forEach((id) => $(`#${id}`).addEventListener('change', (e) => {
+    applyFilters();
+    api.track('filter', id, e.target.type === 'checkbox' ? (e.target.checked ? 'on' : 'off') : e.target.value);
+  }));
 
   const bindRange = (id, out, fmt) => {
     const el = $(`#${id}`);
@@ -151,6 +154,7 @@ async function refreshPendingQueue() {
 // ---------- detail ----------
 async function openDetail(id) {
   const cafe = await api.getCafe(id);
+  api.track('open_cafe', id, cafe.name);
   state.openCafeId = id;
   renderDetail(detailEl, cafe, {
     user: state.me.user,
@@ -182,6 +186,7 @@ function closeDetail() {
 // ---- view-spots ----
 async function openViewDetail(id) {
   const spot = await api.getViewspot(id);
+  api.track('open_view', id, spot.name);
   state.openViewId = id;
   state.openCafeId = null;
   state.chatCleanup?.();
@@ -192,7 +197,7 @@ async function openViewDetail(id) {
     onEdit: () => handleViewEdit(id, spot),
     onDelete: () => handleViewDelete(id),
     onAddPhotos: async (fd) => { await api.addViewspotPhotos(id, fd); await loadCafes(); await openViewDetail(id); },
-    onLike: async () => { const r = await api.likeViewspot(id); loadCafes(); return r; }, // refresh card/declutter in bg
+    onLike: async () => { const r = await api.likeViewspot(id); api.track('like', id, spot.name); loadCafes(); return r; }, // refresh card/declutter in bg
     onClose: closeDetail,
   });
   document.body.classList.add('detail-open');
@@ -402,24 +407,33 @@ async function openInsightsModal() {
   back.querySelector('#inClose').onclick = close;
   back.addEventListener('mousedown', (e) => { if (e.target === back) close(); });
   try {
-    const d = await api.adminInsights();
+    const [d, a] = await Promise.all([api.adminInsights(), api.adminAnalytics()]);
     const stat = (n, label) => `<div class="in-stat"><b>${n}</b><span>${label}</span></div>`;
+    const row = (label, n) => `<div class="in-row">${esc(label)}<span class="in-when">${n}</span></div>`;
+    const A = { pageview: ko ? '페이지뷰' : 'Pageview', open_cafe: ko ? '카페 열람' : 'Open cafe', open_view: ko ? '뷰맛집 열람' : 'Open view', filter: ko ? '필터' : 'Filter', search: ko ? '검색' : 'Search', like: ko ? '따봉' : 'Like', add_cafe: ko ? '카페 제안' : 'Add cafe', add_view: ko ? '뷰맛집 제안' : 'Add view', lang: ko ? '언어변경' : 'Lang', locate: ko ? '내 위치' : 'Locate', install: ko ? '앱설치' : 'Install' };
+    const hhmm = (s) => esc((s || '').slice(11, 16));
     back.querySelector('#inBody').innerHTML = `
       <div class="in-stats">
-        ${stat(d.visits.today, ko ? '오늘 방문' : 'Today')}
-        ${stat(d.visits.total, ko ? '누적 방문' : 'Total visits')}
+        ${stat(a.today.visitors, ko ? '오늘 방문자(고유)' : 'Visitors today')}
+        ${stat(a.today.pageviews, ko ? '페이지뷰' : 'Pageviews')}
+        ${stat(a.today.botPageviews, ko ? '봇 조회' : 'Bot views')}
+        ${stat(d.visits.total, ko ? '누적(구지표)' : 'Legacy total')}
         ${stat(d.users.total, ko ? '가입 유저' : 'Users')}
         ${stat(d.content.cafes, ko ? '카페' : 'Cafes')}
         ${stat(d.content.viewspots, ko ? '뷰맛집' : 'View spots')}
-        ${stat(d.content.reviews, ko ? '스토리' : 'Stories')}
-        ${stat(d.content.votes, ko ? '별점' : 'Votes')}
       </div>
-      <h3 class="detail__h3">${ko ? '가입 유저' : 'Signups'} <small class="muted">${d.users.total}</small></h3>
-      <div class="in-list">${d.users.recent.map((u) => `<div class="in-row"><b>${esc(u.name || u.provider_id)}</b>${u.is_admin ? ' <span class="admin-badge">ADMIN</span>' : ''} <span class="muted">${esc(u.provider)}</span><span class="in-when">${esc((u.created_at || '').slice(0, 10))}</span></div>`).join('')}</div>
-      <h3 class="detail__h3">${ko ? '일별 방문' : 'Daily visits'}</h3>
-      <div class="in-list">${d.visits.days.map((v) => `<div class="in-row">${esc(v.day)}<span class="in-when">${v.n}</span></div>`).join('') || `<p class="muted">${ko ? '없음' : 'None'}</p>`}</div>
-      <h3 class="detail__h3">${ko ? '최근 스토리' : 'Recent stories'}</h3>
-      <div class="in-list">${d.recentReviews.length ? d.recentReviews.map((r) => `<div class="in-row"><b>${esc(r.user_name)}</b> <span class="muted">${esc(r.cafe_name)}</span><span class="in-when">${esc((r.created_at || '').slice(5, 10))}</span><div class="in-body muted">${esc((r.body || '(사진)').slice(0, 70))}</div></div>`).join('') : `<p class="muted">${ko ? '없음' : 'None'}</p>`}</div>`;
+      ${a.today.countries.length ? `<h4 class="in-h4">${ko ? '국가별 방문자' : 'Visitors by country'}</h4><div class="in-list">${a.today.countries.map((c) => row(c.country || '?', c.n)).join('')}</div>` : ''}
+      <h4 class="in-h4">${ko ? '오늘 행동' : 'Actions today'}</h4>
+      <div class="in-list">${a.actions.length ? a.actions.map((x) => row(A[x.type] || x.type, x.n)).join('') : `<p class="muted">${ko ? '아직 없음' : 'none yet'}</p>`}</div>
+      ${a.topCafes.length ? `<h4 class="in-h4">${ko ? '많이 본 카페' : 'Top cafes'}</h4><div class="in-list">${a.topCafes.map((x) => row(x.label || '?', x.n)).join('')}</div>` : ''}
+      ${a.topViews.length ? `<h4 class="in-h4">${ko ? '많이 본 뷰맛집' : 'Top view spots'}</h4><div class="in-list">${a.topViews.map((x) => row(x.label || '?', x.n)).join('')}</div>` : ''}
+      ${a.topSearches.length ? `<h4 class="in-h4">${ko ? '검색어' : 'Searches'}</h4><div class="in-list">${a.topSearches.map((x) => row(x.label || '?', x.n)).join('')}</div>` : ''}
+      <h4 class="in-h4">${ko ? '방문자별 (한 명 vs 여러 명 구분)' : 'Per visitor'} <small class="muted">${a.sessions.length}</small></h4>
+      <div class="in-list">${a.sessions.length ? a.sessions.map((s) => `<div class="in-row"><b>${esc(s.country || '?')} · ${esc(s.ip || '?')}</b>${s.user_id ? ' <span class="admin-badge">로그인</span>' : ''} <span class="muted">${s.pageviews}pv · ${s.events}${ko ? '행동' : 'ev'}</span><span class="in-when">${hhmm(s.first_seen)}–${hhmm(s.last_seen)}</span></div>`).join('') : `<p class="muted">${ko ? '없음' : 'none'}</p>`}</div>
+      <h4 class="in-h4">${ko ? '최근 활동 (실시간)' : 'Recent activity'}</h4>
+      <div class="in-list in-feed">${a.recent.length ? a.recent.map((e) => `<div class="in-row ${e.is_bot ? 'is-bot' : ''}"><span class="ev-type">${esc(e.type)}</span> <span class="muted">${esc(e.label || e.target || '')}</span><span class="in-when">${hhmm(e.ts)} ${esc(e.country || '')}${e.is_bot ? ' 🤖' : ''}${e.is_admin ? ' 👑' : ''}</span></div>`).join('') : `<p class="muted">${ko ? '없음' : 'none'}</p>`}</div>
+      <h4 class="in-h4">${ko ? '가입 유저' : 'Signups'}</h4>
+      <div class="in-list">${d.users.recent.map((u) => `<div class="in-row"><b>${esc(u.name || u.provider_id)}</b>${u.is_admin ? ' <span class="admin-badge">ADMIN</span>' : ''} <span class="muted">${esc(u.provider)}</span><span class="in-when">${esc((u.created_at || '').slice(0, 10))}</span></div>`).join('')}</div>`;
   } catch (e) { back.querySelector('#inBody').innerHTML = `<p class="err">${esc(e.message)}</p>`; }
 }
 

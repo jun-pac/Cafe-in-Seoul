@@ -148,13 +148,26 @@ router.patch('/:id', requireAuth, upload.array('photos', 30), async (req, res) =
   if (photos && !photos.length) { cleanup(); return res.status(400).json({ error: '사진을 한 장 이상 남겨주세요.' }); }
 
   // keep each kept photo's original uploader; new photos are attributed to the editor
-  const owners = new Map(photoOwnersStmt.all(spot.id).map((r) => [r.url, r.created_by]));
+  const currentRows = photoOwnersStmt.all(spot.id);
+  const owners = new Map(currentRows.map((r) => [r.url, r.created_by]));
   db.transaction(() => {
+    let finalPhotos = photos;
+    if (photos) {
+      // DATA SAFETY: an edit must never silently drop a photo the editor didn't have
+      // loaded — most importantly a shot CONTRIBUTED by another user (appended to this
+      // spot). Those are preserved even if the manifest omits them, so they can't vanish.
+      // The editor can still reorder/remove their OWN photos and set the cover.
+      const inManifest = new Set(photos);
+      const protectedExtras = currentRows
+        .filter((r) => !inManifest.has(r.url) && r.created_by && r.created_by !== req.user.id)
+        .map((r) => r.url);
+      finalPhotos = [...photos, ...protectedExtras];
+    }
     db.prepare('UPDATE viewspots SET name = ?, lat = ?, lng = ?, photo_url = ? WHERE id = ?')
       .run(name, lat, lng, photos ? photos[0] : spot.photo_url, spot.id);
     if (photos) {
       delPhotos.run(spot.id);
-      photos.forEach((url, i) => insertPhoto.run(crypto.randomUUID(), spot.id, url, i, owners.get(url) || req.user.id));
+      finalPhotos.forEach((url, i) => insertPhoto.run(crypto.randomUUID(), spot.id, url, i, owners.get(url) || req.user.id));
     }
   })();
   res.json(getStmt.get(spot.id));
