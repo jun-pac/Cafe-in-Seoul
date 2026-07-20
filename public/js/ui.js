@@ -166,41 +166,67 @@ export function openLightbox(photos, start = 0) {
   show();
 }
 
-// Turn the detail hero into a mini-carousel: arrows / swipe / dots move through the
-// gallery (default = the representative photo at index 0). A tap opens the lightbox.
+// Turn the detail hero into a real sliding carousel: the photos sit in a flex track that
+// translateX-es between slides (and follows the finger while dragging, then snaps).
+// Default = the representative photo at index 0; a tap opens the lightbox.
 function setupHero(el, gallery, { onIndex } = {}) {
   const hero = el.querySelector('.detail__hero');
   const carImg = el.querySelector('#carImg');
   if (!hero || !carImg || !gallery.length) return;
-  let idx = 0, swiped = false;
-  const render = (i) => {
+
+  // one photo: keep the simple background-image div
+  if (gallery.length === 1) {
+    carImg.style.backgroundImage = `url('${esc(img(gallery[0]))}')`;
+    carImg.addEventListener('click', () => openLightbox(gallery, 0));
+    onIndex?.(0);
+    return;
+  }
+
+  // build the sliding track of full-width slides in place of the single image div
+  const track = document.createElement('div');
+  track.className = 'carousel__track';
+  track.innerHTML = gallery.map((u) => `<div class="carousel__slide" style="background-image:url('${esc(img(u))}')"></div>`).join('');
+  carImg.replaceWith(track);
+
+  let idx = 0, startX = 0, startY = 0, dragging = false, dragged = false;
+  const to = (i, animate = true) => {
     idx = (i + gallery.length) % gallery.length;
-    carImg.style.backgroundImage = `url('${esc(img(gallery[idx] || ''))}')`;
+    track.style.transition = animate ? 'transform .32s ease' : 'none';
+    track.style.transform = `translateX(-${idx * 100}%)`;
     hero.querySelectorAll('.carousel__dot').forEach((d, k) => d.classList.toggle('is-on', k === idx));
     onIndex?.(idx);
   };
-  if (gallery.length > 1) {
-    const mkNav = (dir, label, ic) => {
-      const b = document.createElement('button');
-      b.type = 'button'; b.className = `carousel__nav carousel__nav--${dir}`; b.setAttribute('aria-label', label);
-      b.innerHTML = icon(ic, 22);
-      b.onclick = (e) => { e.stopPropagation(); render(idx + (dir === 'next' ? 1 : -1)); };
-      return b;
-    };
-    const dots = document.createElement('div');
-    dots.className = 'carousel__dots';
-    dots.innerHTML = gallery.map((_, k) => `<span class="carousel__dot ${k === 0 ? 'is-on' : ''}"></span>`).join('');
-    hero.append(mkNav('prev', '이전', 'chevronLeft'), mkNav('next', '다음', 'chevronRight'), dots);
-    let sx = 0, sy = 0, on = false;
-    carImg.addEventListener('touchstart', (e) => { sx = e.touches[0].clientX; sy = e.touches[0].clientY; on = true; }, { passive: true });
-    carImg.addEventListener('touchend', (e) => {
-      if (!on) return; on = false;
-      const dx = e.changedTouches[0].clientX - sx, dy = e.changedTouches[0].clientY - sy;
-      if (Math.abs(dx) > 40 && Math.abs(dx) > Math.abs(dy)) { render(idx + (dx < 0 ? 1 : -1)); swiped = true; setTimeout(() => { swiped = false; }, 300); }
-    }, { passive: true });
-  }
-  carImg.addEventListener('click', () => { if (!swiped) openLightbox(gallery, idx); });
-  render(0);
+
+  const mkNav = (dir, label, ic) => {
+    const b = document.createElement('button');
+    b.type = 'button'; b.className = `carousel__nav carousel__nav--${dir}`; b.setAttribute('aria-label', label);
+    b.innerHTML = icon(ic, 22);
+    b.onclick = (e) => { e.stopPropagation(); to(idx + (dir === 'next' ? 1 : -1)); };
+    return b;
+  };
+  const dots = document.createElement('div');
+  dots.className = 'carousel__dots';
+  dots.innerHTML = gallery.map((_, k) => `<span class="carousel__dot ${k === 0 ? 'is-on' : ''}"></span>`).join('');
+  hero.append(mkNav('prev', '이전', 'chevronLeft'), mkNav('next', '다음', 'chevronRight'), dots);
+
+  // finger-follow drag with direction lock (vertical → let the panel scroll)
+  track.addEventListener('touchstart', (e) => { startX = e.touches[0].clientX; startY = e.touches[0].clientY; dragging = true; dragged = false; track.style.transition = 'none'; }, { passive: true });
+  track.addEventListener('touchmove', (e) => {
+    if (!dragging) return;
+    const dx = e.touches[0].clientX - startX, dy = e.touches[0].clientY - startY;
+    if (!dragged && Math.abs(dx) < Math.abs(dy)) { dragging = false; to(idx); return; } // vertical scroll wins
+    if (Math.abs(dx) > 6) dragged = true;
+    if (dragged) { e.preventDefault(); track.style.transform = `translateX(calc(-${idx * 100}% + ${dx}px))`; }
+  }, { passive: false });
+  track.addEventListener('touchend', (e) => {
+    if (!dragging) return; dragging = false;
+    const dx = e.changedTouches[0].clientX - startX;
+    if (Math.abs(dx) > 45) to(idx + (dx < 0 ? 1 : -1));
+    else to(idx); // snap back
+  }, { passive: true });
+
+  track.addEventListener('click', () => { if (!dragged) openLightbox(gallery, idx); });
+  to(0, false);
 }
 
 // ---- Detail panel ---------------------------------------------------------

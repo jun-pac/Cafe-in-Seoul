@@ -364,6 +364,9 @@ body.detail-resizing { cursor: ew-resize; user-select: none; }
 
 .detail__hero { position: relative; height: 280px; background: #e2e2ea; overflow: hidden; }
 .carousel__img { position: absolute; inset: 0; background-size: cover; background-position: center; transition: background-image .1s; }
+/* sliding carousel track: full-width slides that translateX between photos */
+.carousel__track { position: absolute; inset: 0; display: flex; will-change: transform; cursor: zoom-in; touch-action: pan-y; }
+.carousel__slide { flex: 0 0 100%; height: 100%; background-size: cover; background-position: center; }
 /* swipeable hero: prev/next arrows + dot indicators */
 .carousel__nav { position: absolute; top: 50%; transform: translateY(-50%); width: 34px; height: 34px; border: none; border-radius: 50%; background: rgba(15,15,20,.4); color: #fff; display: grid; place-items: center; cursor: pointer; z-index: 3; opacity: .82; transition: opacity .12s, background .12s; }
 .carousel__nav:hover { opacity: 1; background: rgba(15,15,20,.68); }

@@ -417,7 +417,7 @@ async function openInsightsModal() {
     const [d, a] = await Promise.all([api.adminInsights(), api.adminAnalytics()]);
     const stat = (n, label) => `<div class="in-stat"><b>${n}</b><span>${label}</span></div>`;
     const row = (label, n) => `<div class="in-row">${esc(label)}<span class="in-when">${n}</span></div>`;
-    const A = { pageview: ko ? '페이지뷰' : 'Pageview', open_cafe: ko ? '카페 열람' : 'Open cafe', open_view: ko ? '뷰맛집 열람' : 'Open view', filter: ko ? '필터' : 'Filter', search: ko ? '검색' : 'Search', like: ko ? '따봉' : 'Like', add_cafe: ko ? '카페 제안' : 'Add cafe', add_view: ko ? '뷰맛집 제안' : 'Add view', lang: ko ? '언어변경' : 'Lang', locate: ko ? '내 위치' : 'Locate', install: ko ? '앱설치' : 'Install' };
+    const A = { pageview: ko ? '페이지뷰' : 'Pageview', open_cafe: ko ? '카페 열람' : 'Open cafe', open_view: ko ? '사진 열람' : 'Open photo', filter: ko ? '필터' : 'Filter', search: ko ? '검색' : 'Search', like: ko ? '따봉' : 'Like', add_cafe: ko ? '카페 제안' : 'Add cafe', add_view: ko ? '사진 제안' : 'Add photo', lang: ko ? '언어변경' : 'Lang', locate: ko ? '내 위치' : 'Locate', install: ko ? '앱설치' : 'Install' };
     const hhmm = (s) => esc((s || '').slice(11, 16));
     back.querySelector('#inBody').innerHTML = `
       <div class="in-stats">
@@ -427,13 +427,13 @@ async function openInsightsModal() {
         ${stat(d.visits.total, ko ? '누적(구지표)' : 'Legacy total')}
         ${stat(d.users.total, ko ? '가입 유저' : 'Users')}
         ${stat(d.content.cafes, ko ? '카페' : 'Cafes')}
-        ${stat(d.content.viewspots, ko ? '뷰맛집' : 'View spots')}
+        ${stat(d.content.viewspots, ko ? '사진' : 'Photos')}
       </div>
       ${a.today.countries.length ? `<h4 class="in-h4">${ko ? '국가별 방문자' : 'Visitors by country'}</h4><div class="in-list">${a.today.countries.map((c) => row(c.country || '?', c.n)).join('')}</div>` : ''}
       <h4 class="in-h4">${ko ? '오늘 행동' : 'Actions today'}</h4>
       <div class="in-list">${a.actions.length ? a.actions.map((x) => row(A[x.type] || x.type, x.n)).join('') : `<p class="muted">${ko ? '아직 없음' : 'none yet'}</p>`}</div>
       ${a.topCafes.length ? `<h4 class="in-h4">${ko ? '많이 본 카페' : 'Top cafes'}</h4><div class="in-list">${a.topCafes.map((x) => row(x.label || '?', x.n)).join('')}</div>` : ''}
-      ${a.topViews.length ? `<h4 class="in-h4">${ko ? '많이 본 뷰맛집' : 'Top view spots'}</h4><div class="in-list">${a.topViews.map((x) => row(x.label || '?', x.n)).join('')}</div>` : ''}
+      ${a.topViews.length ? `<h4 class="in-h4">${ko ? '많이 본 사진' : 'Top photo spots'}</h4><div class="in-list">${a.topViews.map((x) => row(x.label || '?', x.n)).join('')}</div>` : ''}
       ${a.topSearches.length ? `<h4 class="in-h4">${ko ? '검색어' : 'Searches'}</h4><div class="in-list">${a.topSearches.map((x) => row(x.label || '?', x.n)).join('')}</div>` : ''}
       <h4 class="in-h4">${ko ? '방문자별 (한 명 vs 여러 명 구분)' : 'Per visitor'} <small class="muted">${a.sessions.length}</small></h4>
       <div class="in-list">${a.sessions.length ? a.sessions.map((s) => `<div class="in-row"><b>${esc(s.country || '?')} · ${esc(s.ip || '?')}</b>${s.user_id ? ' <span class="admin-badge">로그인</span>' : ''} <span class="muted">${s.pageviews}pv · ${s.events}${ko ? '행동' : 'ev'}</span><span class="in-when">${hhmm(s.first_seen)}–${hhmm(s.last_seen)}</span></div>`).join('') : `<p class="muted">${ko ? '없음' : 'none'}</p>`}</div>
