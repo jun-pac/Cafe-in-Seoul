@@ -1,5 +1,5 @@
 import {
-  sizeLabel, outletLabel, def, won, hoursText, isOpenNow, weeklyHours, esc, img, haversineKm,
+  sizeLabel, outletLabel, def, won, hoursText, isOpenNow, weeklyHours, esc, img, thumb, haversineKm,
 } from './util.js';
 import { icon } from './icons.js';
 import { t } from './i18n.js';
@@ -86,25 +86,30 @@ export function renderAuth(el, me, { onLogout, onGoogleCredential, onLocalLogin,
 }
 
 // ---- Admin pending queue --------------------------------------------------
-export function renderPendingQueue(el, cafes, { onApprove, onReject, onOpen }) {
-  if (!cafes.length) { el.hidden = true; el.innerHTML = ''; return; }
+export function renderPendingQueue(el, { cafes = [], viewspots = [] }, cb) {
+  const total = cafes.length + viewspots.length;
+  if (!total) { el.hidden = true; el.innerHTML = ''; return; }
   el.hidden = false;
-  el.innerHTML = `<div class="pending-queue__title">${icon('shield', 14)} ${t('pending.title')} <b>${cafes.length}</b></div>`;
-  for (const c of cafes) {
+  el.innerHTML = `<div class="pending-queue__title">${icon('shield', 14)} ${t('pending.title')} <b>${total}</b></div>`;
+  const addRow = (item, kind) => {
     const row = document.createElement('div');
     row.className = 'pending-item';
+    const who = item.creator_name ? `<span class="muted">· ${esc(item.creator_name)}</span>` : '';
+    const tag = kind === 'view' ? `${icon('view', 12)} ` : '';
     row.innerHTML = `
-      <button type="button" class="pending-item__name">${esc(c.name)}</button>
-      <div class="pending-item__reason">${esc(c.moderation_reason || t('pending.noReason'))}</div>
+      <button type="button" class="pending-item__name">${tag}${esc(item.name)} ${who}</button>
       <div class="pending-item__actions">
         <button class="btn btn--primary pill sm" data-a="ok">${t('pending.approve')}</button>
         <button class="btn btn--ghost pill sm" data-a="no">${t('pending.reject')}</button>
       </div>`;
-    row.querySelector('.pending-item__name').onclick = () => onOpen(c.id);
-    row.querySelector('[data-a="ok"]').onclick = () => onApprove(c.id);
-    row.querySelector('[data-a="no"]').onclick = () => { if (confirm(`'${c.name}' 거절(삭제)할까요?`)) onReject(c.id); };
+    const isView = kind === 'view';
+    row.querySelector('.pending-item__name').onclick = () => (isView ? cb.onOpenView : cb.onOpenCafe)(item.id);
+    row.querySelector('[data-a="ok"]').onclick = () => (isView ? cb.onApproveView : cb.onApproveCafe)(item.id);
+    row.querySelector('[data-a="no"]').onclick = () => { if (confirm(`'${item.name}' ${t('pending.rejectAsk')}`)) (isView ? cb.onRejectView : cb.onRejectCafe)(item.id); };
     el.appendChild(row);
-  }
+  };
+  cafes.forEach((c) => addRow(c, 'cafe'));
+  viewspots.forEach((v) => addRow(v, 'view'));
 }
 
 // The modal overlay covers the map, so "pick on map" must temporarily hide the
@@ -152,7 +157,7 @@ export function openLightbox(photos, start = 0) {
 }
 
 // ---- Detail panel ---------------------------------------------------------
-export function renderDetail(el, cafe, { user, onVote, onAddReview, onClose, onEdit }) {
+export function renderDetail(el, cafe, { user, onVote, onAddReview, onClose, onEdit, onSetCover, onDeleteStory, onEditStory }) {
   const openNow = isOpenNow(cafe);
   const floorTxt = cafe.multi_floor ? `${cafe.floors}${t('unit.floor')} · ${t('detail.multiFloor')}` : t('detail.singleFloor');
   const viewTxt = cafe.has_view ? (cafe.view_note ? `${t('detail.viewGood')} · ${esc(cafe.view_note)}` : t('detail.viewGood')) : t('detail.viewMeh');
@@ -160,6 +165,7 @@ export function renderDetail(el, cafe, { user, onVote, onAddReview, onClose, onE
   const gallery = (cafe.gallery && cafe.gallery.length) ? cafe.gallery : [cafe.photo_url].filter(Boolean);
 
   el.innerHTML = `
+    <div class="detail__grip"></div>
     <button class="detail__close" title="닫기">${icon('x', 16)}</button>
     <div class="detail__scroll">
       <div class="detail__hero">
@@ -170,7 +176,7 @@ export function renderDetail(el, cafe, { user, onVote, onAddReview, onClose, onE
       <div class="detail__body">
         <h2 class="detail__name">${esc(cafe.name)}</h2>
         <div class="detail__addr">${esc(cafe.address || '')}</div>
-        ${cafe.status === 'pending' ? `<div class="detail__pending">${icon('shield', 14)} ${t('detail.pending')} <span class="muted">${cafe.moderation_reason ? '— ' + esc(cafe.moderation_reason) : ''}</span></div>` : ''}
+        ${cafe.status === 'pending' ? `<div class="detail__pending">${icon('shield', 14)} ${t('detail.pending')} <span class="muted">${cafe.moderation_reason ? '- ' + esc(cafe.moderation_reason) : ''}</span></div>` : ''}
         ${user?.isAdmin ? `<div class="detail__adminrow"><button class="btn btn--ghost sm" id="editCafeBtn">${icon('edit', 14)} ${t('detail.edit')}</button>${cafe.status === 'pending' ? `<button class="btn btn--primary sm" id="approveCafeBtn">${t('detail.approve')}</button>` : ''}</div>` : ''}
 
         <div class="detail__hoursrow">
@@ -181,11 +187,12 @@ export function renderDetail(el, cafe, { user, onVote, onAddReview, onClose, onE
         </div>
 
         <div class="chips">
-          <span class="chip" title="${esc(def('floors'))}">${icon('floors', 14)} ${esc(floorTxt)}</span>
-          <span class="chip" title="${esc(def('size'))}">${icon('size', 14)} ${esc(sizeLabel(cafe.size))}</span>
-          <span class="chip" title="${esc(def('outlets'))}">${icon('outlet', 14)} ${t('f.outlet')} ${esc(outletLabel(cafe.outlets))}</span>
-          <span class="chip" title="${esc(def('view'))}">${icon('view', 14)} ${esc(viewTxt)}</span>
-          <span class="chip" title="${esc(def('price'))}">${icon('price', 14)} ${t('detail.americano')} ${won(cafe.iced_americano_price)}</span>
+          <span class="chip tip" data-tip="${esc(def('floors'))}">${icon('floors', 14)} ${esc(floorTxt)}</span>
+          <span class="chip tip" data-tip="${esc(def('size'))}">${icon('size', 14)} ${esc(sizeLabel(cafe.size))}</span>
+          <span class="chip tip" data-tip="${esc(def('outlets'))}">${icon('outlet', 14)} ${t('f.outlet')} ${esc(outletLabel(cafe.outlets))}</span>
+          <span class="chip tip" data-tip="${esc(def('view'))}">${icon('view', 14)} ${esc(viewTxt)}</span>
+          <span class="chip tip" data-tip="${esc(def('price'))}">${icon('price', 14)} ${t('detail.americano')} ${won(cafe.iced_americano_price)}</span>
+          ${cafe.rain_ok ? `<span class="chip chip--rain tip" data-tip="${esc(def('rain_ok'))}">${icon('umbrella', 14)} ${t('detail.rainOk')}</span>` : ''}
         </div>
 
         <div class="detail__links">
@@ -193,12 +200,12 @@ export function renderDetail(el, cafe, { user, onVote, onAddReview, onClose, onE
           ${cafe.kakao_url ? `<a class="btn btn--map kakao" href="${esc(cafe.kakao_url)}" target="_blank" rel="noopener">${t('detail.kakao')}</a>` : ''}
         </div>
 
-        ${cafe.review_summary ? `<div class="detail__aisum"><div class="detail__aisum-h">${icon('ai', 15)} <b>${t('detail.reviewSummary')}</b></div><p>${esc(cafe.review_summary)}</p></div>` : ''}
+        ${cafe.study_review ? `<div class="detail__study"><div class="detail__study-h">${icon('coffee', 15)} <b>${t('detail.studyReview')}</b></div><p>${esc(cafe.study_review)}</p></div>` : ''}
 
         ${gallery.length > 1 ? `<h3 class="detail__h3">${t('detail.photos')} <small class="muted">${gallery.length}</small></h3>
         <div class="photo-grid" id="photoGrid"></div>` : ''}
 
-        <h3 class="detail__h3">${t('detail.rating')} <small>1–5</small></h3>
+        <h3 class="detail__h3">${t('detail.rating')} <small>1-5</small></h3>
         <div class="votes"></div>
 
         <h3 class="detail__h3">${t('detail.stories')} <small class="muted" id="revCount"></small></h3>
@@ -207,6 +214,8 @@ export function renderDetail(el, cafe, { user, onVote, onAddReview, onClose, onE
 
         <h3 class="detail__h3">${t('detail.chat')} <small>${icon('gps', 12)} ${t('detail.chat.hint')}</small></h3>
         <div class="chat" id="chatBox"></div>
+
+        ${cafe.review_summary ? `<details class="aisum-fold"><summary>${icon('ai', 13)} ${t('detail.reviewSummary')} <span class="muted">${t('detail.reviewSummaryNote')}</span></summary><p>${esc(cafe.review_summary)}</p></details>` : ''}
       </div>
     </div>`;
 
@@ -223,30 +232,41 @@ export function renderDetail(el, cafe, { user, onVote, onAddReview, onClose, onE
   carImg.addEventListener('click', () => openLightbox(gallery, 0));
   const grid = el.querySelector('#photoGrid');
   if (grid) {
-    grid.innerHTML = gallery.map((u, i) =>
-      `<button type="button" class="pg-item" data-i="${i}" style="background-image:url('${esc(img(u))}')"></button>`).join('');
-    grid.querySelectorAll('.pg-item').forEach((b) => (b.onclick = () => openLightbox(gallery, +b.dataset.i)));
+    grid.innerHTML = gallery.map((u, i) => `
+      <div class="pg-item ${i === 0 ? 'is-cover' : ''}" data-i="${i}" style="background-image:url('${esc(img(thumb(u)))}')">
+        ${i === 0 ? `<span class="pg-cover">${icon('star', 10)} ${t('pp.cover')}</span>`
+          : (user?.isAdmin ? `<button type="button" class="pg-setcover" data-url="${esc(u)}">${icon('star', 11)} ${t('pp.makeCoverShort')}</button>` : '')}
+      </div>`).join('');
+    grid.querySelectorAll('.pg-item').forEach((it) => it.addEventListener('click', () => openLightbox(gallery, +it.dataset.i)));
+    grid.querySelectorAll('.pg-setcover').forEach((b) => b.addEventListener('click', (e) => { e.stopPropagation(); onSetCover?.(b.dataset.url); }));
   }
 
-  // votes — update the row in place on click (no full panel reload)
+  // votes - update the row in place on click (no full panel reload)
   const votesEl = el.querySelector('.votes');
   for (const cat of VOTE_CATS) {
     const row = document.createElement('div');
     row.className = 'vote';
-    const paint = () => {
+    let savedTimer = null;
+    const paint = (saved = false) => {
       const avg = cafe.votes.averages[cat.key];
       const n = cafe.votes.counts[cat.key] || 0;
       const mine = cafe.myVotes?.[cat.key] || 0;
+      const foot = saved
+        ? `<span class="vote__saved">${icon('check', 13)} ${t('vote.saved')}</span>`
+        : mine
+          ? `<span class="vote__mine">${icon('check', 12)} ${t('vote.mine')} <b>${mine}</b><span class="vote__hint">· ${t('vote.change')}</span></span>`
+          : `<span class="vote__prompt">${t('vote.tapToRate')}</span>`;
       row.innerHTML = `
         <div class="vote__head">
           <span class="vote__label">${icon(cat.icon)} ${t(`vote.${cat.key}`)}
-            <span class="info" title="${esc(def(cat.key))}">${icon('info', 13)}</span></span>
+            ${def(cat.key) ? `<span class="info tip" data-tip="${esc(def(cat.key))}">${icon('info', 13)}</span>` : ''}</span>
           <span class="vote__avg">${stars(avg)} <span class="muted">(${n})</span></span>
         </div>
-        <div class="vote__stars" role="group" aria-label="${t(`vote.${cat.key}`)}">
+        <div class="vote__stars ${mine ? 'voted' : ''}" role="group" aria-label="${t(`vote.${cat.key}`)}">
           ${[1, 2, 3, 4, 5].map((v) =>
             `<button class="star ${mine >= v ? 'on' : ''}" data-v="${v}" aria-label="${v}">${icon('star', 22)}</button>`).join('')}
-        </div>`;
+        </div>
+        <div class="vote__foot ${saved ? 'ok' : ''}">${foot}</div>`;
       row.querySelectorAll('.star').forEach((b) => {
         b.onclick = async () => {
           if (!user) return alert(t('vote.loginNeeded'));
@@ -255,7 +275,9 @@ export function renderDetail(el, cafe, { user, onVote, onAddReview, onClose, onE
             const agg = await onVote(cat.key, v);      // { averages, counts }
             if (agg) cafe.votes = agg;
             cafe.myVotes = { ...(cafe.myVotes || {}), [cat.key]: v };
-            paint();
+            paint(true);                                // show "저장됨 ✓"
+            if (savedTimer) clearTimeout(savedTimer);
+            savedTimer = setTimeout(() => paint(false), 1800);
           } catch (e) { alert(e.message); }
         };
       });
@@ -267,7 +289,7 @@ export function renderDetail(el, cafe, { user, onVote, onAddReview, onClose, onE
   // stories (Instagram-style: text + multiple photos)
   const reviews = cafe.reviews || [];
   el.querySelector('#revCount').textContent = reviews.length ? `${reviews.length}` : '';
-  renderStories(el.querySelector('.stories'), reviews);
+  renderStories(el.querySelector('.stories'), reviews, { user, onDelete: onDeleteStory, onEdit: onEditStory });
 
   // story composer
   const formEl = el.querySelector('#storyform');
@@ -296,7 +318,7 @@ export function renderDetail(el, cafe, { user, onVote, onAddReview, onClose, onE
 }
 
 // ---- Admin edit modal (curate any cafe's fields) --------------------------
-export function openEditCafeModal(cafe, { onSave }) {
+export function openEditCafeModal(cafe, { onSave, onDraftReview }) {
   const back = document.createElement('div');
   back.className = 'modal-back';
   const sel = (v, o) => (v === o ? 'selected' : '');
@@ -320,34 +342,62 @@ export function openEditCafeModal(cafe, { onSave }) {
             <option value="few" ${sel(cafe.outlets, 'few')}>${t('outlet.few')}</option>
             <option value="none" ${sel(cafe.outlets, 'none')}>${t('outlet.none')}</option></select></label>
           <label class="field"><span>${t('modal.price')}</span><input class="input" type="number" min="0" step="100" name="iced_americano_price" value="${esc(cafe.iced_americano_price)}"></label>
-          <label class="field"><span>${t('modal.open')}</span><input class="input" type="time" name="open_time" value="${esc(cafe.open_time)}"></label>
-          <label class="field"><span>${t('modal.close')}</span><input class="input" type="time" name="close_time" value="${esc(cafe.close_time === '00:00' ? '00:00' : cafe.close_time)}"></label>
         </div>
+        <div class="field"><span>${t('modal.hours')} <small class="muted">${t('modal.hoursHint')}</small></span>
+          <div id="editHoursEd"></div></div>
         <label class="field checkline"><input type="checkbox" name="has_view" ${cafe.has_view ? 'checked' : ''}> <span>${t('modal.viewGood')}</span></label>
+        <label class="field checkline"><input type="checkbox" name="rain_ok" ${cafe.rain_ok ? 'checked' : ''}> <span>${t('modal.rainOk')} <span class="info tip" data-tip="${esc(def('rain_ok'))}">${icon('info', 12)}</span></span></label>
         <label class="field"><span>${t('modal.viewNote')}</span><input class="input" name="view_note" value="${esc(cafe.view_note || '')}"></label>
         <div class="grid2">
           <label class="field"><span>${t('modal.naverLink')}</span><input class="input" name="naver_url" value="${esc(cafe.naver_url || '')}"></label>
           <label class="field"><span>${t('modal.kakaoLink')}</span><input class="input" name="kakao_url" value="${esc(cafe.kakao_url || '')}"></label>
         </div>
         <label class="field"><span>${t('modal.aiSummary')}</span><textarea class="input" rows="2" name="review_summary">${esc(cafe.review_summary || '')}</textarea></label>
+        <div class="field"><span>${t('modal.studyReview')} * <small class="muted">${t('modal.studyReviewHint')}</small></span>
+          <textarea class="input" rows="4" name="study_review" placeholder="${esc(t('modal.studyReviewPlaceholder'))}">${esc(cafe.study_review || '')}</textarea>
+          <div class="storyform__row"><span class="muted">${t('modal.studyReviewAiHint')}</span>
+            <button type="button" class="btn btn--ghost sm" id="eDraftBtn">${icon('ai', 14)} ${t('modal.aiDraft')}</button></div></div>
         <div class="modal__foot"><span class="err" id="eErr"></span><button type="submit" class="btn btn--primary">${t('modal.save')}</button></div>
       </form>
     </div>`;
   document.body.appendChild(back);
   const form = back.querySelector('#editForm');
+  const hoursEd = createHoursEditor(back.querySelector('#editHoursEd'), cafe);
   const picker = createPhotoPicker(back.querySelector('#editPhotoPicker'), {});
-  // load ALL of the cafe's photos (representative set + user story photos) so any
-  // can be picked as the cover — not just the imported cafe_photos.
-  const editPhotos = (cafe.gallery && cafe.gallery.length) ? cafe.gallery
+  // load only the cafe's OWN photos (cover + imported) — NOT story/comment photos.
+  // Those are managed from their story so they never get orphaned here.
+  const editPhotos = (cafe.cafePhotos && cafe.cafePhotos.length) ? cafe.cafePhotos
     : (cafe.photos && cafe.photos.length) ? cafe.photos : [cafe.photo_url].filter(Boolean);
   picker.addUrls(editPhotos);
   const close = () => back.remove();
   back.querySelector('#eClose').onclick = close;
   back.addEventListener('mousedown', (e) => { if (e.target === back) close(); });
+  const eDraftBtn = back.querySelector('#eDraftBtn');
+  if (eDraftBtn) {
+    if (!onDraftReview) eDraftBtn.style.display = 'none';
+    else eDraftBtn.onclick = async () => {
+      const hv = hoursEd.getValue();
+      const original = eDraftBtn.innerHTML;
+      eDraftBtn.disabled = true; eDraftBtn.textContent = t('modal.aiDrafting');
+      try {
+        const { draft } = await onDraftReview({
+          name: form.elements.name.value.trim(),
+          floors: form.elements.floors.value, size: form.elements.size.value, outlets: form.elements.outlets.value,
+          has_view: form.elements.has_view.checked, view_note: form.elements.view_note.value,
+          open_time: hv.open_time, close_time: hv.close_time,
+          iced_americano_price: form.elements.iced_americano_price.value,
+          review_summary: form.elements.review_summary.value,
+        });
+        if (draft) form.elements.study_review.value = draft;
+      } catch (err) { back.querySelector('#eErr').textContent = err.message || 'AI 초안 실패'; }
+      finally { eDraftBtn.disabled = false; eDraftBtn.innerHTML = original; }
+    };
+  }
   form.onsubmit = async (e) => {
     e.preventDefault();
     const { manifest, files, count } = picker.getManifest();
     if (!count) { back.querySelector('#eErr').textContent = '사진을 한 장 이상 남겨주세요.'; return; }
+    if ((form.elements.study_review.value || '').trim().length < 15) { back.querySelector('#eErr').textContent = '카공 총평을 적어주세요 (15자 이상).'; return; }
     const fd = new FormData();
     const setF = (k, v) => fd.set(k, v);
     setF('name', form.elements.name.value);
@@ -356,13 +406,17 @@ export function openEditCafeModal(cafe, { onSave }) {
     setF('size', form.elements.size.value);
     setF('outlets', form.elements.outlets.value);
     setF('iced_americano_price', form.elements.iced_americano_price.value);
-    setF('open_time', form.elements.open_time.value);
-    setF('close_time', form.elements.close_time.value);
+    const hv = hoursEd.getValue();
+    setF('open_time', hv.open_time);
+    setF('close_time', hv.close_time);
+    setF('hours_json', hv.hours_json == null ? '' : hv.hours_json);
     setF('has_view', form.elements.has_view.checked ? 'true' : 'false');
+    setF('rain_ok', form.elements.rain_ok.checked ? 'true' : 'false');
     setF('view_note', form.elements.view_note.value);
     setF('naver_url', form.elements.naver_url.value);
     setF('kakao_url', form.elements.kakao_url.value);
     setF('review_summary', form.elements.review_summary.value);
+    setF('study_review', form.elements.study_review.value);
     setF('photo_manifest', JSON.stringify(manifest));
     files.forEach((f) => fd.append('photos', f));
     try { await onSave(fd); close(); }
@@ -462,36 +516,86 @@ export function initChat(root, cafe, { user, api }) {
   return () => { stopped = true; clearInterval(timer); };
 }
 
-export function renderStories(el, reviews) {
-  el.innerHTML = reviews.length
-    ? reviews.map((r) => {
-        const photos = r.photos && r.photos.length ? r.photos : (r.photo_url ? [r.photo_url] : []);
-        return `
-      <div class="story">
+export function renderStories(el, reviews, { user, onDelete, onEdit } = {}) {
+  const render = () => {
+    el.innerHTML = reviews.length
+      ? reviews.map((r) => {
+          const photos = r.photos && r.photos.length ? r.photos : (r.photo_url ? [r.photo_url] : []);
+          const mine = user && (user.isAdmin || user.id === r.user_id);
+          return `
+      <div class="story" data-rid="${esc(r.id)}">
         <div class="story__head"><b>${esc(r.user_name)}</b>
-          <span class="muted">${esc((r.created_at || '').slice(0, 10))}</span></div>
+          <span class="muted">${esc((r.created_at || '').slice(0, 10))}</span>
+          ${mine && onEdit ? `<button type="button" class="story__act story__edit" data-rid="${esc(r.id)}">${t('story.edit')}</button>` : ''}
+          ${mine && onDelete ? `<button type="button" class="story__act story__del" data-rid="${esc(r.id)}">${t('story.delete')}</button>` : ''}</div>
         ${r.body ? `<div class="story__body">${esc(r.body)}</div>` : ''}
-        ${photos.length ? `<div class="story__photos">${photos.map((u) => `<img class="story__photo" src="${esc(img(u))}" loading="lazy" alt="">`).join('')}</div>` : ''}
+        ${photos.length ? `<div class="story__photos">${photos.map((u) => `<img class="story__photo" src="${esc(img(thumb(u)))}" loading="lazy" alt="">`).join('')}</div>` : ''}
       </div>`;
-      }).join('')
-    : `<p class="muted">${t('story.empty')}</p>`;
+        }).join('')
+      : `<p class="muted">${t('story.empty')}</p>`;
+
+    if (onDelete) el.querySelectorAll('.story__del').forEach((b) => b.addEventListener('click', async () => {
+      if (!window.confirm(t('story.deleteConfirm'))) return;
+      try { await onDelete(b.dataset.rid); } catch (e) { alert(e.message); }
+    }));
+    if (onEdit) el.querySelectorAll('.story__edit').forEach((b) => b.addEventListener('click', () => beginEdit(b.dataset.rid)));
+  };
+
+  // turn one story into an inline editor (body + photos)
+  const beginEdit = (rid) => {
+    const r = reviews.find((x) => x.id === rid);
+    const node = el.querySelector(`.story[data-rid="${CSS.escape(rid)}"]`);
+    if (!r || !node) return;
+    node.classList.add('story--editing');
+    node.innerHTML = `
+      <textarea class="input st-edit-body" rows="3" placeholder="${esc(t('story.placeholder'))}">${esc(r.body || '')}</textarea>
+      <div class="photo-picker st-edit-picker"></div>
+      <div class="storyform__row"><span class="err st-edit-err"></span>
+        <button type="button" class="btn btn--ghost sm st-edit-cancel">${t('common.cancel')}</button>
+        <button type="button" class="btn btn--primary sm st-edit-save">${t('modal.save')}</button></div>`;
+    const picker = createPhotoPicker(node.querySelector('.st-edit-picker'), {});
+    picker.addUrls((r.photos && r.photos.length) ? r.photos : (r.photo_url ? [r.photo_url] : []));
+    node.querySelector('.st-edit-cancel').onclick = render;
+    node.querySelector('.st-edit-save').onclick = async () => {
+      const body = node.querySelector('.st-edit-body').value.trim();
+      const { manifest, files, count } = picker.getManifest();
+      if (!body && !count) { node.querySelector('.st-edit-err').textContent = t('story.need'); return; }
+      const fd = new FormData();
+      fd.append('body', body);
+      fd.set('photo_manifest', JSON.stringify(manifest));
+      files.forEach((f) => fd.append('photos', f));
+      try { await onEdit(rid, fd); } catch (e) { node.querySelector('.st-edit-err').textContent = e.message || '수정 실패'; }
+    };
+  };
+
+  render();
 }
 
 // ---- View-spot detail (lighter: name + photos + comments) -----------------
-export function renderViewDetail(el, spot, { user, onAddComment, onEdit, onDelete, onClose }) {
+export function renderViewDetail(el, spot, { user, onAddComment, onEdit, onDelete, onClose, onAddPhotos }) {
   const gallery = (spot.photos && spot.photos.length) ? spot.photos : [spot.photo_url].filter(Boolean);
   el.innerHTML = `
+    <div class="detail__grip"></div>
     <button class="detail__close" title="닫기">${icon('x', 16)}</button>
     <div class="detail__scroll">
       <div class="detail__hero detail__hero--view">
         <div class="carousel__img" id="carImg" role="button" title="${t('detail.zoom')}"></div>
         ${gallery.length > 1 ? `<div class="carousel__count">${icon('camera', 12)} ${gallery.length}</div>` : ''}
         <div class="detail__viewtag">${icon('view', 13)} VIEW</div>
+        <div class="detail__heroby" id="heroBy" hidden></div>
       </div>
       <div class="detail__body">
         <h2 class="detail__name">${esc(spot.name)}</h2>
+        ${spot.creator_name ? `<div class="detail__by">${icon('user', 12)} ${t('view.addedBy')} <b>${esc(spot.creator_name)}</b></div>` : ''}
         ${spot.canEdit ? `<div class="detail__adminrow"><button class="btn btn--ghost sm" id="vEdit">${icon('edit', 14)} ${t('detail.edit')}</button><button class="btn btn--ghost sm" id="vDel">${t('detail.delete')}</button></div>` : ''}
-        ${gallery.length > 1 ? `<h3 class="detail__h3">${t('detail.photos')} <small class="muted">${gallery.length}</small></h3><div class="photo-grid" id="photoGrid"></div>` : ''}
+        ${gallery.length ? `<h3 class="detail__h3">${t('detail.photos')} <small class="muted">${gallery.length}</small></h3><div class="photo-grid" id="photoGrid"></div>` : ''}
+        ${user ? `<div class="viewadd">
+          <h3 class="detail__h3">${t('view.addPhotos')}</h3>
+          <div class="filmnote">${icon('camera', 14)} ${t('view.filmNote')}</div>
+          <div class="photo-picker" id="vAddPicker"></div>
+          <div class="storyform__row"><span class="err" id="vAddErr"></span>
+            <button type="button" class="btn btn--primary sm" id="vAddBtn">${t('view.addPhotos')}</button></div>
+        </div>` : ''}
         <h3 class="detail__h3">${t('comment.header')} <small class="muted" id="cCount"></small></h3>
         <div class="commentform" id="commentform"></div>
         <div class="comments"></div>
@@ -501,13 +605,31 @@ export function renderViewDetail(el, spot, { user, onAddComment, onEdit, onDelet
   el.querySelector('#vEdit')?.addEventListener('click', onEdit);
   el.querySelector('#vDel')?.addEventListener('click', onDelete);
 
+  const byUrl = {};
+  (spot.photoMeta || []).forEach((m) => { if (m.uploader) byUrl[m.url] = m.uploader; });
   const carImg = el.querySelector('#carImg');
   carImg.style.backgroundImage = `url('${esc(img(gallery[0] || ''))}')`;
   carImg.addEventListener('click', () => openLightbox(gallery, 0));
+  const heroBy = el.querySelector('#heroBy');
+  if (heroBy && byUrl[gallery[0]]) { heroBy.innerHTML = `${icon('user', 11)} ${esc(byUrl[gallery[0]])}`; heroBy.hidden = false; }
   const grid = el.querySelector('#photoGrid');
   if (grid) {
-    grid.innerHTML = gallery.map((u, i) => `<button type="button" class="pg-item" data-i="${i}" style="background-image:url('${esc(img(u))}')"></button>`).join('');
+    grid.innerHTML = gallery.map((u, i) => `<button type="button" class="pg-item" data-i="${i}" style="background-image:url('${esc(img(thumb(u)))}')">${byUrl[u] ? `<span class="pg-by">${esc(byUrl[u])}</span>` : ''}</button>`).join('');
     grid.querySelectorAll('.pg-item').forEach((b) => (b.onclick = () => openLightbox(gallery, +b.dataset.i)));
+  }
+
+  if (user && onAddPhotos) {
+    const addPicker = createPhotoPicker(el.querySelector('#vAddPicker'), {});
+    el.querySelector('#vAddBtn').onclick = async () => {
+      const { files, count } = addPicker.getManifest();
+      const errEl = el.querySelector('#vAddErr');
+      if (!count) { errEl.textContent = t('view.needPhoto'); return; }
+      const fd = new FormData();
+      files.forEach((f) => fd.append('photos', f));
+      const btn = el.querySelector('#vAddBtn');
+      btn.disabled = true;
+      try { await onAddPhotos(fd); } catch (e) { errEl.textContent = e.message || '추가 실패'; btn.disabled = false; }
+    };
   }
 
   const comments = spot.comments || [];
@@ -555,6 +677,7 @@ export function openViewModal({ mode = 'create', spot, onSearch, onPickLocation,
           <input type="hidden" name="lat" value="${spot ? esc(spot.lat) : ''}">
           <input type="hidden" name="lng" value="${spot ? esc(spot.lng) : ''}"></div>
         <div class="field"><span>${t('modal.photo')} * <small class="muted">${t('modal.photoHint')}</small></span>
+          <div class="filmnote">${icon('camera', 14)} ${t('view.filmNote')}</div>
           <div class="photo-picker" id="vPicker"></div></div>
         <div class="modal__foot"><span class="err" id="vErr"></span>
           <button type="submit" class="btn btn--primary">${mode === 'edit' ? t('modal.save') : t('modal.submit')}</button></div>
@@ -624,11 +747,90 @@ export function openViewModal({ mode = 'create', spot, onSearch, onPickLocation,
   return { close };
 }
 
+// ---- Per-weekday hours editor -----------------------------------------------
+// Anything the AI/Kakao autofill guesses about hours is fully human-editable here.
+// getValue() returns { hours_json, open_time, close_time }: when every day is
+// open with identical times it collapses to a single schedule (hours_json=null).
+export function createHoursEditor(container, initial = {}) {
+  const T = /^\d\d:\d\d$/;
+  let fallO = T.test(initial.open_time || '') ? initial.open_time : '09:00';
+  let fallC = T.test(initial.close_time || '') ? initial.close_time : '22:00';
+  const norm = (c) => (c === '24:00' ? '00:00' : c); // <input type=time> can't hold 24:00
+  let week = null;
+  try { week = initial.hours_json ? JSON.parse(initial.hours_json) : null; } catch { week = null; }
+  // an all-closed schedule is almost always a bad parse, not a real closed cafe → treat as no data
+  const wasAllClosed = Array.isArray(week) && week.every((e) => !e || e.closed);
+  if (wasAllClosed) week = null;
+  // bad parse often pairs with degenerate 00:00~00:00 single times → use sensible defaults
+  // (but leave a real 24h cafe, whose hours_json is null, untouched)
+  if (wasAllClosed && fallO === '00:00' && fallC === '00:00') { fallO = '09:00'; fallC = '22:00'; }
+
+  const rows = [];
+  for (let d = 0; d < 7; d++) {
+    const e = Array.isArray(week) ? week[d] : null;
+    if (e && e.closed) rows.push({ closed: true, open: fallO, close: fallC });
+    else if (e && e.open) rows.push({ closed: false, open: norm(e.open), close: norm(e.close) || fallC });
+    else rows.push({ closed: false, open: fallO, close: fallC });
+  }
+
+  container.innerHTML = `
+    <div class="hours-ed">
+      <div class="hours-ed__bulk">
+        <input type="time" class="input hours-ed__bo" value="${fallO}">
+        <span class="hours-ed__sep">~</span>
+        <input type="time" class="input hours-ed__bc" value="${fallC}">
+        <button type="button" class="btn btn--sm" data-act="all">${t('hours.applyAll')}</button>
+      </div>
+      ${rows.map((e, d) => `
+        <div class="hours-ed__row ${e.closed ? 'is-closed' : ''}" data-d="${d}">
+          <span class="hours-ed__day">${t(`dow.${d}`)}</span>
+          <input type="time" class="input he-open" value="${esc(e.open)}" ${e.closed ? 'disabled' : ''}>
+          <span class="hours-ed__sep">~</span>
+          <input type="time" class="input he-close" value="${esc(norm(e.close))}" ${e.closed ? 'disabled' : ''}>
+          <label class="hours-ed__off"><input type="checkbox" class="he-closed" ${e.closed ? 'checked' : ''}> ${t('hours.closed')}</label>
+        </div>`).join('')}
+    </div>`;
+
+  const rowEls = [...container.querySelectorAll('.hours-ed__row')];
+  const syncRow = (r) => {
+    const closed = r.querySelector('.he-closed').checked;
+    r.classList.toggle('is-closed', closed);
+    r.querySelector('.he-open').disabled = closed;
+    r.querySelector('.he-close').disabled = closed;
+  };
+  rowEls.forEach((r) => r.querySelector('.he-closed').addEventListener('change', () => syncRow(r)));
+  container.querySelector('[data-act="all"]').addEventListener('click', () => {
+    const o = container.querySelector('.hours-ed__bo').value || fallO;
+    const c = container.querySelector('.hours-ed__bc').value || fallC;
+    rowEls.forEach((r) => {
+      r.querySelector('.he-closed').checked = false;
+      r.querySelector('.he-open').value = o;
+      r.querySelector('.he-close').value = c;
+      syncRow(r);
+    });
+  });
+
+  return {
+    getValue() {
+      const days = rowEls.map((r, d) => (r.querySelector('.he-closed').checked
+        ? { dow: d, closed: true }
+        : { dow: d, open: r.querySelector('.he-open').value || fallO, close: r.querySelector('.he-close').value || fallC }));
+      const allOpen = days.every((e) => !e.closed);
+      const same = allOpen && days.every((e) => e.open === days[0].open && e.close === days[0].close);
+      const firstOpen = days.find((e) => !e.closed);
+      const open_time = firstOpen ? firstOpen.open : fallO;
+      const close_time = firstOpen ? firstOpen.close : fallC;
+      if (same) return { hours_json: null, open_time: days[0].open, close_time: days[0].close };
+      return { hours_json: JSON.stringify(days), open_time, close_time };
+    },
+  };
+}
+
 // ---- Reusable photo picker (reorderable; first = cover/representative) -----
 export function createPhotoPicker(container, { onChange } = {}) {
   let items = []; // { kind:'file'|'url', file?, url?, obj? }
   let dragFrom = null;
-  const MAX = 10;
+  const MAX = 40;
   container.classList.add('photo-picker');
 
   function move(from, to) {
@@ -640,7 +842,7 @@ export function createPhotoPicker(container, { onChange } = {}) {
   function render() {
     const tiles = items.map((it, i) => `
       <div class="pp-item ${i === 0 ? 'is-cover' : ''}" data-i="${i}" draggable="true" title="${i === 0 ? t('pp.isCover') : t('pp.makeCover')}">
-        <div class="pp-img" style="background-image:url('${it.kind === 'url' ? esc(img(it.url)) : it.obj}')"></div>
+        <div class="pp-img" style="background-image:url('${it.kind === 'url' ? esc(img(thumb(it.url))) : it.obj}')"></div>
         ${i === 0 ? `<span class="pp-cover">${icon('star', 11)} ${t('pp.cover')}</span>` : `<span class="pp-hovercover">${t('pp.makeCoverShort')}</span>`}
         <button type="button" class="pp-del" title="${t('detail.delete')}">${icon('x', 12)}</button>
       </div>`).join('');
@@ -698,7 +900,7 @@ export function createPhotoPicker(container, { onChange } = {}) {
 // location / photos / hours / americano price / AI review summary → human edits
 // the rest (floors/size/outlets/view) and saves. No fake links are generated.
 export function openAddCafeModal(opts) {
-  const { user, capabilities, onSearch, onEnrich, onPickLocation, onCancelPick, onSubmit } = opts;
+  const { user, capabilities, onSearch, onEnrich, onPickLocation, onCancelPick, onSubmit, onDraftReview } = opts;
   const canFetch = user?.isAdmin && capabilities?.kakao;
 
   const back = document.createElement('div');
@@ -714,7 +916,6 @@ export function openAddCafeModal(opts) {
         <div class="formsec">
           <div class="formsec__title">1. ${t('modal.find')}</div>
           <input type="hidden" name="kakao_place_id">
-          <input type="hidden" name="hours_json">
           ${canFetch ? `
           <div class="field"><span>${t('modal.searchByName')} <small class="muted">${t('modal.searchHint')}</small></span>
             <div class="autofill__search">
@@ -758,14 +959,10 @@ export function openAddCafeModal(opts) {
             <div class="photo-picker" id="photoPicker"></div>
           </div>
 
-          <div class="grid2">
-            <label class="field"><span>${t('modal.open')} *</span>
-              <input class="input" type="time" name="open_time" value="09:00" required></label>
-            <label class="field"><span>${t('modal.close')} *</span>
-              <input class="input" type="time" name="close_time" value="22:00" required></label>
-            <label class="field"><span>${t('modal.price')} *</span>
-              <input class="input" type="number" name="iced_americano_price" min="0" step="100" value="4500" required></label>
-          </div>
+          <div class="field"><span>${t('modal.hours')} * <small class="muted">${t('modal.hoursHint')}</small></span>
+            <div id="addHoursEd"></div></div>
+          <label class="field"><span>${t('modal.price')} *</span>
+            <input class="input" type="number" name="iced_americano_price" min="0" step="100" value="4500" required></label>
 
           <label class="field"><span>${t('modal.aiSummary')} <small class="muted">(${t('modal.editable')})</small></span>
             <textarea class="input" name="review_summary" rows="3"></textarea></label>
@@ -791,8 +988,19 @@ export function openAddCafeModal(opts) {
               </select></label>
           </div>
           <label class="field checkline"><input type="checkbox" name="has_view"> <span>${t('modal.viewGood')} <span class="info" title="${esc(def('view'))}">${icon('info', 12)}</span></span></label>
+          <label class="field checkline"><input type="checkbox" name="rain_ok"> <span>${t('modal.rainOk')} <span class="info tip" data-tip="${esc(def('rain_ok'))}">${icon('info', 12)}</span></span></label>
           <label class="field"><span>${t('modal.viewNote')}</span>
             <input class="input" name="view_note"></label>
+        </div>
+
+        <div class="formsec">
+          <div class="formsec__title">4. ${t('modal.studyReview')} *</div>
+          <p class="formsec__desc">${t('modal.studyReviewHint')}</p>
+          <div class="field">
+            <textarea class="input" name="study_review" rows="4" placeholder="${esc(t('modal.studyReviewPlaceholder'))}"></textarea>
+            <div class="storyform__row"><span class="muted">${t('modal.studyReviewAiHint')}</span>
+              <button type="button" class="btn btn--ghost sm" id="draftReviewBtn">${icon('ai', 14)} ${t('modal.aiDraft')}</button></div>
+          </div>
         </div>
 
         <div class="modal__foot">
@@ -807,6 +1015,7 @@ export function openAddCafeModal(opts) {
   const hint = back.querySelector('#pickHint');
   const errEl = back.querySelector('#formErr');
   const picker = createPhotoPicker(back.querySelector('#photoPicker'), {});
+  let hoursEd = createHoursEditor(back.querySelector('#addHoursEd'), {});
 
   const close = () => { onCancelPick?.(); back.remove(); };
   back.querySelector('#mClose').onclick = close;
@@ -833,9 +1042,11 @@ export function openAddCafeModal(opts) {
       form.elements.lng.value = Number(f.lng).toFixed(6);
       hint.textContent = `카카오에서 위치 가져옴: ${Number(f.lat).toFixed(5)}, ${Number(f.lng).toFixed(5)}`;
     }
-    if (f.open_time) form.elements.open_time.value = f.open_time;
-    if (f.close_time) form.elements.close_time.value = f.close_time === '24:00' ? '00:00' : f.close_time;
-    if (f.hours_json) form.elements.hours_json.value = f.hours_json; // per-weekday schedule
+    // re-seed the per-day hours editor with what Kakao gave - fully editable
+    if (f.hours_json || f.open_time) {
+      hoursEd = createHoursEditor(back.querySelector('#addHoursEd'),
+        { hours_json: f.hours_json, open_time: f.open_time, close_time: f.close_time });
+    }
     if (f.iced_americano_price) form.elements.iced_americano_price.value = f.iced_americano_price;
     if (data.review_summary) form.elements.review_summary.value = data.review_summary;
 
@@ -894,7 +1105,7 @@ export function openAddCafeModal(opts) {
           b.onclick = () => {
             form.elements.name.value = b.dataset.name;
             form.elements.kakao_url.value = b.dataset.url;
-            resultsEl.innerHTML = `<div class="muted">선택됨: <b>${esc(b.dataset.name)}</b> — 정보 가져오는 중…</div>`;
+            resultsEl.innerHTML = `<div class="muted">선택됨: <b>${esc(b.dataset.name)}</b> - 정보 가져오는 중…</div>`;
             doFetch();
           };
         });
@@ -906,17 +1117,47 @@ export function openAddCafeModal(opts) {
     qEl.addEventListener('keydown', (e) => { if (e.key === 'Enter') { e.preventDefault(); doSearch(); } });
   }
 
+  // AI draft for the 카공 총평 (admin edits it after)
+  const draftBtn = back.querySelector('#draftReviewBtn');
+  if (draftBtn) {
+    if (!onDraftReview) draftBtn.style.display = 'none';
+    else draftBtn.onclick = async () => {
+      const hv = hoursEd.getValue();
+      const ta = form.elements.study_review;
+      const original = draftBtn.innerHTML;
+      draftBtn.disabled = true; draftBtn.textContent = t('modal.aiDrafting');
+      try {
+        const { draft } = await onDraftReview({
+          name: form.elements.name.value.trim(),
+          floors: form.elements.floors.value, size: form.elements.size.value, outlets: form.elements.outlets.value,
+          has_view: form.elements.has_view.checked, view_note: form.elements.view_note.value,
+          open_time: hv.open_time, close_time: hv.close_time,
+          iced_americano_price: form.elements.iced_americano_price.value,
+          review_summary: form.elements.review_summary.value,
+        });
+        if (draft) ta.value = draft; else errEl.textContent = 'AI 초안을 만들지 못했어요. 직접 적어주세요.';
+      } catch (e2) { errEl.textContent = e2.message || 'AI 초안 실패'; }
+      finally { draftBtn.disabled = false; draftBtn.innerHTML = original; }
+    };
+  }
+
   form.onsubmit = async (e) => {
     e.preventDefault();
     errEl.textContent = '';
     if (!form.elements.name.value.trim()) { errEl.textContent = '카페를 검색해 선택하거나 이름을 입력하세요.'; return; }
     if (!form.elements.kakao_url.value.trim() && !form.elements.naver_url.value.trim()) { errEl.textContent = t('modal.needLink'); return; }
     if (!form.elements.lat.value || !form.elements.lng.value) { errEl.textContent = '위치를 가져오거나 지도에서 선택하세요.'; return; }
+    if ((form.elements.study_review.value || '').trim().length < 15) { errEl.textContent = '카공 총평을 적어주세요 (감시받지 않는 기분 등, 15자 이상).'; return; }
     const { manifest, files, count } = picker.getManifest();
     if (!count) { errEl.textContent = '사진을 한 장 이상 추가하세요 (첫 번째가 대표).'; return; }
 
     const fd = new FormData(form);
+    const hv = hoursEd.getValue();
+    fd.set('open_time', hv.open_time);
+    fd.set('close_time', hv.close_time);
+    fd.set('hours_json', hv.hours_json == null ? '' : hv.hours_json);
     fd.set('has_view', form.elements.has_view.checked ? 'true' : 'false');
+    fd.set('rain_ok', form.elements.rain_ok.checked ? 'true' : 'false');
     fd.set('photo_manifest', JSON.stringify(manifest));
     files.forEach((f) => fd.append('photos', f));
     try {

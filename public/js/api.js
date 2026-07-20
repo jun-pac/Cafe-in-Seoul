@@ -7,6 +7,7 @@ const json = async (res) => {
 
 export const api = {
   me: () => fetch('/api/auth/me').then(json),
+  stats: () => fetch('/api/stats').then(json),
   devLogin: (name) =>
     fetch('/api/auth/dev-login', {
       method: 'POST',
@@ -44,6 +45,12 @@ export const api = {
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify(payload), // { kakaoUrl } or { placeId }
     }).then(json),
+  adminDraftReview: (payload) =>
+    fetch('/api/admin/draft-review', {
+      method: 'POST', headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(payload),
+    }).then(json),
+  adminInsights: () => fetch('/api/admin/insights').then(json),
   adminPending: () => fetch('/api/admin/pending').then(json),
   adminApprove: (id) => fetch(`/api/admin/cafes/${id}/approve`, { method: 'POST' }).then(json),
   adminReject: (id) => fetch(`/api/admin/cafes/${id}/reject`, { method: 'POST' }).then(json),
@@ -54,6 +61,11 @@ export const api = {
     fetch('/api/cafes', { method: 'POST', body: formData }).then(json),
   updateCafe: (id, formData) =>
     fetch(`/api/cafes/${id}`, { method: 'PATCH', body: formData }).then(json),
+  setCover: (id, url) =>
+    fetch(`/api/cafes/${id}/cover`, {
+      method: 'POST', headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ url }),
+    }).then(json),
 
   vote: (id, category, score) =>
     fetch(`/api/cafes/${id}/vote`, {
@@ -64,13 +76,21 @@ export const api = {
 
   addReview: (id, formData) =>
     fetch(`/api/cafes/${id}/reviews`, { method: 'POST', body: formData }).then(json),
+  updateReview: (id, reviewId, formData) =>
+    fetch(`/api/cafes/${id}/reviews/${reviewId}`, { method: 'PATCH', body: formData }).then(json),
+  deleteReview: (id, reviewId) =>
+    fetch(`/api/cafes/${id}/reviews/${reviewId}`, { method: 'DELETE' }).then(json),
 
   listViewspots: () => fetch('/api/viewspots').then(json),
   viewSearch: (q) => fetch(`/api/viewspots/search?q=${encodeURIComponent(q)}`).then(json),
   getViewspot: (id) => fetch(`/api/viewspots/${id}`).then(json),
   createViewspot: (formData) => fetch('/api/viewspots', { method: 'POST', body: formData }).then(json),
   updateViewspot: (id, formData) => fetch(`/api/viewspots/${id}`, { method: 'PATCH', body: formData }).then(json),
+  addViewspotPhotos: (id, formData) => fetch(`/api/viewspots/${id}/photos`, { method: 'POST', body: formData }).then(json),
   deleteViewspot: (id) => fetch(`/api/viewspots/${id}`, { method: 'DELETE' }).then(json),
+  viewspotPending: () => fetch('/api/viewspots/pending/list').then(json),
+  approveViewspot: (id) => fetch(`/api/viewspots/${id}/approve`, { method: 'POST' }).then(json),
+  rejectViewspot: (id) => fetch(`/api/viewspots/${id}/reject`, { method: 'POST' }).then(json),
   addViewComment: (id, body) =>
     fetch(`/api/viewspots/${id}/comments`, {
       method: 'POST', headers: { 'Content-Type': 'application/json' },

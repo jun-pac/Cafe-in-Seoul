@@ -9,6 +9,9 @@ const db = require('../db');
 const { decorate } = require('../cafeModel');
 const { requireAuth, requireAdmin, isAdmin } = require('../auth');
 const { moderate } = require('../moderation');
+const { setCafeCover } = require('../cafePhotos');
+const { processUploads } = require('../images');
+const { sendAdminAlert } = require('../mailer');
 
 const router = express.Router();
 
@@ -27,7 +30,7 @@ const upload = multer({
 const listStmt = db.prepare('SELECT * FROM cafes');
 const getStmt = db.prepare('SELECT * FROM cafes WHERE id = ?');
 const reviewsStmt = db.prepare(`
-  SELECT r.id, r.body, r.photo_url, r.created_at, u.name AS user_name, u.avatar_url AS user_avatar
+  SELECT r.id, r.user_id, r.body, r.photo_url, r.created_at, u.name AS user_name, u.avatar_url AS user_avatar
   FROM reviews r JOIN users u ON u.id = r.user_id
   WHERE r.cafe_id = ? ORDER BY r.created_at DESC
 `);
@@ -40,10 +43,10 @@ const myVotesStmt = db.prepare('SELECT category, score FROM votes WHERE cafe_id 
 const insertCafe = db.prepare(`
   INSERT INTO cafes (id, name, address, lat, lng, photo_url, floors, open_time, close_time,
                      hours_json, size, naver_url, kakao_url, iced_americano_price, has_view, view_note,
-                     outlets, review_summary, kakao_place_id, status, moderation_reason, created_by)
+                     outlets, review_summary, study_review, rain_ok, kakao_place_id, status, moderation_reason, created_by)
   VALUES (@id, @name, @address, @lat, @lng, @photo_url, @floors, @open_time, @close_time,
           @hours_json, @size, @naver_url, @kakao_url, @iced_americano_price, @has_view, @view_note,
-          @outlets, @review_summary, @kakao_place_id, @status, @moderation_reason, @created_by)
+          @outlets, @review_summary, @study_review, @rain_ok, @kakao_place_id, @status, @moderation_reason, @created_by)
 `);
 
 // GET /api/cafes — map list. Everyone sees approved cafes; a logged-in user also
@@ -52,6 +55,7 @@ router.get('/', (req, res) => {
   const uid = req.user?.id;
   const admin = isAdmin(req.user);
   const cafes = listStmt.all()
+    .filter((c) => c.status !== 'rejected') // soft-deleted cafes never appear on the map
     .filter((c) => c.status === 'approved' || admin || (uid && c.created_by === uid))
     .map(decorate);
   cafes.sort((a, b) => b.score - a.score);
@@ -67,11 +71,21 @@ router.get('/:id', (req, res) => {
   const photosByReview = {};
   for (const p of reviewPhotosStmt.all(cafe.id)) (photosByReview[p.review_id] ||= []).push(p.url);
   for (const r of detail.reviews) r.photos = photosByReview[r.id] || (r.photo_url ? [r.photo_url] : []);
-  // carousel gallery: cafe photos (ordered, representative first) + story photos, deduped
-  const cp = cafePhotosStmt.all(cafe.id).map((p) => p.url);
-  const base = cp.length ? cp : (detail.photo_url ? [detail.photo_url] : []);
-  detail.photos = base;                 // cafe-level photos
-  detail.gallery = [...new Set([...base, ...galleryStmt.all(cafe.id).map((p) => p.url)].filter(Boolean))];
+  // Unified gallery. ABSOLUTE rule: photos the admin UPLOADED (local /uploads/ files)
+  // always come before Kakao-scraped ones — never the other way around. Within each
+  // group we keep the ordered source (cover first, then cafe_photos manifest order,
+  // then story photos), so edit-modal reordering still sticks inside a group.
+  const cover = detail.photo_url ? [detail.photo_url] : [];
+  const imported = cafePhotosStmt.all(cafe.id).map((p) => p.url);   // cafe_photos (manifest / Kakao)
+  const stories = galleryStmt.all(cafe.id).map((p) => p.url);       // review_photos (story uploads)
+  const merged = [...new Set([...cover, ...imported, ...stories].filter(Boolean))];
+  const isUpload = (u) => u.startsWith('/uploads/');
+  detail.gallery = [...merged.filter(isUpload), ...merged.filter((u) => !isUpload(u))];
+  detail.photos = detail.gallery;
+  // the cafe's OWN photos (cover + imported) — NOT story photos. The edit modal uses
+  // this so story photos can't be deleted there and orphaned; delete those via the story.
+  const own = [...new Set([...cover, ...imported].filter(Boolean))];
+  detail.cafePhotos = [...own.filter(isUpload), ...own.filter((u) => !isUpload(u))];
   detail.myVotes = {};
   if (req.user) {
     for (const v of myVotesStmt.all(cafe.id, req.user.id)) detail.myVotes[v.category] = v.score;
@@ -87,10 +101,11 @@ function validationError(body, hasPhoto) {
   const missing = [];
   const need = (k) => (body[k] === undefined || body[k] === null || String(body[k]).trim() === '') && missing.push(k);
   ['name', 'lat', 'lng', 'floors', 'open_time', 'close_time', 'size',
-   'iced_americano_price', 'outlets'].forEach(need);
+   'iced_americano_price', 'outlets', 'study_review'].forEach(need);
   if (!hasPhoto) missing.push('photo');
   if (body.has_view === undefined || body.has_view === null || body.has_view === '') missing.push('has_view');
   if (missing.length) return `필수 항목 누락: ${missing.join(', ')}`;
+  if ((body.study_review || '').trim().length < 15) return '카공 총평을 조금 더 자세히 적어주세요 (감시받지 않는 기분 등).';
 
   // at least one map link (Kakao OR Naver) — not both required
   if (!(body.kakao_url || '').trim() && !(body.naver_url || '').trim()) {
@@ -109,10 +124,11 @@ function validationError(body, hasPhoto) {
 // POST /api/cafes — register a cafe (auth required). multipart with `photos` (many)
 // + `photo_manifest` (JSON array of 'file' | 'url:<url>') defining order; the first
 // photo is the representative. Admins auto-publish; others go through AI moderation.
-router.post('/', requireAuth, upload.array('photos', 10), async (req, res, next) => {
+router.post('/', requireAuth, upload.array('photos', 30), async (req, res, next) => {
   const b = req.body || {};
   const files = req.files || [];
   const cleanup = () => files.forEach((f) => fs.unlink(f.path, () => {}));
+  await processUploads(files); // compress + generate thumbnails before we build URLs
 
   let manifest = [];
   try { manifest = JSON.parse(b.photo_manifest || '[]'); } catch { manifest = []; }
@@ -153,17 +169,27 @@ router.post('/', requireAuth, upload.array('photos', 10), async (req, res, next)
     view_note: (b.view_note || '').trim() || null,
     outlets: b.outlets,
     review_summary: (b.review_summary || '').trim() || null,
+    study_review: (b.study_review || '').trim() || null,
+    rain_ok: toBool(b.rain_ok),
     kakao_place_id: (b.kakao_place_id || '').trim() || null,
     created_by: req.user.id,
   };
 
+  // admins publish immediately; everyone else PROPOSES (pending, hidden until approved)
+  const admin = isAdmin(req.user);
+  const status = admin ? 'approved' : 'pending';
   try {
-    const verdict = await moderate(cafe, { isAdmin: isAdmin(req.user) });
     db.transaction(() => {
-      insertCafe.run({ ...cafe, status: verdict.status, moderation_reason: verdict.reason });
+      insertCafe.run({ ...cafe, status, moderation_reason: admin ? null : '사용자 제안 (승인 대기)' });
       ordered.forEach((url, i) => insertCafePhoto.run(crypto.randomUUID(), cafe.id, url, i));
     })();
-    res.status(201).json({ ...decorate(getStmt.get(cafe.id)), moderation: verdict });
+    if (!admin) {
+      sendAdminAlert(
+        `[Cafe in Seoul] 새 카페 제안: ${cafe.name}`,
+        `${req.user.name || req.user.id} 님이 카페를 제안했습니다.\n\n이름: ${cafe.name}\n주소: ${cafe.address || '-'}\n카카오: ${cafe.kakao_url || '-'}\n네이버: ${cafe.naver_url || '-'}\n\n관리자로 로그인해 심사 대기열에서 승인/거절하세요:\n${process.env.BASE_URL || ''}`
+      ).catch(() => {});
+    }
+    res.status(201).json({ ...decorate(getStmt.get(cafe.id)), pending: !admin });
   } catch (e) {
     cleanup();
     next(e);
@@ -175,14 +201,16 @@ router.post('/', requireAuth, upload.array('photos', 10), async (req, res, next)
 const EDITABLE = {
   name: 'text', address: 'text', floors: 'int', size: 'size', outlets: 'outlets',
   has_view: 'bool', view_note: 'text', open_time: 'time', close_time: 'time',
-  iced_americano_price: 'int', naver_url: 'link', kakao_url: 'link', review_summary: 'text',
+  hours_json: 'hours', rain_ok: 'bool',
+  iced_americano_price: 'int', naver_url: 'link', kakao_url: 'link', review_summary: 'text', study_review: 'text',
 };
 const delCafePhotos = db.prepare('DELETE FROM cafe_photos WHERE cafe_id = ?');
-router.patch('/:id', requireAdmin, upload.array('photos', 10), (req, res) => {
+router.patch('/:id', requireAdmin, upload.array('photos', 30), async (req, res) => {
   const cafe = getStmt.get(req.params.id);
   const files = req.files || [];
   const cleanup = () => files.forEach((f) => fs.unlink(f.path, () => {}));
   if (!cafe) { cleanup(); return res.status(404).json({ error: 'not found' }); }
+  await processUploads(files); // compress + thumbnails
   const b = req.body || {};
   const sets = [];
   const params = { id: req.params.id };
@@ -196,6 +224,20 @@ router.patch('/:id', requireAdmin, upload.array('photos', 10), (req, res) => {
     else if (type === 'size') { if (!SIZES.has(v)) { if (bail('size 값 오류')) return; } }
     else if (type === 'outlets') { if (!OUTLETS.has(v)) { if (bail('outlets 값 오류')) return; } }
     else if (type === 'link') { v = (v == null ? '' : String(v).trim()); } // NOT NULL column → store '' not null
+    else if (type === 'hours') {
+      // per-weekday schedule: JSON array of 7 [{dow,open,close}|{dow,closed:true}], or empty → null
+      const raw = (v == null ? '' : String(v)).trim();
+      if (!raw) { v = null; }
+      else {
+        let arr; try { arr = JSON.parse(raw); } catch { arr = null; }
+        if (!Array.isArray(arr) || arr.length !== 7) { if (bail('영업시간(요일별) 형식이 올바르지 않습니다.')) return; }
+        for (const e of arr) {
+          if (!e || e.closed) continue;
+          if (!TIME_RE.test(e.open || '') || !TIME_RE.test(e.close || '')) { if (bail('영업시간 형식은 HH:MM 이어야 합니다.')) return; }
+        }
+        v = JSON.stringify(arr);
+      }
+    }
     else { v = (v == null ? '' : String(v).trim()) || null; if (k === 'name' && !v) { if (bail('이름은 비울 수 없습니다.')) return; } }
     sets.push(`${k} = @${k}`);
     params[k] = v;
@@ -226,6 +268,16 @@ router.patch('/:id', requireAdmin, upload.array('photos', 10), (req, res) => {
       ordered.forEach((url, i) => insertCafePhoto.run(crypto.randomUUID(), req.params.id, url, i));
     }
   })();
+  res.json(decorate(getStmt.get(req.params.id)));
+});
+
+// POST /api/cafes/:id/cover  { url } — admin sets any of the cafe's photos as the representative
+router.post('/:id/cover', requireAdmin, express.json(), (req, res) => {
+  const cafe = getStmt.get(req.params.id);
+  if (!cafe) return res.status(404).json({ error: 'not found' });
+  const url = (req.body?.url || '').trim();
+  if (!url) return res.status(400).json({ error: 'url이 필요합니다.' });
+  setCafeCover(req.params.id, url);
   res.json(decorate(getStmt.get(req.params.id)));
 });
 

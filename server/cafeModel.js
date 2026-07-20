@@ -31,6 +31,7 @@ function decorate(cafe) {
   return {
     ...cafe,
     has_view: Number(cafe.has_view) === 1,
+    rain_ok: Number(cafe.rain_ok) === 1,
     multi_floor: Number(cafe.floors) >= 2,
     status: cafe.status || 'approved',
     votes: { averages, counts },

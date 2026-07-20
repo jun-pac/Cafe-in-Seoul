@@ -159,6 +159,15 @@ if (!cafeCols.has('hours_json')) {
   // per-weekday hours: JSON array [{dow:0-6, open, close, closed?}] (dow 0=Sun)
   db.exec(`ALTER TABLE cafes ADD COLUMN hours_json TEXT`);
 }
+if (!cafeCols.has('study_review')) {
+  // editorial 카공 총평 — the study-friendliness verdict (surveillance feel, openness, etc.)
+  db.exec(`ALTER TABLE cafes ADD COLUMN study_review TEXT`);
+}
+if (!cafeCols.has('rain_ok')) {
+  // "우천시 카페": directly connected to a subway station by underground passage
+  // (admin-set, not crowd-sourced). Default off.
+  db.exec(`ALTER TABLE cafes ADD COLUMN rain_ok INTEGER NOT NULL DEFAULT 0`);
+}
 
 const userCols = new Set(db.prepare(`PRAGMA table_info(users)`).all().map((c) => c.name));
 if (!userCols.has('password_hash')) {
@@ -168,21 +177,76 @@ if (!userCols.has('is_admin')) {
   db.exec(`ALTER TABLE users ADD COLUMN is_admin INTEGER NOT NULL DEFAULT 0`);
 }
 
-// --- safety net: timestamped DB backup on startup (keep last 20) ---
+// per-photo uploader attribution for view-spot photos
+const vpCols = new Set(db.prepare(`PRAGMA table_info(viewspot_photos)`).all().map((c) => c.name));
+if (!vpCols.has('created_by')) {
+  db.exec(`ALTER TABLE viewspot_photos ADD COLUMN created_by TEXT`);
+}
+// view-spots can be user-proposed (pending) awaiting admin approval
+const vsCols = new Set(db.prepare(`PRAGMA table_info(viewspots)`).all().map((c) => c.name));
+if (!vsCols.has('status')) {
+  db.exec(`ALTER TABLE viewspots ADD COLUMN status TEXT NOT NULL DEFAULT 'approved'`);
+}
+
+// daily unique-visitor tally (one bump per visitor session per day)
+db.exec(`CREATE TABLE IF NOT EXISTS daily_visits (day TEXT PRIMARY KEY, n INTEGER NOT NULL DEFAULT 0)`);
+
+// --- safety net: timestamped DB backups (keep last 60) ---
 // So no operation is ever irreversible: if data is lost, restore from data/backups/.
-try {
-  const backupsDir = path.join(DATA_DIR, 'backups');
-  if (!fs.existsSync(backupsDir)) fs.mkdirSync(backupsDir, { recursive: true });
-  const rows = db.prepare('SELECT (SELECT COUNT(*) FROM cafes) + (SELECT COUNT(*) FROM users) + (SELECT COUNT(*) FROM viewspots) AS n').get().n;
-  if (rows > 0) {
+const backupsDir = path.join(DATA_DIR, 'backups');
+const KEEP_BACKUPS = 60;
+function backupNow() {
+  try {
+    if (!fs.existsSync(backupsDir)) fs.mkdirSync(backupsDir, { recursive: true });
+    const rows = db.prepare('SELECT (SELECT COUNT(*) FROM cafes) + (SELECT COUNT(*) FROM users) + (SELECT COUNT(*) FROM viewspots) AS n').get().n;
+    if (rows <= 0) return; // never overwrite history with an empty snapshot
     db.pragma('wal_checkpoint(TRUNCATE)'); // flush WAL into the main file first
     const stamp = new Date().toISOString().replace(/[:.]/g, '-').slice(0, 19);
-    fs.copyFileSync(path.join(DATA_DIR, 'app.db'), path.join(backupsDir, `app-${stamp}.db`));
+    const dest = path.join(backupsDir, `app-${stamp}.db`);
+    if (!fs.existsSync(dest)) fs.copyFileSync(path.join(DATA_DIR, 'app.db'), dest);
     const files = fs.readdirSync(backupsDir).filter((f) => /^app-.*\.db$/.test(f)).sort();
-    for (const f of files.slice(0, -20)) fs.unlinkSync(path.join(backupsDir, f)); // prune to 20
+    for (const f of files.slice(0, -KEEP_BACKUPS)) fs.unlinkSync(path.join(backupsDir, f));
+  } catch (e) {
+    console.error('DB backup skipped:', e.message);
   }
-} catch (e) {
-  console.error('DB backup skipped:', e.message);
 }
+backupNow(); // on startup
+// and periodically while the server runs; .unref() so short-lived scripts still exit
+try {
+  const timer = setInterval(backupNow, 5 * 60 * 1000);
+  if (timer.unref) timer.unref();
+} catch { /* setInterval unavailable */ }
+
+// --- hard guard: make accidental bulk data loss structurally impossible ---
+// ANY code path through this module — the server, a seed, or an ad-hoc
+// `node -e "...DELETE..."` — is blocked from dropping tables or running a
+// DELETE/UPDATE with no WHERE. Legitimate single-row ops (WHERE id=?) pass.
+// Escape hatch, used only with deliberate intent: ALLOW_DESTRUCTIVE=1.
+const DESTRUCTIVE = [
+  { re: /\bdrop\s+table\b/i, why: 'DROP TABLE' },
+  { re: /\bdelete\s+from\s+["`[]?\w+["`\]]?\s*(;|$)/i, why: 'DELETE without WHERE' },
+  { re: /\bupdate\s+["`[]?\w+["`\]]?\s+set\b(?![\s\S]*\bwhere\b)/i, why: 'UPDATE without WHERE' },
+  { re: /\btruncate\b/i, why: 'TRUNCATE' },
+];
+function assertSafe(sql) {
+  if (process.env.ALLOW_DESTRUCTIVE === '1') return sql;
+  const s = String(sql);
+  for (const { re, why } of DESTRUCTIVE) {
+    if (re.test(s)) {
+      backupNow(); // snapshot first, then refuse
+      throw new Error(
+        `🛑 차단됨: 위험한 SQL (${why}). 이 DB는 보호되어 있어 통째로 지울 수 없습니다.\n` +
+        `   정말 의도한 거라면 ALLOW_DESTRUCTIVE=1 을 명시적으로 설정하세요.\n   → ${s.trim().slice(0, 140)}`
+      );
+    }
+  }
+  return sql;
+}
+const _exec = db.exec.bind(db);
+db.exec = (sql) => _exec(assertSafe(sql));
+const _prepare = db.prepare.bind(db);
+db.prepare = (sql) => _prepare(assertSafe(sql));
+
+db.backupNow = backupNow; // exposed for manual/scripted snapshots
 
 module.exports = db;

@@ -64,7 +64,7 @@ function entryText(e) {
   if (!e || e.closed) return t('hours.closed');
   if (is24(e)) return t('hours.24h');
   const c = e.close === '00:00' ? '24:00' : e.close;
-  return `${e.open} – ${c}`;
+  return `${e.open} ~ ${c}`;
 }
 // today's hours, for the header line
 export function hoursText(cafe, date = new Date()) {
@@ -86,6 +86,7 @@ export function weeklyHours(cafe, date = new Date()) {
 export function passesFilters(cafe, f) {
   if (f.multiFloor && !cafe.multi_floor) return false;
   if (f.hasView && !cafe.has_view) return false;
+  if (f.rainOk && !cafe.rain_ok) return false;
   if (f.openNow && !isOpenNow(cafe)) return false;
   if (f.openLate && !opensLate(cafe)) return false;
   if (f.sizes && f.sizes.size && !f.sizes.has(cafe.size)) return false;
@@ -117,6 +118,14 @@ export function img(url) {
     const h = new URL(url, window.location.href).hostname;
     if (PROXY_HOSTS.test(h)) return '/api/img?u=' + encodeURIComponent(url);
   } catch { /* not absolute */ }
+  return url;
+}
+
+// Small (~480px) variant for cards/grid. Locally-uploaded photos have a
+// pre-generated "_thumb.jpg" (see server/images.js); external URLs are left
+// as-is (handled by img()). Wrap with img() at the call site.
+export function thumb(url) {
+  if (url && url.startsWith('/uploads/')) return url.replace(/\.[^.]+$/, '_thumb.jpg');
   return url;
 }
 

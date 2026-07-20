@@ -1,7 +1,7 @@
 import { declutter, CARD_W, CARD_H } from './declutter.js';
-import { esc, img } from './util.js';
+import { esc, img, thumb } from './util.js';
 
-// Minimal light OSM basemap: CARTO Positron (light_all) raster tiles — clean,
+// Minimal light OSM basemap: CARTO Positron (light_all) raster tiles - clean,
 // airy grayscale. No API key required.
 const STYLE = {
   version: 8,
@@ -27,14 +27,31 @@ export function initMap(containerId, { onCardClick }) {
     style: STYLE,
     center: [126.986, 37.556], // Seoul
     zoom: 12,
+    minZoom: 6.2,              // can't zoom out wider than ~the Korean peninsula
+    maxBounds: [[124.0, 32.6], [132.6, 39.3]], // keep panning within South Korea (Jeju ↔ DMZ, west sea ↔ Ulleung/Dokdo)
     attributionControl: { compact: true },
+    dragRotate: false,        // north is ALWAYS up
+    pitchWithRotate: false,
+    touchPitch: false,
   });
+  map.touchZoomRotate?.disableRotation?.(); // kill the two-finger twist on mobile (keep pinch-zoom)
+  map.keyboard?.disableRotation?.();
   map.addControl(new maplibregl.NavigationControl({ showCompass: false }), 'bottom-right');
+  // "locate me" button (asks permission, centers on the user) — makes GPS actually useful
+  if (maplibregl.GeolocateControl) {
+    map.addControl(new maplibregl.GeolocateControl({
+      positionOptions: { enableHighAccuracy: true },
+      trackUserLocation: true,
+      showUserLocation: true,
+    }), 'bottom-right');
+  }
 
   const entries = new Map(); // id -> { cafe, marker, el, imgEl, badgeEl }
   let visibleSet = null; // Set of ids passing filters (null = all)
   let selectedId = null;
-  let cardScale = Number(localStorage.getItem('cardScale')) || 1;
+  // default one tick smaller on mobile (narrower screens are cramped)
+  const isMobile = typeof window !== 'undefined' && window.innerWidth <= 760;
+  let cardScale = Number(localStorage.getItem('cardScale')) || (isMobile ? 0.85 : 1);
   const container = map.getContainer();
   container.style.setProperty('--card-scale', cardScale);
   let pickMode = false;
@@ -46,9 +63,9 @@ export function initMap(containerId, { onCardClick }) {
     el.className = 'cafe-card' + (kind === 'view' ? ' cafe-card--view' : '');
     const scoreHtml = kind === 'view'
       ? '<span class="cafe-card__tag">VIEW</span>'
-      : `<span class="cafe-card__score" title="카공 종합점수 (0–100): 다층·콘센트·면적·뷰·영업시간 + 집단지성 투표">${item.score}</span>`;
+      : `<span class="cafe-card__score" title="카공 종합점수 (0-100): 다층·콘센트·면적·뷰·영업시간 + 집단지성 투표">${item.score}</span>`;
     el.innerHTML = `
-      <div class="cafe-card__photo" style="background-image:url('${esc(img(item.photo_url))}')">
+      <div class="cafe-card__photo" style="background-image:url('${esc(img(thumb(item.photo_url)))}')">
         ${scoreHtml}
         <span class="cafe-card__badge" hidden></span>
         <span class="cafe-card__pending">심사중</span>
@@ -60,6 +77,11 @@ export function initMap(containerId, { onCardClick }) {
       e.stopPropagation();
       onCardClick?.(item, kind);
     });
+    // "+N" badge → reveal the cards hidden underneath this survivor
+    const badge = el.querySelector('.cafe-card__badge');
+    badge.style.cursor = 'pointer';
+    badge.title = '겹친 카페 보기';
+    badge.addEventListener('click', (e) => { e.stopPropagation(); toggleCluster(item.id, el); });
     return el;
   }
 
@@ -72,11 +94,15 @@ export function initMap(containerId, { onCardClick }) {
     for (const item of items) {
       const existing = entries.get(item.id);
       if (existing) {
+        // move the marker if the location was edited (e.g. viewspot re-search)
+        if (existing.item.lat !== item.lat || existing.item.lng !== item.lng) {
+          existing.marker.setLngLat([item.lng, item.lat]);
+        }
         existing.item = item;
         const sc = existing.el.querySelector('.cafe-card__score');
         if (sc) sc.textContent = item.score;
         // reflect edits to the representative photo / name without a full reload
-        existing.el.querySelector('.cafe-card__photo').style.backgroundImage = `url('${esc(img(item.photo_url))}')`;
+        existing.el.querySelector('.cafe-card__photo').style.backgroundImage = `url('${esc(img(thumb(item.photo_url)))}')`;
         existing.el.querySelector('.cafe-card__name').textContent = item.name;
         if (kind === 'cafe') existing.el.classList.toggle('is-pending', item.status === 'pending');
         continue;
@@ -119,6 +145,7 @@ export function initMap(containerId, { onCardClick }) {
       const d = decision.get(id);
       if (!d || !d.visible) {
         if (visibleSet && !visibleSet.has(id)) continue; // already hidden above
+        if (clusterFor === id) closeCluster(); // survivor got absorbed → drop its popup
         ent.el.style.display = 'none';
         continue;
       }
@@ -126,11 +153,51 @@ export function initMap(containerId, { onCardClick }) {
       if (d.absorbed > 0) {
         ent.badgeEl.hidden = false;
         ent.badgeEl.textContent = `+${d.absorbed}`;
+        ent.absorbedIds = d.absorbedIds;
       } else {
         ent.badgeEl.hidden = true;
+        ent.absorbedIds = null;
+        if (clusterFor === id) closeCluster(); // its cluster dissolved (e.g. zoomed in)
       }
       ent.el.classList.toggle('is-selected', id === selectedId);
     }
+  }
+
+  // ---- "+N" cluster reveal: list the survivor + the cards it absorbed ----------
+  let clusterPop = null;
+  let clusterFor = null;
+  function closeCluster() {
+    if (clusterPop) { clusterPop.remove(); clusterPop = null; }
+    clusterFor = null;
+  }
+  function toggleCluster(id, anchorEl) {
+    if (clusterFor === id) { closeCluster(); return; }
+    closeCluster();
+    const ent = entries.get(id);
+    if (!ent || !ent.absorbedIds || !ent.absorbedIds.length) return;
+    const members = [ent, ...ent.absorbedIds.map((aid) => entries.get(aid)).filter(Boolean)];
+    const pop = document.createElement('div');
+    pop.className = 'cluster-pop';
+    pop.addEventListener('click', (e) => e.stopPropagation());
+    pop.innerHTML = `<div class="cluster-pop__head">이 위치에 ${members.length}곳</div>`
+      + members.map((m) => `
+        <button type="button" class="cluster-pop__row" data-id="${esc(m.item.id)}">
+          <span class="cluster-pop__thumb" style="background-image:url('${esc(img(thumb(m.item.photo_url)))}')"></span>
+          <span class="cluster-pop__name">${esc(m.item.name)}</span>
+          ${m.kind === 'view' ? '<span class="cluster-pop__tag">VIEW</span>'
+            : `<span class="cluster-pop__score">${m.item.score}</span>`}
+        </button>`).join('');
+    anchorEl.appendChild(pop);
+    clusterPop = pop;
+    clusterFor = id;
+    pop.querySelectorAll('.cluster-pop__row').forEach((b) => {
+      b.addEventListener('click', (e) => {
+        e.stopPropagation();
+        const m = entries.get(b.dataset.id);
+        closeCluster();
+        if (m) onCardClick?.(m.item, m.kind);
+      });
+    });
   }
 
   let raf = 0;
@@ -142,13 +209,20 @@ export function initMap(containerId, { onCardClick }) {
     });
   }
 
-  // Declutter only when movement settles (not every frame). During a drag the
-  // markers still follow the map via MapLibre's own transform; we just re-resolve
-  // overlaps on release, which keeps panning smooth.
+  // Re-resolve overlaps while moving, but THROTTLED (~14fps) - markers follow the
+  // map natively every frame; only their show/hide needs updating, and decluttering
+  // 50+ cards every frame is what bogs down weaker phones. moveend does the final pass.
+  let lastDeclutter = 0;
+  const onMoveThrottled = () => {
+    const now = (typeof performance !== 'undefined' && performance.now) ? performance.now() : 0;
+    if (now - lastDeclutter >= 70) { lastDeclutter = now; scheduleRefresh(); }
+  };
+  map.on('move', onMoveThrottled);
   map.on('moveend', scheduleRefresh);
   map.on('zoomend', scheduleRefresh);
   map.on('resize', scheduleRefresh);
   map.on('load', scheduleRefresh);
+  map.on('movestart', closeCluster); // don't leave a stale popup floating mid-pan
 
   function flyTo(cafe) {
     map.flyTo({ center: [cafe.lng, cafe.lat], zoom: Math.max(map.getZoom(), 15), speed: 0.8 });

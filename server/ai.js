@@ -108,4 +108,45 @@ async function moderate(cafe) {
   catch { return null; }
 }
 
-module.exports = { summarize, moderate, HAS_AI };
+// Drafts a concise "카공 총평" (study-friendliness verdict) an admin then edits.
+// The #1 virtue of a study cafe is "감시받지 않는 기분" (not feeling watched), so
+// the draft must speak to that. Numeric fields are shown separately, so don't list them.
+const STUDY_SYSTEM = `너는 "카공(카페에서 오래 공부/작업)" 관점에서 카페 총평 초안을 쓰는 도우미다.
+카공의 제1 덕목은 "감시받지 않는 기분"이다. 아래 정보를 바탕으로 오래 머물며 공부하기에 어떤지 간결하게(2~3문장, 한국어) 초안을 써라.
+규칙:
+- 반드시 "눈치/감시받는 느낌"을 언급해라 (좌석이 카운터에서 잘 보이는지, 출입이 자유로운지, 공간이 개방적/폐쇄적인지 등 주어진 정보로 추론).
+- 층수·면적·콘센트·영업시간·가격 같은 수치는 따로 표시되니 그대로 나열하지 말고, 카공 경험 관점의 총평만 써라.
+- 지어내지 말고 주어진 범위에서만. 확실치 않으면 "직접 확인 필요"처럼 여지를 둬라.
+- 이건 초안이며 사람이 수정한다. 반드시 아래 JSON만: { "draft": "총평 초안(한국어, 2~3문장)" }`;
+
+async function draftStudyReview(cafe) {
+  if (!HAS_AI) return null;
+  const info = `이름: ${cafe.name}
+층수: ${cafe.floors} / 면적: ${cafe.size} / 콘센트: ${cafe.outlets} / 뷰: ${cafe.has_view ? '있음' : '없음'}${cafe.view_note ? `(${cafe.view_note})` : ''}
+영업: ${cafe.open_time} ~ ${cafe.close_time}
+아이스아메리카노: ${cafe.iced_americano_price}원
+리뷰요약: ${cafe.review_summary || '없음'}`;
+
+  const sleep = (ms) => new Promise((res) => setTimeout(res, ms));
+  let r, lastErr;
+  for (let attempt = 0; attempt < 3; attempt++) {
+    if (attempt) await sleep(500 * attempt);
+    r = await fetch('https://api.openai.com/v1/chat/completions', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${OPENAI_API_KEY}` },
+      body: JSON.stringify({
+        model: MODEL, temperature: 0.5, response_format: { type: 'json_object' },
+        messages: [{ role: 'system', content: STUDY_SYSTEM }, { role: 'user', content: info }],
+      }),
+    });
+    if (r.ok) break;
+    lastErr = `HTTP ${r.status}`;
+    if (r.status !== 429 && r.status < 500) break;
+  }
+  if (!r.ok) throw new Error(`OpenAI 오류 (${lastErr})`);
+  const data = await r.json();
+  try { return (JSON.parse(data.choices?.[0]?.message?.content || '{}').draft || '').trim() || null; }
+  catch { return null; }
+}
+
+module.exports = { summarize, moderate, draftStudyReview, HAS_AI };

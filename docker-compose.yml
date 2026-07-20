@@ -1,0 +1,18 @@
+services:
+  app:
+    build: .
+    image: cafe-in-seoul
+    container_name: cafe-in-seoul
+    restart: unless-stopped        # survives crashes and host reboots
+    user: "1003:1003"              # run as host user so DB/uploads/backups stay owned by you (not root)
+    env_file: .env                 # OPENAI/KAKAO/GOOGLE keys, BASE_URL, ADMIN_EMAILS
+    environment:
+      - PORT=8001
+      - NODE_ENV=production
+    ports:
+      - "8001:8001"                # cloudflared (on host) → localhost:8001 → this container
+    volumes:
+      - ./data:/app/data           # sqlite DB + auto-backups persist on the host
+      - ./uploads:/app/uploads      # user-uploaded photos persist on the host
+      - ./public:/app/public        # live frontend edits (no rebuild needed)
+      - ./server:/app/server        # live backend edits (just `docker compose restart`)

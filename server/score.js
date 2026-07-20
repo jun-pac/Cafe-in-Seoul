@@ -23,19 +23,32 @@ function opensLate(open_time, close_time) {
   return c >= 22 * 60;                // closes 22:00 or later
 }
 
+// Iced-americano price → 0..18. Cheap is a big deal for study cafes, so this is
+// the single heaviest discrete factor. <=3,500won gets full marks, >=7,000 zero.
+const P_CHEAP = 3500, P_EXP = 7000, P_WEIGHT = 18;
+function priceScore(price) {
+  const p = Number(price);
+  if (!Number.isFinite(p) || p <= 0) return P_WEIGHT * 0.5; // unknown -> mid
+  if (p <= P_CHEAP) return P_WEIGHT;
+  if (p >= P_EXP) return 0;
+  return P_WEIGHT * (P_EXP - p) / (P_EXP - P_CHEAP);
+}
+
 function discreteScore(cafe) {
   let s = 0;
-  if (Number(cafe.floors) >= 2) s += 12;              // multi-floor: less pressure to leave
+  s += priceScore(cafe.iced_americano_price);         // cheap coffee: the biggest factor
 
-  const outlets = { many: 12, some: 8, few: 4, none: 0 };
+  if (Number(cafe.floors) >= 2) s += 7;               // multi-floor: less pressure to leave
+
+  const outlets = { many: 9, some: 6, few: 3, none: 0 };
   s += outlets[cafe.outlets] ?? 0;
 
-  const size = { large: 10, medium: 7, small: 3 };
+  const size = { large: 6, medium: 4, small: 2 };
   s += size[cafe.size] ?? 0;
 
-  if (Number(cafe.has_view) === 1 || cafe.has_view === true) s += 6;
+  if (Number(cafe.has_view) === 1 || cafe.has_view === true) s += 4;
 
-  if (opensLate(cafe.open_time, cafe.close_time)) s += 10;
+  if (opensLate(cafe.open_time, cafe.close_time)) s += 6;
 
   return Math.min(50, s);            // cap at 50
 }

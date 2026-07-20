@@ -8,7 +8,11 @@
     "start": "node server/index.js",
     "dev": "node --watch server/index.js",
     "seed": "node server/seed.js",
-    "import": "node server/import-kakao.js"
+    "import": "node server/import-kakao.js",
+    "backups": "node scripts/restore.js",
+    "restore": "node scripts/restore.js",
+    "optimize": "node scripts/optimize-images.js",
+    "draft-reviews": "node scripts/draft-reviews.js"
   },
   "engines": {
     "node": ">=18"
@@ -20,7 +24,9 @@
     "express-session": "^1.18.1",
     "google-auth-library": "^9.15.1",
     "multer": "^2.2.0",
+    "nodemailer": "^9.0.3",
     "passport": "^0.7.0",
-    "passport-google-oauth20": "^2.0.0"
+    "passport-google-oauth20": "^2.0.0",
+    "sharp": "^0.35.3"
   }
 }

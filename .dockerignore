@@ -1,0 +1,13 @@
+# keep the image small and never bake in host-only or mutable state
+node_modules
+npm-debug.log*
+.git
+.gitignore
+.env
+data
+uploads
+*.md
+scratchpad
+Dockerfile
+docker-compose.yml
+.dockerignore

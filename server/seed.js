@@ -18,6 +18,14 @@ const tx = db.transaction(() => {
     admin = { id };
   }
 
+  // additional admins (create once; never overwrite)
+  for (const uname of ['damhiya', 'YGH']) {
+    if (!db.prepare(`SELECT 1 FROM users WHERE provider='local' AND provider_id=?`).get(uname)) {
+      db.prepare(`INSERT INTO users (id, provider, provider_id, name, password_hash, is_admin)
+                  VALUES (?,?,?,?,?,1)`).run(crypto.randomUUID(), 'local', uname, uname, hashPassword('chongchong'));
+    }
+  }
+
   const existsById = db.prepare('SELECT 1 FROM cafes WHERE kakao_place_id = ?');
   const existsByName = db.prepare('SELECT 1 FROM cafes WHERE name = ?');
   const insertCafe = db.prepare(`

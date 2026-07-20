@@ -1,15 +1,17 @@
 // Greedy overlap resolution for photo cards.
 //
 // As you zoom out, cards start colliding. We keep the highest-scoring card in
-// any overlapping cluster and hide the rest — the survivor shows a "+N" badge
+// any overlapping cluster and hide the rest - the survivor shows a "+N" badge
 // counting how many nearby cards it absorbed.
 //
 // Cards are anchored bottom-center on their point, so the card's bounding box
 // sits ABOVE the point: [x - W/2, y - H, x + W/2, y].
 
 export const CARD_W = 138; // base .cafe-card width (CSS)
-export const CARD_H = 122; // base photo + label height
-const PAD = 6; // extra gap so survivors breathe
+export const CARD_H = 128; // full card box: photo + the name label below it (so overlap never buries a name)
+// Negative PAD = cards may OVERLAP by this many px before one is culled. Some
+// photo overlap is fine for density, but not so much that a name gets covered.
+const PAD = -18;
 
 function overlaps(a, b) {
   return !(
@@ -50,12 +52,13 @@ export function declutter(items, viewport, cardW = CARD_W, cardH = CARD_H) {
 
     const hit = placed.find((p) => overlaps(p.box, box));
     if (hit) {
-      result.set(it.id, { visible: false, absorbed: 0 });
+      result.set(it.id, { visible: false, absorbed: 0, absorbedIds: [] });
       const survivor = result.get(hit.id);
       survivor.absorbed += 1;
+      survivor.absorbedIds.push(it.id); // remember WHO was hidden here, for the "+N" reveal
     } else {
       placed.push({ box, id: it.id });
-      result.set(it.id, { visible: true, absorbed: 0 });
+      result.set(it.id, { visible: true, absorbed: 0, absorbedIds: [] });
     }
   }
   return result;

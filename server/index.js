@@ -31,15 +31,49 @@ app.use(session({
     httpOnly: true,
     sameSite: 'lax',
     maxAge: 1000 * 60 * 60 * 24 * 30, // 30 days
-    secure: (process.env.BASE_URL || '').startsWith('https'),
+    // 'auto' + trust proxy: Secure cookie over the HTTPS Cloudflare tunnel
+    // (cloudflared sends X-Forwarded-Proto: https), plain cookie on direct
+    // http://localhost:8001 — so login works both ways.
+    secure: 'auto',
   },
 }));
 app.use(passport.initialize());
 app.use(passport.session());
 
+// api responses are dynamic — never cache them (fixes windows showing different counts)
+app.use('/api', (req, res, next) => { res.setHeader('Cache-Control', 'no-store'); next(); });
+
+// daily visitor tally: count only real PAGE loads (not API/asset/script traffic),
+// once per visitor session per day, and never count admins (so dev refreshes don't inflate it).
+const db = require('./db');
+const bumpVisit = db.prepare(`INSERT INTO daily_visits (day, n) VALUES (?, 1) ON CONFLICT(day) DO UPDATE SET n = n + 1`);
+app.use((req, res, next) => {
+  try {
+    const isPageLoad = req.method === 'GET' && (req.path === '/' || req.path === '/index.html');
+    const today = new Date().toISOString().slice(0, 10);
+    if (isPageLoad && !req.user?.is_admin && req.session && req.session.visitDay !== today) {
+      req.session.visitDay = today;
+      bumpVisit.run(today);
+    }
+  } catch { /* ignore */ }
+  next();
+});
+const todayVisits = db.prepare('SELECT n FROM daily_visits WHERE day = ?');
+const totalVisits = db.prepare('SELECT COALESCE(SUM(n), 0) AS t FROM daily_visits');
+app.get('/api/stats', (req, res) => {
+  const today = new Date().toISOString().slice(0, 10);
+  res.json({ date: today, today: todayVisits.get(today)?.n || 0, total: totalVisits.get().t });
+});
+
 // static assets
 app.use('/uploads', express.static(path.join(__dirname, '..', 'uploads'), { maxAge: '7d' }));
-app.use(express.static(path.join(__dirname, '..', 'public')));
+app.use(express.static(path.join(__dirname, '..', 'public'), {
+  // revalidate code assets so a code update is never masked by a stale browser cache
+  // (ETag → cheap 304 when unchanged); images/fonts still cache normally
+  setHeaders: (res, filePath) => {
+    if (/\.(js|css|html)$/.test(filePath)) res.setHeader('Cache-Control', 'no-cache');
+  },
+}));
 
 // api
 app.use('/api/auth', auth.router);
