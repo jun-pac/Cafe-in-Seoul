@@ -12,8 +12,8 @@ const GOOGLE_CLIENT_ID = process.env.GOOGLE_CLIENT_ID || '';
 const GIS_ENABLED = !!GOOGLE_CLIENT_ID;
 const googleClient = GIS_ENABLED ? new OAuth2Client(GOOGLE_CLIENT_ID) : null;
 
-// Optional allowlist of admin emails (comma-separated). If empty, every
-// logged-in user is treated as admin (convenient for local/dev).
+// Allowlist of admin emails (comma-separated). Only these emails (plus accounts with
+// is_admin=1) are admins; an EMPTY list means no email-based admins (safe default).
 const ADMIN_EMAILS = (process.env.ADMIN_EMAILS || '')
   .split(',').map((s) => s.trim().toLowerCase()).filter(Boolean);
 
