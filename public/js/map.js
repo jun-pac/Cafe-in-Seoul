@@ -31,6 +31,7 @@ export function initMap(containerId, { onCardClick }) {
     minZoom: 6.2,              // can't zoom out wider than ~the Korean peninsula
     maxBounds: [[124.0, 32.6], [132.6, 39.3]], // keep panning within South Korea (Jeju ↔ DMZ, west sea ↔ Ulleung/Dokdo)
     attributionControl: { compact: true },
+    preserveDrawingBuffer: true, // keep the WebGL buffer so the map shows up in screenshots
     dragRotate: false,        // north is ALWAYS up
     pitchWithRotate: false,
     touchPitch: false,
