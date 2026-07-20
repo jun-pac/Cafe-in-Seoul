@@ -4,6 +4,7 @@ data/*.db-*
 data/backups/
 uploads/*
 !uploads/.gitkeep
+uploads_backups/
 .env
 *.log
 .DS_Store

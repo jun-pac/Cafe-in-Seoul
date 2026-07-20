@@ -119,6 +119,8 @@ app.use((err, req, res, next) => {
   res.status(status).json({ error: err.message || '서버 오류' });
 });
 
+require('./backupUploads').startUploadsBackup(); // mirror every photo file (boot + every 10 min)
+
 app.listen(PORT, () => {
   console.log(`\n☕  seoul-cafe running at ${process.env.BASE_URL || `http://localhost:${PORT}`}`);
   console.log(`   Google SSO: ${auth.GIS_ENABLED ? 'enabled (GIS token flow)' : 'disabled (using dev login)'}\n`);
