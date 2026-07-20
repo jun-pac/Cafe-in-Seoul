@@ -166,6 +166,43 @@ export function openLightbox(photos, start = 0) {
   show();
 }
 
+// Turn the detail hero into a mini-carousel: arrows / swipe / dots move through the
+// gallery (default = the representative photo at index 0). A tap opens the lightbox.
+function setupHero(el, gallery, { onIndex } = {}) {
+  const hero = el.querySelector('.detail__hero');
+  const carImg = el.querySelector('#carImg');
+  if (!hero || !carImg || !gallery.length) return;
+  let idx = 0, swiped = false;
+  const render = (i) => {
+    idx = (i + gallery.length) % gallery.length;
+    carImg.style.backgroundImage = `url('${esc(img(gallery[idx] || ''))}')`;
+    hero.querySelectorAll('.carousel__dot').forEach((d, k) => d.classList.toggle('is-on', k === idx));
+    onIndex?.(idx);
+  };
+  if (gallery.length > 1) {
+    const mkNav = (dir, label, ic) => {
+      const b = document.createElement('button');
+      b.type = 'button'; b.className = `carousel__nav carousel__nav--${dir}`; b.setAttribute('aria-label', label);
+      b.innerHTML = icon(ic, 22);
+      b.onclick = (e) => { e.stopPropagation(); render(idx + (dir === 'next' ? 1 : -1)); };
+      return b;
+    };
+    const dots = document.createElement('div');
+    dots.className = 'carousel__dots';
+    dots.innerHTML = gallery.map((_, k) => `<span class="carousel__dot ${k === 0 ? 'is-on' : ''}"></span>`).join('');
+    hero.append(mkNav('prev', '이전', 'chevronLeft'), mkNav('next', '다음', 'chevronRight'), dots);
+    let sx = 0, sy = 0, on = false;
+    carImg.addEventListener('touchstart', (e) => { sx = e.touches[0].clientX; sy = e.touches[0].clientY; on = true; }, { passive: true });
+    carImg.addEventListener('touchend', (e) => {
+      if (!on) return; on = false;
+      const dx = e.changedTouches[0].clientX - sx, dy = e.changedTouches[0].clientY - sy;
+      if (Math.abs(dx) > 40 && Math.abs(dx) > Math.abs(dy)) { render(idx + (dx < 0 ? 1 : -1)); swiped = true; setTimeout(() => { swiped = false; }, 300); }
+    }, { passive: true });
+  }
+  carImg.addEventListener('click', () => { if (!swiped) openLightbox(gallery, idx); });
+  render(0);
+}
+
 // ---- Detail panel ---------------------------------------------------------
 export function renderDetail(el, cafe, { user, onVote, onAddReview, onClose, onEdit, onSetCover, onDeleteStory, onEditStory, onLike }) {
   const openNow = isOpenNow(cafe);
@@ -247,10 +284,8 @@ export function renderDetail(el, cafe, { user, onVote, onAddReview, onClose, onE
     const w = el.querySelector('#weekHours'); if (w) w.hidden = !w.hidden;
   });
 
-  // hero = representative photo; click → lightbox. Grid below shows all photos.
-  const carImg = el.querySelector('#carImg');
-  carImg.style.backgroundImage = `url('${esc(img(gallery[0] || ''))}')`;
-  carImg.addEventListener('click', () => openLightbox(gallery, 0));
+  // hero = swipeable carousel (default = representative photo). Grid below shows all.
+  setupHero(el, gallery);
   const grid = el.querySelector('#photoGrid');
   if (grid) {
     grid.innerHTML = gallery.map((u, i) => `
@@ -651,11 +686,11 @@ export function renderViewDetail(el, spot, { user, onAddComment, onEdit, onDelet
 
   const byUrl = {};
   (spot.photoMeta || []).forEach((m) => { if (m.uploader) byUrl[m.url] = m.uploader; });
-  const carImg = el.querySelector('#carImg');
-  carImg.style.backgroundImage = `url('${esc(img(gallery[0] || ''))}')`;
-  carImg.addEventListener('click', () => openLightbox(gallery, 0));
   const heroBy = el.querySelector('#heroBy');
-  if (heroBy && byUrl[gallery[0]]) { heroBy.innerHTML = `${icon('user', 11)} ${esc(byUrl[gallery[0]])}`; heroBy.hidden = false; }
+  setupHero(el, gallery, { onIndex: (i) => {
+    const by = byUrl[gallery[i]];
+    if (heroBy) { heroBy.innerHTML = by ? `${icon('user', 11)} ${esc(by)}` : ''; heroBy.hidden = !by; }
+  } });
   const grid = el.querySelector('#photoGrid');
   if (grid) {
     grid.innerHTML = gallery.map((u, i) => `<button type="button" class="pg-item" data-i="${i}" style="background-image:url('${esc(img(thumb(u)))}')">${byUrl[u] ? `<span class="pg-by">${esc(byUrl[u])}</span>` : ''}</button>`).join('');

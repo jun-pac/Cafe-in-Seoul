@@ -79,30 +79,34 @@
 
       <!-- Advanced filters (open by default so people find them) -->
       <div id="filteradv">
-        <label class="pilltog tip"><input type="checkbox" id="f-multifloor"><span data-i18n="f.multiFloor.short" data-tip-i18n="def.floors">다층</span></label>
-        <label class="pilltog tip"><input type="checkbox" id="f-openlate"><span data-i18n="f.openLate.short" data-tip-i18n="def.openLate">늦게까지</span></label>
-        <label class="pilltog tip"><input type="checkbox" id="f-view"><span data-i18n="f.view.short" data-tip-i18n="def.view">뷰</span></label>
-        <label class="pilltog tip"><input type="checkbox" id="f-rainok"><span data-i18n="f.rainOk.short" data-tip-i18n="def.rain_ok">우천시</span></label>
-        <span class="fbar__sep"></span>
-        <select id="f-size" class="input input--xs tip" data-tip-i18n="def.size">
-          <option value="" data-i18n="f.size.all">면적 전체</option>
-          <option value="medium" data-i18n="f.size.medium">중형 이상</option>
-          <option value="large" data-i18n="f.size.large">대형</option>
-        </select>
-        <select id="f-outlet" class="input input--xs tip" data-tip-i18n="def.outlets">
-          <option value="" data-i18n="f.outlet.all">콘센트 전체</option>
-          <option value="few" data-i18n="f.outlet.few">있음</option>
-          <option value="some" data-i18n="f.outlet.some">보통 이상</option>
-          <option value="many" data-i18n="f.outlet.many">많음</option>
-        </select>
-        <span class="fbar__sep"></span>
-        <label class="fbar__field"><span class="tip" data-i18n="vote.quiet" data-tip-i18n="def.quiet">조용함</span>
-          <input type="range" id="f-quiet" class="fbar__range fbar__range--sm" min="0" max="5" step="1" value="0"><b id="f-quiet-val" class="fbar__num"></b></label>
-        <label class="fbar__field"><span class="tip" data-i18n="vote.coffee" data-tip-i18n="def.coffee">커피맛</span>
-          <input type="range" id="f-coffee" class="fbar__range fbar__range--sm" min="0" max="5" step="1" value="0"><b id="f-coffee-val" class="fbar__num"></b></label>
-        <label class="fbar__field"><span data-i18n="vote.restroom">화장실</span>
-          <input type="range" id="f-restroom" class="fbar__range fbar__range--sm" min="0" max="5" step="1" value="0"><b id="f-restroom-val" class="fbar__num"></b></label>
-        <button id="f-reset" class="linkbtn" data-i18n="filters.reset">초기화</button>
+        <!-- the 6 essentials, forced onto ONE row -->
+        <div class="adv-primary">
+          <label class="pilltog tip"><input type="checkbox" id="f-multifloor"><span data-i18n="f.multiFloor.short" data-tip-i18n="def.floors">다층</span></label>
+          <label class="pilltog tip"><input type="checkbox" id="f-openlate"><span data-i18n="f.openLate.short" data-tip-i18n="def.openLate">늦게까지</span></label>
+          <label class="pilltog tip"><input type="checkbox" id="f-view"><span data-i18n="f.view.short" data-tip-i18n="def.view">뷰</span></label>
+          <label class="pilltog tip"><input type="checkbox" id="f-rainok"><span data-i18n="f.rainOk.short" data-tip-i18n="def.rain_ok">우천시</span></label>
+          <select id="f-size" class="input input--xs tip" data-tip-i18n="def.size">
+            <option value="" data-i18n="f.size.all">면적</option>
+            <option value="medium" data-i18n="f.size.medium">중형+</option>
+            <option value="large" data-i18n="f.size.large">대형</option>
+          </select>
+          <select id="f-outlet" class="input input--xs tip" data-tip-i18n="def.outlets">
+            <option value="" data-i18n="f.outlet.all">콘센트</option>
+            <option value="few" data-i18n="f.outlet.few">있음</option>
+            <option value="some" data-i18n="f.outlet.some">보통+</option>
+            <option value="many" data-i18n="f.outlet.many">많음</option>
+          </select>
+        </div>
+        <!-- ratings + reset drop to a second row -->
+        <div class="adv-secondary">
+          <label class="fbar__field"><span class="tip" data-i18n="vote.quiet" data-tip-i18n="def.quiet">조용함</span>
+            <input type="range" id="f-quiet" class="fbar__range fbar__range--sm" min="0" max="5" step="1" value="0"><b id="f-quiet-val" class="fbar__num"></b></label>
+          <label class="fbar__field"><span class="tip" data-i18n="vote.coffee" data-tip-i18n="def.coffee">커피맛</span>
+            <input type="range" id="f-coffee" class="fbar__range fbar__range--sm" min="0" max="5" step="1" value="0"><b id="f-coffee-val" class="fbar__num"></b></label>
+          <label class="fbar__field"><span data-i18n="vote.restroom">화장실</span>
+            <input type="range" id="f-restroom" class="fbar__range fbar__range--sm" min="0" max="5" step="1" value="0"><b id="f-restroom-val" class="fbar__num"></b></label>
+          <button id="f-reset" class="linkbtn" data-i18n="filters.reset">초기화</button>
+        </div>
       </div>
     </header>
 

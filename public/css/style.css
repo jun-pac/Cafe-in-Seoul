@@ -69,7 +69,11 @@ b { font-weight: 700; }
 
 /* inline filter bar — wraps on desktop, scrolls on mobile */
 #filterbar, #filteradv { display: flex; flex-wrap: wrap; align-items: center; gap: 7px 8px; padding: 8px 14px; border-top: 1px solid var(--hair); }
-#filteradv { background: var(--surface-2); }
+#filteradv { background: var(--surface-2); flex-direction: column; align-items: stretch; gap: 7px; }
+.adv-primary { display: flex; flex-wrap: nowrap; align-items: center; gap: 6px; }  /* the 6 stay on ONE line */
+.adv-secondary { display: flex; flex-wrap: wrap; align-items: center; gap: 7px 10px; }
+.adv-primary .pilltog span { padding: 4px 9px; font-size: 11.5px; }                /* compact enough to fit */
+.adv-primary .input--xs { padding: 4px 5px; font-size: 11px; flex: 0 1 auto; min-width: 0; }
 #filteradv[hidden] { display: none; } /* the attribute must win over display:flex */
 /* category toggles + like filter share the one filter row as inline pills */
 .pilltog--cafe input:checked + span { background: var(--ink); color: #fff; border-color: var(--ink); }
@@ -357,6 +361,15 @@ body.detail-resizing { cursor: ew-resize; user-select: none; }
 
 .detail__hero { position: relative; height: 280px; background: #e2e2ea; overflow: hidden; }
 .carousel__img { position: absolute; inset: 0; background-size: cover; background-position: center; transition: background-image .1s; }
+/* swipeable hero: prev/next arrows + dot indicators */
+.carousel__nav { position: absolute; top: 50%; transform: translateY(-50%); width: 34px; height: 34px; border: none; border-radius: 50%; background: rgba(15,15,20,.4); color: #fff; display: grid; place-items: center; cursor: pointer; z-index: 3; opacity: .82; transition: opacity .12s, background .12s; }
+.carousel__nav:hover { opacity: 1; background: rgba(15,15,20,.68); }
+.carousel__nav--prev { left: 8px; }
+.carousel__nav--next { right: 8px; }
+.carousel__nav .ic { display: block; }
+.carousel__dots { position: absolute; bottom: 9px; left: 50%; transform: translateX(-50%); display: flex; gap: 5px; z-index: 3; }
+.carousel__dot { width: 6px; height: 6px; border-radius: 50%; background: rgba(255,255,255,.55); box-shadow: 0 0 2px rgba(0,0,0,.4); }
+.carousel__dot.is-on { background: #fff; }
 .carousel__nav {
   position: absolute; top: 50%; transform: translateY(-50%); width: 38px; height: 38px; border-radius: 50%;
   border: 0; background: rgba(255,255,255,.9); color: var(--ink); cursor: pointer; font-size: 22px; line-height: 1;
