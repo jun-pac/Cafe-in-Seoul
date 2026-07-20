@@ -1,160 +1,116 @@
-# ☕ 서울 카공 지도 (seoul-cafe)
+# ☕ Cafe in Seoul (cafe-in-seoul.com)
 
-카공(카페 공부)하기 좋은 서울 카페를 지도에서 찾는 웹앱. 지도 위에 **핀 대신 카페 대표사진 카드**를 띄우고,
-줌아웃해서 카드가 겹치면 **종합점수가 가장 높은 카페만 남깁니다**.
+카공(카페 공부)하기 좋은 서울 카페 + 사진 찍기 좋은 장소를 지도에서 찾는 웹앱. 지도 위에 **핀 대신
+대표사진 카드**를 띄우고, 줌아웃해서 카드가 겹치면 **카페는 종합점수, 사진 스팟은 따봉 수가 높은 쪽만
+남깁니다**. 한/영 전환 시 UI뿐 아니라 **이름·리뷰·댓글 등 콘텐츠까지 AI로 번역**됩니다.
 
-## 기능 (요구사항 매핑)
+두 카테고리:
+- **주인장 추천 카페** — 카공 관점에서 큐레이션한 카페 (종합점수 기반).
+- **주인장이 찍은 사진** — 사진 찍기 좋은 장소 (필름/DSLR 사진, 따봉·댓글).
 
-- **다크 미니멀 지도** — CARTO dark_matter 래스터 타일. `design.md` 톤(순흑 캔버스·화이트 타이포·고스트 필·무채색)으로 디자인.
-- **사진 카드 마커 + 겹침 제거** — 줌 레벨마다 픽셀 충돌을 계산해, 겹치는 카드 중 종합점수 1등만 남기고 나머지는 숨김. 살아남은 카드에는 `+N` 배지로 흡수한 개수를 표시. (`public/js/declutter.js`)
-- **카드 클릭 → 우측 상세 패널** — 사진, 모든 필드, 지도 링크, 투표, 후기.
-- **필터** — 다층 여부 · 영업중/늦게까지 · 면적(소/중/대) · 콘센트 수준 · 아메리카노 가격 상한 · 집단지성 평가(조용함/커피맛/화장실) 최소점수.
-- **카페 등록 (로그인 필요)** — 3단계 폼:
-  1. **직접 입력**: 카페 이름, 카카오 지도 링크(필수·실제 장소 링크), 네이버 링크(선택)
-  2. **가져온 정보(수정 가능)**: 카카오 링크로 위치·대표사진·영업시간·아이스아메리카노 가격·리뷰 AI요약을 불러오고 사람이 수정
-  3. **직접 판단(카공 핵심)**: 층수(다층)·면적·콘센트·뷰 — 사람이 입력
-  → 링크는 사람이 붙여넣은 **실제 장소 링크**만 저장(검색결과 링크 자동생성 없음).
-- **집단지성 투표(1–5)** — 커피맛 · 조용함 · 화장실 청결. 사용자당 카테고리별 1표(재투표 시 갱신).
-- **후기 + 사진 (로그인 필요)** — 자유 텍스트 + 이미지 업로드.
-- **종합점수** — discrete 필드(최대 50) + 투표(최대 50, 조용함 가중치 최고)로 0–100 산출. 카드 겹침 우선순위 = 이 점수. (`server/score.js`)
-- **SSO 로그인** — Google Identity Services(GIS). **client ID만 필요(secret 불필요).** 미설정 시 **데모 로그인(닉네임 입력)** 으로 모든 기능 사용 가능.
-- **🤖 카카오 링크 → 자동 채우기 (관리자)** — 붙여넣은 카카오 장소 링크에서 좌표·주소·영업시간·아메리카노가격·사진을 규칙기반으로 추출하고, 리뷰를 OpenAI가 **한 문단 요약**. 층수/면적/콘센트/뷰 같은 주관적 판단은 자동추론하지 않고 사람이 입력.
-- **계정 로그인** — 아이디/비밀번호 회원가입·로그인(scrypt) + Google SSO 병행. 시드 관리자 `sejun`/`chongchong`.
-- **AI 심사(pending/approved)** — 누구나 카페 등록 가능. 관리자는 자동 승인, 그 외는 AI가 실존(카카오)·특별함(심야/대형복층/뷰)을 판단해 승인 또는 **pending**(본인·관리자에게만 표시, 관리자 승인 전 비공개).
-- **실시간 영업중 필터 기본 ON** — 시간이 가장 중요한 필터. 기본은 지금 영업중인 카페만, 토글로 해제.
-- **📍 동네 토크(GPS 채팅)** — 카페별 채팅. 읽기는 누구나, **쓰기는 GPS 1km 이내 인증** 시에만(서버가 거리 재검증). 실제 그 장소 사람들의 이야기를 담는 소셜.
-- **관리자 수정** — 상세에서 ✎ 수정으로 층수/면적/콘센트/뷰 등 큐레이션.
+> ⚠️ **"뷰 맛집"이라는 표현은 폐기됨.** 위 두 이름을 사용.
+
+## 핵심 기능
+
+- **밝은 미니멀 지도** — CARTO light_all 래스터 타일(자체 호스팅 벤더). 모바일에서 **북쪽 고정(회전 잠금)**.
+- **사진 카드 마커 + 겹침 제거(declutter)** — 픽셀 충돌 계산으로 겹치는 카드 중 1등만 남기고 `+N` 배지로 흡수 개수 표시. 카페가 항상 사진 스팟보다 우선. (`public/js/declutter.js`)
+- **상세 패널** — 대표사진 **슬라이딩 캐러셀**(스와이프/화살표/점, 손가락 따라 이동 후 스냅), 모든 필드, 지도 링크, 투표, 카공 총평, 후기/댓글.
+- **필터 한 줄 배치** — 영업중 · ♥좋아요 · 카테고리 토글 / 상세: 다층 · 늦게까지(22시+) · 뷰 · 우천시 · 면적(이상) · 콘센트(이상). 면적·콘센트는 "이상" 최소 기준 드롭다운.
+- **따봉(좋아요)** — 카페·사진 스팟 모두 로그인 후 따봉 가능. **♥좋아요 필터**로 내가 좋아요한 곳만 보기(비로그인 시 로그인 안내).
+- **집단지성 투표(1–5)** — 커피맛·조용함·화장실. 사용자당 카테고리별 1표.
+- **후기(스토리) + 댓글 + 사진** — 로그인 필요. 스토리 수정/삭제, 사진 업로드(첨부 기여자 표시).
+- **카공 총평(study_review)** — 감시받는 느낌·개방감 등 카공 친화도 평가(필수, AI 초안 지원).
+- **우천시 카페(rain_ok)** — 지하철역과 지하로 직접 연결된 곳(관리자 지정).
+- **제안 → 심사 대기열** — 로그인 사용자는 누구나 카페/사진 스팟 제안 가능. 관리자는 자동 승인, 그 외는 **pending**(본인·관리자에게만 보임) → 관리자 승인/거절. 제안 시 관리자에게 이메일 알림(SMTP).
+- **중복 생성 원천 차단** — 느린 업로드 중 다중 클릭으로 생기던 중복을 프론트(버튼 잠금) + 백엔드(멱등성 가드)로 구조적으로 방지.
+- **PWA** — 설치 프롬프트(모바일), 서비스워커(network-first). 지도 스크린샷 대응(`preserveDrawingBuffer`).
+- **관리자 통계** — 방문자(고유 세션)·행동(무엇을 클릭)·국가별·인기 카페/스팟·방문자별·실시간 활동 피드. 봇 필터. **시간은 KST(UTC+9)**.
+- **English 콘텐츠 번역** — EN 토글 시 이름·주소·카공총평·리뷰요약·리뷰본문·댓글을 OpenAI로 번역해 `*_en` 컬럼에 저장·표시(한글 폴백).
+
+## 스택
+
+Express 4 · better-sqlite3(WAL) · express-session/passport(scrypt) · multer · sharp(이미지 압축+썸네일) ·
+nodemailer(SMTP) · OpenAI(gpt-4o-mini) · MapLibre GL JS(자체 호스팅) · 번들러 없는 바닐라 ES 모듈 프론트.
 
 ## 빠른 시작
 
+### Docker (권장 — 운영과 동일)
+```bash
+docker compose up -d          # http://localhost:8001, 컨테이너 cafe-in-seoul, user 1003:1003
+docker compose logs -f app
+docker compose restart        # server/*.js 편집 후 (public/은 무캐시 라이브)
+```
+- 바인드 마운트: `data/`(SQLite+백업) · `uploads/`(사진) · `public/` · `server/`.
+- **주의(WAL-over-bindmount):** 호스트/`docker compose exec`로 DB에 쓰면 실행 중 컨테이너가 `restart` 전까지 못 봄. out-of-process DB 쓰기 후엔 반드시 restart.
+- **주의(env):** `env_file: .env` 값은 컨테이너 **생성 시점**에만 읽힘. `.env` 변경 반영은 `docker compose up -d --force-recreate`.
+
+### 로컬(Node)
 ```bash
 npm install
-npm run seed      # 실제 서울 카페 11곳(카카오 데이터) + 데모 유저/투표/후기
-npm start         # http://localhost:3000
+npm start                     # http://localhost:3000
 ```
 
-- 로그인: 사이드바에서 **아이디/비밀번호** 로그인 또는 회원가입. (Google 버튼도 표시)
-  - 시드 관리자 계정: **`sejun` / `chongchong`** (자동채우기 등 관리자 기능 사용 가능).
-- `npm run reset` : DB 삭제 후 재시드.
+## 환경변수(.env — gitignore됨)
 
-> 예시 카페 사진은 `picsum.photos` 시드 이미지(항상 로드됨)를 씁니다. 실제 등록 시엔 파일 업로드가 `uploads/`에 저장됩니다.
-
-## Google SSO 설정 (GIS — secret 불필요)
-
-Google Identity Services 토큰 방식이라 **client ID만** 있으면 됩니다(비밀키 X).
-
-1. https://console.cloud.google.com/apis/credentials → **웹 애플리케이션** OAuth 클라이언트 생성.
-2. **승인된 자바스크립트 원본**에 추가: `http://localhost:3000` (배포 시 `https://seoul-cafe.com`).
-   - 리디렉션 URI는 필요 없음(토큰 방식).
-3. `.env`:
-   ```
-   GOOGLE_CLIENT_ID=...apps.googleusercontent.com
-   ADMIN_EMAILS=you@gmail.com      # 비우면 로그인한 모두가 관리자(로컬 편의)
-   SESSION_SECRET=<랜덤 문자열>
-   ```
-`GOOGLE_CLIENT_ID`가 있으면 Google 버튼이 뜹니다. (아이디/비밀번호 로그인은 항상 가능)
-
-### `Error 401: invalid_client` / `no registered origin` 고치기
-GIS는 **리디렉션 URI가 아니라 "승인된 자바스크립트 원본"** 을 봅니다. 콘솔의 해당 OAuth 클라이언트에서:
-- 클라이언트 타입이 **웹 애플리케이션**인지 확인.
-- **승인된 자바스크립트 원본**에 접속 주소를 정확히 추가: `http://localhost:3000`
-  (127.0.0.1로 접속하면 `http://127.0.0.1:3000`도 별도 추가 — localhost와 다름).
-- 저장 후 반영에 몇 분 걸릴 수 있음. 그동안은 **아이디/비밀번호 로그인**으로 사용.
-- 관리자 Google 계정은 `.env`의 `ADMIN_EMAILS`에 이메일을 넣어야 관리자 권한을 받습니다.
-
-## 🤖 카카오 링크 → 자동 채우기 (관리자 전용)
-
-사람이 **실제 링크**를 넣고 나머지를 자동으로 채우는 방식(검색결과 링크를 지어내지 않음).
-
-1. 카페 이름 + 카카오 지도 **장소 링크** 붙여넣기 (모르면 "🔎 검색으로 링크 찾기"로 실제 place_url 획득).
-2. **가져오기** 클릭 →
-   - **규칙 기반**(카카오 `panel3`): 좌표·주소·영업시간·아이스아메리카노 가격(메뉴)·대표사진 후보.
-   - **AI**(OpenAI): 카카오 리뷰/블로그를 **한 문단 요약** + 키워드. (층수·면적·콘센트·뷰는 자동추론 안 함 → 사람이 판단)
-3. 관리자가 확인·수정 후 저장.
-
-지원 링크: `place.map.kakao.com/<id>`, `map.kakao.com/?itemId=<id>`, 공유 단축링크(리다이렉트 추적). 좌표만 있는 `link/map` 링크는 장소ID가 없어 미지원.
-
-필요 env: `KAKAO_API_KEY`(카카오 REST 키), `OPENAI_API_KEY`(+선택 `OPENAI_MODEL`, 기본 `gpt-4o-mini`).
-> 카카오 상세(영업시간/메뉴/리뷰)는 비공식 내부 엔드포인트(`panel3`)를 사용 — 스펙이 바뀌면 조정 필요. AI 요약이 실패해도(예: OpenAI 5xx, 자동 재시도함) 카카오 기본 정보는 채워집니다.
-
-## (검토) 정부 인허가 데이터로 카페 일괄 수집
-
-전국 카페는 **LOCALDATA(지방행정 인허가 데이터)**의 `휴게음식점` 업종에서 상호·주소·좌표·영업상태를 대량으로 받을 수 있습니다. 단:
-- 좌표계가 **EPSG:5174(중부원점 TM)** — WGS84(lat/lng)로 변환 필요(`proj4`).
-- Open API는 **변동분**만, 전체는 다운로드(CSV). **인증키 필요**(무료).
-- 영업시간/사진/리뷰는 없음 → **카카오로 보강 + AI 요약**하는 파이프라인으로 연결.
-- ⚠️ 2026-04-16부로 `localdata.go.kr`가 **공공데이터포털(data.go.kr)** 로 이관됨.
-
-즉 "정부 데이터로 뼈대(상호·위치) 일괄 → 카카오로 살(사진·영업시간·리뷰) → AI 요약"이 현실적 로드맵.
-
-## seoul-cafe.com + Cloudflare Tunnel (도메인 구매 후)
-
-도메인을 사서 Cloudflare에 연결한 뒤:
-
-```bash
-# 1) 서버 실행 (예: 3000 포트)
-npm start
-
-# 2) cloudflared 설치 후 터널 생성
-cloudflared tunnel login
-cloudflared tunnel create seoul-cafe
-cloudflared tunnel route dns seoul-cafe seoul-cafe.com
-
-# 3) ~/.cloudflared/config.yml
-#   tunnel: <TUNNEL_ID>
-#   credentials-file: /home/USER/.cloudflared/<TUNNEL_ID>.json
-#   ingress:
-#     - hostname: seoul-cafe.com
-#       service: http://localhost:3000
-#     - service: http_status:404
-
-cloudflared tunnel run seoul-cafe
+```
+GOOGLE_CLIENT_ID=...apps.googleusercontent.com   # GIS 토큰 방식 → client ID만 필요(secret 미사용)
+KAKAO_API_KEY=...                                 # 카카오 링크 자동 채우기/장소 검색
+OPENAI_API_KEY=sk-...   OPENAI_MODEL=gpt-4o-mini  # 리뷰 요약·카공총평 초안·영어 번역
+ADMIN_EMAILS=you@gmail.com                        # Google 로그인 관리자 허용목록(로컬 계정은 is_admin 컬럼)
+ALERT_EMAIL / SMTP_HOST / SMTP_PORT / SMTP_USER / SMTP_PASSWORD   # 제안 알림 메일
+BASE_URL=https://cafe-in-seoul.com  SESSION_SECRET=<랜덤>
 ```
 
-그리고 `.env`에서 `BASE_URL=https://seoul-cafe.com` 로 바꾸면 세션 쿠키가 `secure`로 발급되고 OAuth 콜백 URL도 맞춰집니다. (`app.set('trust proxy', 1)` 이미 설정됨.)
+## 로그인
+
+- **로컬 아이디/비밀번호**(scrypt) — **대소문자 구분**(case-sensitive). 관리자: `sejun`, `damhiya`, `YGH`(=`ygh`).
+- **Google SSO(GIS 토큰 방식)** — client **ID만** 필요, **secret 불필요**, **리디렉션 URI 불필요**. Google Cloud Console에서 **"승인된 자바스크립트 원본"** 에 `https://cafe-in-seoul.com` 추가. 관리자는 `.env`의 `ADMIN_EMAILS`에 이메일 등록.
+- **📍 동네 토크(GPS 채팅)** — 카페별 채팅. 읽기는 누구나, 쓰기는 GPS 1km 이내 인증 시(서버 재검증).
+
+## 배포 (Cloudflare Tunnel)
+
+호스트에서 `cloudflared` 터널이 `cafe-in-seoul.com` → `localhost:8001`(컨테이너) 로 라우팅. `app.set('trust proxy', 1)` 설정됨(세션 쿠키 `secure`, `CF-Connecting-IP` 신뢰).
+
+## 데이터 안전 (중요)
+
+- **DB 데이터 절대 삭제 금지가 원칙.** `server/db.js`에 하드 가드: WHERE 없는 DELETE/UPDATE, DROP/TRUNCATE 차단(예외: `ALLOW_DESTRUCTIVE=1`). 삭제는 **soft-delete**(`status='rejected'`, 행 보존·지도에서 숨김).
+- **자동 백업**: DB는 부팅 시 + 5분마다 `data/backups/` (60개 유지). **업로드 사진**은 `data/backups/uploads-mirror/` 로 미러(부팅+10분, 불변 파일만 복사). `npm run backups` / `npm run restore [latest|<file>]`.
+- **사진 파일은 코드가 삭제하지 않음** — 행이 지워져도 파일은 "고아"로 남아 복구 가능.
+- **UI 원칙:** 컬러 이모지 금지. 단색 SVG 아이콘(`icons.js`, `currentColor`) 또는 CSS-컬러 유니코드 기호만 사용.
 
 ## API 요약
 
 | Method | Path | 설명 |
 |---|---|---|
-| GET  | `/api/cafes` | 목록(점수 포함, 점수순 정렬) |
-| GET  | `/api/cafes/:id` | 상세 + 후기 + 내 투표 |
-| POST | `/api/cafes` | 등록 (auth, multipart `photo` + 필수 필드) |
-| POST | `/api/cafes/:id/vote` | `{category, score}` 투표 (auth) |
-| POST | `/api/cafes/:id/reviews` | 후기(multipart, `body` + 선택 `photo`) (auth) |
-| GET  | `/api/auth/me` | 로그인 상태/방식 (+ isAdmin) |
-| POST | `/api/auth/google/verify` | GIS ID 토큰 검증 로그인 |
-| POST | `/api/auth/dev-login` | 데모 로그인 (Google 미설정 시) |
-| POST | `/api/auth/logout` | 로그아웃 |
-| GET  | `/api/admin/search?q=` | 카카오 카페 검색 → 실제 place_url (admin) |
-| POST | `/api/admin/enrich` | `{kakaoUrl}` → 좌표/사진/영업시간/가격 + 리뷰 AI요약 (admin) |
+| GET  | `/api/cafes` · `/api/cafes/:id` | 목록(점수순, likes/liked/`*_en`) · 상세(후기·투표·따봉) |
+| POST | `/api/cafes` · `/api/cafes/:id/vote` · `/reviews` · `/like` · `/cover` | 등록/투표/후기/따봉/대표사진 |
+| GET/POST | `/api/viewspots` … `/:id/like` `/comments` `/photos` `/approve` `/reject` | 사진 스팟 |
+| GET  | `/api/auth/me` · POST `/register` `/login` `/google/verify` `/logout` | 계정 |
+| GET  | `/api/admin/insights` · `/analytics` · `/pending` · `/search` · POST `/enrich` `/draft-review` | 관리자 |
+| GET  | `/api/stats` · POST `/api/track` | 방문 통계 · 행동 이벤트 비콘 |
 
 ## 구조
 
 ```
 server/
-  index.js        Express 앱 + 세션 + 정적 서빙
-  db.js           SQLite 스키마 (better-sqlite3)
-  score.js        종합점수 계산
-  cafeModel.js    투표 집계 + 점수 데코레이션
-  auth.js         Google GIS 토큰 로그인 + 데모 로그인 + 관리자 판별
-  kakao.js        카카오 검색/상세 추출 (영업시간·메뉴·리뷰·사진)
-  ai.js           OpenAI 리뷰 분석 → 소프트 필드 추론
-  routes/         cafes / votes / reviews / admin(자동채우기)
-  seed.js         예시 데이터
+  index.js          Express + 세션 + 방문/이벤트 미들웨어 + 정적 서빙
+  db.js             SQLite 스키마·마이그레이션·삭제 하드가드·자동백업
+  score.js          카공 종합점수         cafeModel.js  투표집계+점수 데코
+  auth.js           Google GIS + 로컬(scrypt, 대소문자 구분) + 관리자 판별
+  kakao.js          카카오 검색/상세 추출   ai.js  리뷰요약·카공총평초안·translateBatch(영어번역)
+  i18nContent.js    콘텐츠 영어번역(_en) 헬퍼   mailer.js  제안 알림 SMTP
+  cafePhotos.js     대표사진(cover) 설정   images.js  sharp 압축+썸네일
+  analytics.js      이벤트 기록 + 관리자 통계 집계(봇필터, KST)
+  backupUploads.js  업로드 파일 미러 백업
+  routes/           cafes · viewspots · reviews · admin
 public/
-  index.html      사이드바(필터) + 지도 + 상세 패널
-  css/style.css
-  js/
-    app.js        오케스트레이션(상태·필터·상세)
-    map.js        MapLibre + 사진카드 마커 + declutter 연동
-    declutter.js  겹침 제거(최고점 생존) 알고리즘
-    ui.js         상세 패널 / 투표 / 후기 / 등록 모달
-    util.js       포맷·필터 유틸
-    api.js        fetch 래퍼
+  index.html        헤더(카테고리 토글+필터) + 지도 + 상세 패널
+  css/style.css     밝은 미니멀 + 모바일 반응형
+  js/  app.js(오케스트레이션) map.js(마커/declutter) declutter.js
+       ui.js(상세/캐러셀/모달) i18n.js(t·L 번역헬퍼) icons.js util.js api.js
+  manifest.json · sw.js (PWA)
 ```
 
 ## 참고
-
-- `data/`(SQLite), `uploads/`, `node_modules/`, `.env` 는 git에서 제외됩니다.
-- Node 18+ 필요 (개발/검증은 Node 20).
+- `data/*.db` · `data/backups/` · `uploads/*` · `node_modules/` · `.env` 는 git 제외.
+- Node 20 권장.
