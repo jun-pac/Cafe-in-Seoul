@@ -1,6 +1,7 @@
 import { declutter, CARD_W, CARD_H } from './declutter.js';
 import { esc, img, thumb } from './util.js';
 import { icon } from './icons.js';
+import { L } from './i18n.js';
 
 // Minimal light OSM basemap: CARTO Positron (light_all) raster tiles - clean,
 // airy grayscale. No API key required.
@@ -72,7 +73,7 @@ export function initMap(containerId, { onCardClick }) {
         <span class="cafe-card__badge" hidden></span>
         <span class="cafe-card__pending">심사중</span>
       </div>
-      <div class="cafe-card__name">${esc(item.name)}</div>
+      <div class="cafe-card__name">${esc(L(item, 'name'))}</div>
       <div class="cafe-card__tip"></div>`;
     if (kind === 'cafe') el.classList.toggle('is-pending', item.status === 'pending');
     el.addEventListener('click', (e) => {
@@ -107,7 +108,7 @@ export function initMap(containerId, { onCardClick }) {
         if (lk) lk.textContent = item.likes || 0;
         // reflect edits to the representative photo / name without a full reload
         existing.el.querySelector('.cafe-card__photo').style.backgroundImage = `url('${esc(img(thumb(item.photo_url)))}')`;
-        existing.el.querySelector('.cafe-card__name').textContent = item.name;
+        existing.el.querySelector('.cafe-card__name').textContent = L(item, 'name');
         if (kind === 'cafe') existing.el.classList.toggle('is-pending', item.status === 'pending');
         continue;
       }
@@ -188,7 +189,7 @@ export function initMap(containerId, { onCardClick }) {
       + members.map((m) => `
         <button type="button" class="cluster-pop__row" data-id="${esc(m.item.id)}">
           <span class="cluster-pop__thumb" style="background-image:url('${esc(img(thumb(m.item.photo_url)))}')"></span>
-          <span class="cluster-pop__name">${esc(m.item.name)}</span>
+          <span class="cluster-pop__name">${esc(L(m.item, 'name'))}</span>
           ${m.kind === 'view' ? '<span class="cluster-pop__tag">VIEW</span>'
             : `<span class="cluster-pop__score">${m.item.score}</span>`}
         </button>`).join('');

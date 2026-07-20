@@ -168,6 +168,10 @@ if (!cafeCols.has('rain_ok')) {
   // (admin-set, not crowd-sourced). Default off.
   db.exec(`ALTER TABLE cafes ADD COLUMN rain_ok INTEGER NOT NULL DEFAULT 0`);
 }
+// AI-generated English translations of user-facing text (shown when the UI is in English)
+for (const col of ['name_en', 'address_en', 'study_review_en', 'view_note_en', 'review_summary_en']) {
+  if (!cafeCols.has(col)) db.exec(`ALTER TABLE cafes ADD COLUMN ${col} TEXT`);
+}
 
 const userCols = new Set(db.prepare(`PRAGMA table_info(users)`).all().map((c) => c.name));
 if (!userCols.has('password_hash')) {
@@ -187,6 +191,12 @@ const vsCols = new Set(db.prepare(`PRAGMA table_info(viewspots)`).all().map((c) 
 if (!vsCols.has('status')) {
   db.exec(`ALTER TABLE viewspots ADD COLUMN status TEXT NOT NULL DEFAULT 'approved'`);
 }
+if (!vsCols.has('name_en')) db.exec(`ALTER TABLE viewspots ADD COLUMN name_en TEXT`);
+// English translations of user text: story bodies + view-spot comments
+const reviewCols2 = new Set(db.prepare(`PRAGMA table_info(reviews)`).all().map((c) => c.name));
+if (!reviewCols2.has('body_en')) db.exec(`ALTER TABLE reviews ADD COLUMN body_en TEXT`);
+const vcCols = new Set(db.prepare(`PRAGMA table_info(viewspot_comments)`).all().map((c) => c.name));
+if (!vcCols.has('body_en')) db.exec(`ALTER TABLE viewspot_comments ADD COLUMN body_en TEXT`);
 
 // daily unique-visitor tally (one bump per visitor session per day)
 db.exec(`CREATE TABLE IF NOT EXISTS daily_visits (day TEXT PRIMARY KEY, n INTEGER NOT NULL DEFAULT 0)`);

@@ -149,4 +149,46 @@ async function draftStudyReview(cafe) {
   catch { return null; }
 }
 
-module.exports = { summarize, moderate, draftStudyReview, HAS_AI };
+// Translate an array of Korean strings to natural English in one call. Names → common English
+// or clean romanization; sentences → fluent English. Returns a same-length array (null on fail).
+async function translateBatch(texts) {
+  if (!HAS_AI || !texts.length) return texts.map(() => null);
+  const SYSTEM = 'You translate Korean text for a Seoul cafe / photo-spot map app into natural English. '
+    + 'For place and cafe names use the common English name if one exists, otherwise a clean romanization '
+    + '(e.g. 여의도한강공원 → "Yeouido Hangang Park", 콩카페 → "Kong Cafe", 성수동 → "Seongsu-dong"). '
+    + 'For addresses, romanize/translate to a standard English Korean address. For reviews/comments, translate '
+    + 'fluently and concisely, preserving tone. Return ONLY a JSON object {"out":[...]} where each array element '
+    + 'is a PLAIN STRING (never an object), in the same length and order as the input array.';
+  const payload = JSON.stringify({
+    model: MODEL, temperature: 0.2, response_format: { type: 'json_object' },
+    messages: [{ role: 'system', content: SYSTEM }, { role: 'user', content: JSON.stringify(texts) }],
+  });
+  const sleep = (ms) => new Promise((res) => setTimeout(res, ms));
+  let r, lastErr;
+  for (let attempt = 0; attempt < 3; attempt++) {
+    if (attempt) await sleep(500 * attempt);
+    r = await fetch('https://api.openai.com/v1/chat/completions', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${OPENAI_API_KEY}` },
+      body: payload,
+    });
+    if (r.ok) break;
+    lastErr = `HTTP ${r.status}`;
+    if (r.status !== 429 && r.status < 500) break;
+  }
+  if (!r.ok) throw new Error(`OpenAI 번역 오류 (${lastErr})`);
+  const data = await r.json();
+  try {
+    const arr = JSON.parse(data.choices?.[0]?.message?.content || '{}').out;
+    if (Array.isArray(arr) && arr.length === texts.length) {
+      // the model sometimes wraps each item as {field: "translation"} — unwrap to the string
+      return arr.map((s) => {
+        const v = typeof s === 'string' ? s : (s && typeof s === 'object' ? String(Object.values(s)[0] ?? '') : '');
+        return v.trim() ? v.trim() : null;
+      });
+    }
+  } catch { /* fall through */ }
+  return texts.map(() => null);
+}
+
+module.exports = { summarize, moderate, draftStudyReview, translateBatch, HAS_AI };

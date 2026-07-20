@@ -361,6 +361,8 @@ async function rerenderI18n() {
   ['f-price', 'f-quiet', 'f-coffee', 'f-restroom'].forEach((id) => $(`#${id}`).dispatchEvent(new Event('input')));
   await refreshMe();               // re-render auth bar in the new language
   applyFilters();                  // result text
+  if (state.cafes) map.setCafes(state.cafes);        // refresh card names (KO ⇄ EN)
+  if (state.viewspots) map.setViewspots(state.viewspots);
   await refreshPendingQueue();
   if (state.openCafeId) await openDetail(state.openCafeId);
   else if (state.openViewId) await openViewDetail(state.openViewId);

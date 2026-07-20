@@ -9,6 +9,7 @@ const db = require('../db');
 const { requireAuth, isAdmin } = require('../auth');
 const { setCafeCover } = require('../cafePhotos');
 const { processUploads } = require('../images');
+const i18nContent = require('../i18nContent');
 
 const router = express.Router();
 
@@ -56,6 +57,7 @@ router.post('/:id/reviews', requireAuth, upload.array('photos', 30), async (req,
     coverSet = true;
   }
 
+  if (body) i18nContent.translateReview(reviewId).catch(() => {}); // translate the story body
   const review = getReview.get(reviewId);
   review.photos = photosOf.all(reviewId).map((p) => p.url);
   review.coverSet = coverSet;
@@ -97,6 +99,7 @@ router.patch('/:id/reviews/:reviewId', requireAuth, upload.array('photos', 30), 
       ordered.forEach((url, i) => insertPhoto.run(crypto.randomUUID(), req.params.reviewId, req.params.id, url, i));
     }
   })();
+  i18nContent.translateReview(req.params.reviewId).catch(() => {}); // refresh body_en after edit
   res.json({ ok: true });
 });
 

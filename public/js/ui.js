@@ -2,7 +2,7 @@ import {
   sizeLabel, outletLabel, def, won, hoursText, isOpenNow, weeklyHours, esc, img, thumb, haversineKm,
 } from './util.js';
 import { icon } from './icons.js';
-import { t } from './i18n.js';
+import { t, L } from './i18n.js';
 
 const VOTE_CATS = [
   { key: 'coffee', icon: 'coffee' },
@@ -221,8 +221,8 @@ export function renderDetail(el, cafe, { user, onVote, onAddReview, onClose, onE
         <div class="detail__scorebig" title="${esc(t('score.tip'))}">${cafe.score}<small>SCORE</small></div>
       </div>
       <div class="detail__body">
-        <h2 class="detail__name">${esc(cafe.name)}</h2>
-        <div class="detail__addr">${esc(cafe.address || '')}</div>
+        <h2 class="detail__name">${esc(L(cafe, 'name'))}</h2>
+        <div class="detail__addr">${esc(L(cafe, 'address'))}</div>
         ${cafe.status === 'pending' ? `<div class="detail__pending">${icon('shield', 14)} ${t('detail.pending')} <span class="muted">${cafe.moderation_reason ? '- ' + esc(cafe.moderation_reason) : ''}</span></div>` : ''}
         ${user?.isAdmin ? `<div class="detail__adminrow"><button class="btn btn--ghost sm" id="editCafeBtn">${icon('edit', 14)} ${t('detail.edit')}</button>${cafe.status === 'pending' ? `<button class="btn btn--primary sm" id="approveCafeBtn">${t('detail.approve')}</button>` : ''}<button class="btn btn--ghost sm btn--danger" id="removeCafeBtn">${icon('minus', 14)} ${t('detail.remove')}</button></div>` : ''}
         <button type="button" class="like-btn ${cafe.liked ? 'is-liked' : ''}" id="cLike">${icon('thumbsUp', 15)} <span id="cLikeN">${cafe.likes || 0}</span></button>
@@ -248,7 +248,7 @@ export function renderDetail(el, cafe, { user, onVote, onAddReview, onClose, onE
           ${cafe.kakao_url ? `<a class="btn btn--map kakao" href="${esc(cafe.kakao_url)}" target="_blank" rel="noopener">${t('detail.kakao')}</a>` : ''}
         </div>
 
-        ${cafe.study_review ? `<div class="detail__study"><div class="detail__study-h">${icon('coffee', 15)} <b>${t('detail.studyReview')}</b></div><p>${esc(cafe.study_review)}</p></div>` : ''}
+        ${cafe.study_review ? `<div class="detail__study"><div class="detail__study-h">${icon('coffee', 15)} <b>${t('detail.studyReview')}</b></div><p>${esc(L(cafe, 'study_review'))}</p></div>` : ''}
 
         ${gallery.length > 1 ? `<h3 class="detail__h3">${t('detail.photos')} <small class="muted">${gallery.length}</small></h3>
         <div class="photo-grid" id="photoGrid"></div>` : ''}
@@ -263,7 +263,7 @@ export function renderDetail(el, cafe, { user, onVote, onAddReview, onClose, onE
         <h3 class="detail__h3">${t('detail.chat')} <small>${icon('gps', 12)} ${t('detail.chat.hint')}</small></h3>
         <div class="chat" id="chatBox"></div>
 
-        ${cafe.review_summary ? `<details class="aisum-fold"><summary>${icon('ai', 13)} ${t('detail.reviewSummary')} <span class="muted">${t('detail.reviewSummaryNote')}</span></summary><p>${esc(cafe.review_summary)}</p></details>` : ''}
+        ${cafe.review_summary ? `<details class="aisum-fold"><summary>${icon('ai', 13)} ${t('detail.reviewSummary')} <span class="muted">${t('detail.reviewSummaryNote')}</span></summary><p>${esc(L(cafe, 'review_summary'))}</p></details>` : ''}
       </div>
     </div>`;
 
@@ -596,7 +596,7 @@ export function renderStories(el, reviews, { user, onDelete, onEdit } = {}) {
           <span class="muted">${esc((r.created_at || '').slice(0, 10))}</span>
           ${mine && onEdit ? `<button type="button" class="story__act story__edit" data-rid="${esc(r.id)}">${t('story.edit')}</button>` : ''}
           ${mine && onDelete ? `<button type="button" class="story__act story__del" data-rid="${esc(r.id)}">${t('story.delete')}</button>` : ''}</div>
-        ${r.body ? `<div class="story__body">${esc(r.body)}</div>` : ''}
+        ${r.body ? `<div class="story__body">${esc(L(r, 'body'))}</div>` : ''}
         ${photos.length ? `<div class="story__photos">${photos.map((u) => `<img class="story__photo" src="${esc(img(thumb(u)))}" loading="lazy" alt="">`).join('')}</div>` : ''}
       </div>`;
         }).join('')
@@ -653,7 +653,7 @@ export function renderViewDetail(el, spot, { user, onAddComment, onEdit, onDelet
         <div class="detail__heroby" id="heroBy" hidden></div>
       </div>
       <div class="detail__body">
-        <h2 class="detail__name">${esc(spot.name)}</h2>
+        <h2 class="detail__name">${esc(L(spot, 'name'))}</h2>
         ${spot.creator_name ? `<div class="detail__by">${icon('user', 12)} ${t('view.addedBy')} <b>${esc(spot.creator_name)}</b></div>` : ''}
         <button type="button" class="like-btn ${spot.liked ? 'is-liked' : ''}" id="vLike">${icon('thumbsUp', 15)} <span id="vLikeN">${spot.likes || 0}</span></button>
         ${spot.canEdit ? `<div class="detail__adminrow"><button class="btn btn--ghost sm" id="vEdit">${icon('edit', 14)} ${t('detail.edit')}</button><button class="btn btn--ghost sm" id="vDel">${t('detail.delete')}</button></div>` : ''}
@@ -714,7 +714,7 @@ export function renderViewDetail(el, spot, { user, onAddComment, onEdit, onDelet
   const comments = spot.comments || [];
   el.querySelector('#cCount').textContent = comments.length ? `${comments.length}` : '';
   el.querySelector('.comments').innerHTML = comments.length
-    ? comments.map((c) => `<div class="story"><div class="story__head"><b>${esc(c.user_name)}</b><span class="muted">${esc((c.created_at || '').slice(0, 10))}</span></div><div class="story__body">${esc(c.body)}</div></div>`).join('')
+    ? comments.map((c) => `<div class="story"><div class="story__head"><b>${esc(c.user_name)}</b><span class="muted">${esc((c.created_at || '').slice(0, 10))}</span></div><div class="story__body">${esc(L(c, 'body'))}</div></div>`).join('')
     : `<p class="muted">${t('comment.empty')}</p>`;
   const cf = el.querySelector('#commentform');
   if (user) {

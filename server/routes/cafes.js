@@ -12,6 +12,7 @@ const { moderate } = require('../moderation');
 const { setCafeCover } = require('../cafePhotos');
 const { processUploads } = require('../images');
 const { sendAdminAlert } = require('../mailer');
+const i18nContent = require('../i18nContent');
 
 const router = express.Router();
 
@@ -30,7 +31,7 @@ const upload = multer({
 const listStmt = db.prepare('SELECT * FROM cafes');
 const getStmt = db.prepare('SELECT * FROM cafes WHERE id = ?');
 const reviewsStmt = db.prepare(`
-  SELECT r.id, r.user_id, r.body, r.photo_url, r.created_at, u.name AS user_name, u.avatar_url AS user_avatar
+  SELECT r.id, r.user_id, r.body, r.body_en, r.photo_url, r.created_at, u.name AS user_name, u.avatar_url AS user_avatar
   FROM reviews r JOIN users u ON u.id = r.user_id
   WHERE r.cafe_id = ? ORDER BY r.created_at DESC
 `);
@@ -211,6 +212,7 @@ router.post('/', requireAuth, upload.array('photos', 30), async (req, res, next)
         `${req.user.name || req.user.id} 님이 카페를 제안했습니다.\n\n이름: ${cafe.name}\n주소: ${cafe.address || '-'}\n카카오: ${cafe.kakao_url || '-'}\n네이버: ${cafe.naver_url || '-'}\n\n관리자로 로그인해 심사 대기열에서 승인/거절하세요:\n${process.env.BASE_URL || ''}`
       ).catch(() => {});
     }
+    i18nContent.translateCafe(cafe.id).catch(() => {}); // fill *_en in the background
     res.status(201).json({ ...decorate(getStmt.get(cafe.id)), pending: !admin });
   } catch (e) {
     cleanup();
@@ -290,6 +292,7 @@ router.patch('/:id', requireAdmin, upload.array('photos', 30), async (req, res) 
       ordered.forEach((url, i) => insertCafePhoto.run(crypto.randomUUID(), req.params.id, url, i));
     }
   })();
+  if (sets.length) i18nContent.translateCafe(req.params.id).catch(() => {}); // refresh *_en after an edit
   res.json(decorate(getStmt.get(req.params.id)));
 });
 

@@ -7,6 +7,7 @@ const express = require('express');
 const multer = require('multer');
 const { processUploads } = require('../images');
 const { sendAdminAlert } = require('../mailer');
+const i18nContent = require('../i18nContent');
 const db = require('../db');
 const kakao = require('../kakao');
 const { requireAuth, requireAdmin, isAdmin } = require('../auth');
@@ -34,7 +35,7 @@ const upload = multer({
   fileFilter: (req, file, cb) => cb(null, /^image\//.test(file.mimetype)),
 });
 
-const listStmt = db.prepare('SELECT id, name, lat, lng, photo_url, status, created_by FROM viewspots');
+const listStmt = db.prepare('SELECT id, name, name_en, lat, lng, photo_url, status, created_by FROM viewspots');
 const getStmt = db.prepare('SELECT * FROM viewspots WHERE id = ?');
 const photosMetaStmt = db.prepare(`SELECT vp.url, u.name AS uploader
   FROM viewspot_photos vp LEFT JOIN users u ON u.id = vp.created_by
@@ -55,7 +56,7 @@ const findDupeSpot = db.prepare(`SELECT id, status FROM viewspots
 const delPhotos = db.prepare('DELETE FROM viewspot_photos WHERE viewspot_id = ?');
 const delSpot = db.prepare('DELETE FROM viewspots WHERE id = ?');
 const listComments = db.prepare(`
-  SELECT c.id, c.body, c.created_at, u.name AS user_name
+  SELECT c.id, c.body, c.body_en, c.created_at, u.name AS user_name
   FROM viewspot_comments c JOIN users u ON u.id = c.user_id
   WHERE c.viewspot_id = ? ORDER BY c.created_at DESC
 `);
@@ -144,6 +145,7 @@ router.post('/', requireAuth, upload.array('photos', 30), async (req, res) => {
       `${req.user.name || req.user.id} 님이 뷰맛집을 제안했습니다.\n\n이름: ${name}\n좌표: ${lat}, ${lng}\n\n관리자로 로그인해 심사 대기열에서 승인/거절하세요:\n${process.env.BASE_URL || ''}`
     ).catch(() => {});
   }
+  i18nContent.translateViewspot(id).catch(() => {}); // fill name_en in the background
   res.status(201).json({ ...getStmt.get(id), pending: !admin });
 });
 
@@ -185,6 +187,7 @@ router.patch('/:id', requireAuth, upload.array('photos', 30), async (req, res) =
       finalPhotos.forEach((url, i) => insertPhoto.run(crypto.randomUUID(), spot.id, url, i, owners.get(url) || req.user.id));
     }
   })();
+  if (name !== spot.name) i18nContent.translateViewspot(spot.id).catch(() => {}); // re-translate if renamed
   res.json(getStmt.get(spot.id));
 });
 
@@ -244,6 +247,7 @@ router.post('/:id/comments', requireAuth, express.json(), (req, res) => {
   if (!body) return res.status(400).json({ error: '댓글을 입력하세요.' });
   const id = crypto.randomUUID();
   insertComment.run(id, req.params.id, req.user.id, body);
+  i18nContent.translateComment(id).catch(() => {}); // translate the comment in the background
   res.status(201).json(listComments.all(req.params.id)[0]);
 });
 

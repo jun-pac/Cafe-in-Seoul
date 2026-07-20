@@ -216,3 +216,11 @@ export function applyStaticI18n(root = document) {
   // resolve tooltips (so filter controls explain each category to the user too)
   root.querySelectorAll('[data-tip-i18n]').forEach((el) => { el.setAttribute('data-tip', t(el.getAttribute('data-tip-i18n'))); });
 }
+
+// Localized content field: returns obj.<field>_en when the UI is English (and it exists),
+// otherwise the original Korean obj.<field>. Used for AI-translated names/reviews/comments.
+export function L(obj, field) {
+  if (!obj) return '';
+  if (getLang() === 'en' && obj[`${field}_en`]) return obj[`${field}_en`];
+  return obj[field] ?? '';
+}
