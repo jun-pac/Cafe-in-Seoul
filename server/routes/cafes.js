@@ -39,6 +39,13 @@ const galleryStmt = db.prepare('SELECT url FROM review_photos WHERE cafe_id = ? 
 const cafePhotosStmt = db.prepare('SELECT url FROM cafe_photos WHERE cafe_id = ? ORDER BY ord');
 const insertCafePhoto = db.prepare('INSERT INTO cafe_photos (id, cafe_id, url, ord) VALUES (?,?,?,?)');
 const myVotesStmt = db.prepare('SELECT category, score FROM votes WHERE cafe_id = ? AND user_id = ?');
+// a user can't create the same cafe twice — blocks double-submits (same Kakao place, or
+// same name at ~the same spot). Matches the view-spot idempotency guard.
+const findDupeCafe = db.prepare(`SELECT id, status FROM cafes
+  WHERE created_by = ? AND status != 'rejected' AND (
+    (kakao_place_id IS NOT NULL AND kakao_place_id = ?) OR
+    (name = ? AND ABS(lat - ?) < 0.0005 AND ABS(lng - ?) < 0.0005)
+  ) ORDER BY rowid DESC LIMIT 1`);
 
 const insertCafe = db.prepare(`
   INSERT INTO cafes (id, name, address, lat, lng, photo_url, floors, open_time, close_time,
@@ -173,6 +180,11 @@ router.post('/', requireAuth, upload.array('photos', 30), async (req, res, next)
     kakao_place_id: (b.kakao_place_id || '').trim() || null,
     created_by: req.user.id,
   };
+
+  // Idempotency guard (no awaited work between here and the synchronous insert below →
+  // racing double-submits can't both pass). If this user already has this cafe, return it.
+  const dupeCafe = findDupeCafe.get(req.user.id, cafe.kakao_place_id, cafe.name, cafe.lat, cafe.lng);
+  if (dupeCafe) { cleanup(); return res.json({ ...decorate(getStmt.get(dupeCafe.id)), pending: dupeCafe.status === 'pending', deduped: true }); }
 
   // admins publish immediately; everyone else PROPOSES (pending, hidden until approved)
   const admin = isAdmin(req.user);

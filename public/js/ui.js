@@ -420,6 +420,9 @@ export function openEditCafeModal(cafe, { onSave, onDraftReview }) {
     const { manifest, files, count } = picker.getManifest();
     if (!count) { back.querySelector('#eErr').textContent = '사진을 한 장 이상 남겨주세요.'; return; }
     if ((form.elements.study_review.value || '').trim().length < 15) { back.querySelector('#eErr').textContent = '카공 총평을 적어주세요 (15자 이상).'; return; }
+    const btn = form.querySelector('button[type="submit"]');
+    if (btn && btn.disabled) return; // already saving → ignore repeat clicks
+    if (btn) { btn.disabled = true; var orig = btn.textContent; btn.textContent = t('modal.submitting'); }
     const fd = new FormData();
     const setF = (k, v) => fd.set(k, v);
     setF('name', form.elements.name.value);
@@ -442,7 +445,7 @@ export function openEditCafeModal(cafe, { onSave, onDraftReview }) {
     setF('photo_manifest', JSON.stringify(manifest));
     files.forEach((f) => fd.append('photos', f));
     try { await onSave(fd); close(); }
-    catch (err) { back.querySelector('#eErr').textContent = err.message || '저장 실패'; }
+    catch (err) { back.querySelector('#eErr').textContent = err.message || '저장 실패'; if (btn) { btn.disabled = false; btn.textContent = orig; } }
   };
   return { close };
 }
@@ -1187,6 +1190,9 @@ export function openAddCafeModal(opts) {
     if ((form.elements.study_review.value || '').trim().length < 15) { errEl.textContent = '카공 총평을 적어주세요 (감시받지 않는 기분 등, 15자 이상).'; return; }
     const { manifest, files, count } = picker.getManifest();
     if (!count) { errEl.textContent = '사진을 한 장 이상 추가하세요 (첫 번째가 대표).'; return; }
+    const btn = form.querySelector('button[type="submit"]');
+    if (btn && btn.disabled) return; // already submitting → ignore repeat clicks (kills double-submit)
+    if (btn) { btn.disabled = true; var orig = btn.textContent; btn.textContent = t('modal.submitting'); }
 
     const fd = new FormData(form);
     const hv = hoursEd.getValue();
@@ -1202,6 +1208,7 @@ export function openAddCafeModal(opts) {
       close();
     } catch (err) {
       errEl.textContent = err.message || '등록 실패';
+      if (btn) { btn.disabled = false; btn.textContent = orig; }
     }
   };
 
