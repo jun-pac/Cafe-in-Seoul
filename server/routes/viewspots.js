@@ -46,6 +46,12 @@ const setVsApproved = db.prepare(`UPDATE viewspots SET status='approved' WHERE i
 const setVsRejected = db.prepare(`UPDATE viewspots SET status='rejected' WHERE id=?`);
 const insertPhoto = db.prepare('INSERT INTO viewspot_photos (id, viewspot_id, url, ord, created_by) VALUES (?,?,?,?,?)');
 const maxOrdStmt = db.prepare('SELECT COALESCE(MAX(ord), -1) AS m FROM viewspot_photos WHERE viewspot_id = ?');
+// a user can't create the same spot twice (same name + ~same place, ~55m). Blocks the
+// double-submit that made 5× 잠수교 when slow uploads got clicked repeatedly.
+const findDupeSpot = db.prepare(`SELECT id, status FROM viewspots
+  WHERE created_by = ? AND name = ? AND status != 'rejected'
+    AND ABS(lat - ?) < 0.0005 AND ABS(lng - ?) < 0.0005
+  ORDER BY rowid DESC LIMIT 1`);
 const delPhotos = db.prepare('DELETE FROM viewspot_photos WHERE viewspot_id = ?');
 const delSpot = db.prepare('DELETE FROM viewspots WHERE id = ?');
 const listComments = db.prepare(`
@@ -114,6 +120,13 @@ router.post('/', requireAuth, upload.array('photos', 30), async (req, res) => {
   if (!name) { cleanup(); return res.status(400).json({ error: '장소 이름을 입력하세요.' }); }
   if (!Number.isFinite(lat) || !Number.isFinite(lng)) { cleanup(); return res.status(400).json({ error: '위치를 지정하세요.' }); }
   if (!photos.length) { cleanup(); return res.status(400).json({ error: '사진을 한 장 이상 올려주세요.' }); }
+
+  // Idempotency guard — the structural fix for double-submits. There is NO awaited work
+  // between this check and the synchronous insert below, and better-sqlite3 is synchronous,
+  // so two racing requests can't both pass: whichever runs its check+insert first wins, and
+  // the other sees the row and returns it. No duplicate can be created.
+  const dupe = findDupeSpot.get(req.user.id, name, lat, lng);
+  if (dupe) { cleanup(); return res.json({ ...getStmt.get(dupe.id), pending: dupe.status === 'pending', deduped: true }); }
 
   // admins publish immediately; everyone else PROPOSES (pending)
   const admin = isAdmin(req.user);

@@ -769,13 +769,17 @@ export function openViewModal({ mode = 'create', spot, onSearch, onPickLocation,
     if (!form.elements.lat.value || !form.elements.lng.value) { errEl.textContent = t('view.needLoc'); return; }
     const { manifest, files, count } = picker.getManifest();
     if (!count) { errEl.textContent = t('view.needPhoto'); return; }
+    const btn = form.querySelector('button[type="submit"]');
+    if (btn.disabled) return; // already submitting → ignore repeat clicks (kills double-submit)
+    btn.disabled = true; const orig = btn.textContent; btn.textContent = t('modal.submitting');
     const fd = new FormData();
     fd.set('name', form.elements.name.value);
     fd.set('lat', form.elements.lat.value);
     fd.set('lng', form.elements.lng.value);
     fd.set('photo_manifest', JSON.stringify(manifest));
     files.forEach((f) => fd.append('photos', f));
-    try { await onSubmit(fd); close(); } catch (err) { errEl.textContent = err.message || '실패'; }
+    try { await onSubmit(fd); close(); }
+    catch (err) { errEl.textContent = err.message || '실패'; btn.disabled = false; btn.textContent = orig; }
   };
   return { close };
 }
