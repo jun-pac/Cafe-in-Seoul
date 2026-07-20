@@ -105,7 +105,7 @@ const DICT = {
     'show.cafes': 'Curated cafes', 'show.views': 'Curated photos',
     'show.cafes.short': 'Cafes', 'show.views.short': 'Photos',
     'f.openNow': 'Open now only', 'f.openNow.hint': '(live)',
-    'f.openNow.short': 'Open', 'f.openLate.short': 'Late', 'f.multiFloor.short': 'Multi', 'f.view.short': 'View', 'f.rainOk.short': 'Rain OK', 'f.liked': '♥',
+    'f.openNow.short': 'Open', 'f.openLate.short': 'Late', 'f.multiFloor.short': 'Multi', 'f.view.short': 'View', 'f.rainOk.short': 'Rain', 'f.liked': '♥',
     'f.liked.loginNeeded': 'Log in to see only places you liked.',
     'f.openLate': 'Open late (22:00+)', 'f.multiFloor': 'Multi-floor only',
     'f.multiFloor.hint': '(good for long stays)', 'f.view': 'Great view',
