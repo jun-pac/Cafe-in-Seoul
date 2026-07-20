@@ -110,7 +110,7 @@ function wireFilters() {
     label.textContent = fmt(el.value);
   };
   const priceFmt = (v) => (getLang() === 'ko' ? `${Number(v).toLocaleString('ko-KR')}원 이하` : `≤ ₩${Number(v).toLocaleString('en-US')}`);
-  const ratingFmt = (v) => (+v ? (getLang() === 'ko' ? `${v}점 이상` : `${v}+`) : t('f.outlet.all'));
+  const ratingFmt = (v) => (+v ? (getLang() === 'ko' ? `${v}점 이상` : `${v}+`) : (getLang() === 'ko' ? '전체' : 'Any'));
   bindRange('f-price', 'f-price-val', priceFmt);
   bindRange('f-quiet', 'f-quiet-val', ratingFmt);
   bindRange('f-coffee', 'f-coffee-val', ratingFmt);
