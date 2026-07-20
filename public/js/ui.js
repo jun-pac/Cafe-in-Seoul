@@ -367,8 +367,8 @@ export function openEditCafeModal(cafe, { onSave, onDraftReview }) {
   const form = back.querySelector('#editForm');
   const hoursEd = createHoursEditor(back.querySelector('#editHoursEd'), cafe);
   const picker = createPhotoPicker(back.querySelector('#editPhotoPicker'), {});
-  // load only the cafe's OWN photos (cover + imported) — NOT story/comment photos.
-  // Those are managed from their story so they never get orphaned here.
+  // show EVERY photo (cover + imported + story uploads), same order as the card/hero,
+  // so the representative photo is consistent across all three. First = cover.
   const editPhotos = (cafe.cafePhotos && cafe.cafePhotos.length) ? cafe.cafePhotos
     : (cafe.photos && cafe.photos.length) ? cafe.photos : [cafe.photo_url].filter(Boolean);
   picker.addUrls(editPhotos);

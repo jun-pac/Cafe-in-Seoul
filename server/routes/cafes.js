@@ -71,21 +71,20 @@ router.get('/:id', (req, res) => {
   const photosByReview = {};
   for (const p of reviewPhotosStmt.all(cafe.id)) (photosByReview[p.review_id] ||= []).push(p.url);
   for (const r of detail.reviews) r.photos = photosByReview[r.id] || (r.photo_url ? [r.photo_url] : []);
-  // Unified gallery. ABSOLUTE rule: photos the admin UPLOADED (local /uploads/ files)
-  // always come before Kakao-scraped ones — never the other way around. Within each
-  // group we keep the ordered source (cover first, then cafe_photos manifest order,
-  // then story photos), so edit-modal reordering still sticks inside a group.
+  // Unified gallery. THE representative photo (photo_url = the cover) is ALWAYS first,
+  // so the map card, the detail hero, and the edit modal all lead with the SAME photo —
+  // they can never disagree. Remaining photos follow, admin UPLOADS before Kakao-scraped.
   const cover = detail.photo_url ? [detail.photo_url] : [];
-  const imported = cafePhotosStmt.all(cafe.id).map((p) => p.url);   // cafe_photos (manifest / Kakao)
+  const imported = cafePhotosStmt.all(cafe.id).map((p) => p.url);   // cafe_photos (cover + imported/Kakao)
   const stories = galleryStmt.all(cafe.id).map((p) => p.url);       // review_photos (story uploads)
-  const merged = [...new Set([...cover, ...imported, ...stories].filter(Boolean))];
   const isUpload = (u) => u.startsWith('/uploads/');
-  detail.gallery = [...merged.filter(isUpload), ...merged.filter((u) => !isUpload(u))];
+  const rest = [...new Set([...imported, ...stories].filter(Boolean))].filter((u) => u !== detail.photo_url);
+  const restOrdered = [...rest.filter(isUpload), ...rest.filter((u) => !isUpload(u))];
+  detail.gallery = [...new Set([...cover, ...restOrdered])];
   detail.photos = detail.gallery;
-  // the cafe's OWN photos (cover + imported) — NOT story photos. The edit modal uses
-  // this so story photos can't be deleted there and orphaned; delete those via the story.
-  const own = [...new Set([...cover, ...imported].filter(Boolean))];
-  detail.cafePhotos = [...own.filter(isUpload), ...own.filter((u) => !isUpload(u))];
+  // Edit modal shows EVERY photo (same list, same order as the gallery/card) so nothing
+  // is hidden and the lead photo is always the representative one.
+  detail.cafePhotos = detail.gallery;
   detail.myVotes = {};
   if (req.user) {
     for (const v of myVotesStmt.all(cafe.id, req.user.id)) detail.myVotes[v.category] = v.score;
