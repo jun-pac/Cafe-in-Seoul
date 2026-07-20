@@ -83,10 +83,10 @@ router.post('/register', express.json(), (req, res, next) => {
   const password = req.body?.password || '';
   if (!USERNAME_RE.test(username)) return res.status(400).json({ error: '아이디는 2~20자 영문/숫자/._- 만 가능합니다.' });
   if (password.length < 4) return res.status(400).json({ error: '비밀번호는 4자 이상이어야 합니다.' });
-  if (findByProvider.get('local', username.toLowerCase())) return res.status(409).json({ error: '이미 존재하는 아이디입니다.' });
+  if (findByProvider.get('local', username)) return res.status(409).json({ error: '이미 존재하는 아이디입니다.' });
 
   const user = upsertUser({
-    provider: 'local', provider_id: username.toLowerCase(),
+    provider: 'local', provider_id: username, // case-sensitive: store the id exactly as typed
     name: username, password_hash: hashPassword(password), is_admin: 0,
   });
   req.login(user, (err) => {
@@ -96,7 +96,7 @@ router.post('/register', express.json(), (req, res, next) => {
 });
 
 router.post('/login', express.json(), (req, res, next) => {
-  const username = (req.body?.username || '').trim().toLowerCase();
+  const username = (req.body?.username || '').trim(); // case-sensitive: match the id exactly
   const password = req.body?.password || '';
   const user = findByProvider.get('local', username);
   if (!user || !verifyPassword(password, user.password_hash)) {
