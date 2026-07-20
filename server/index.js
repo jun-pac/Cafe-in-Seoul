@@ -54,12 +54,23 @@ const BOT_UA = /bot|crawler|spider|crawling|slurp|mediapartners|bingpreview|face
 app.use((req, res, next) => {
   try {
     const isPageLoad = req.method === 'GET' && (req.path === '/' || req.path === '/index.html');
-    const ua = req.get('user-agent') || '';
-    const isBot = !ua || BOT_UA.test(ua);
-    const today = new Date().toISOString().slice(0, 10);
-    if (isPageLoad && !isBot && !req.user?.is_admin && req.session && req.session.visitDay !== today) {
-      req.session.visitDay = today;
-      bumpVisit.run(today);
+    if (isPageLoad) {
+      const ua = req.get('user-agent') || '';
+      const isBot = !ua || BOT_UA.test(ua);
+      const today = new Date().toISOString().slice(0, 10);
+      const reason = req.user?.is_admin ? 'admin'
+        : isBot ? 'bot'
+        : (req.session && req.session.visitDay === today) ? 'dupe'
+        : 'counted';
+      // Cloudflare passes the real client IP + country; log every homepage load with why it
+      // did/didn't count, so we can see exactly who is bumping the number.
+      const ip = req.headers['cf-connecting-ip'] || req.ip || '?';
+      const country = req.headers['cf-ipcountry'] || '?';
+      console.log(`[PAGELOAD ${reason}] ip=${ip} ${country} ua=${JSON.stringify(ua).slice(0, 150)}`);
+      if (reason === 'counted' && req.session) {
+        req.session.visitDay = today;
+        bumpVisit.run(today);
+      }
     }
   } catch { /* ignore */ }
   next();

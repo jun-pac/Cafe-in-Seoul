@@ -144,6 +144,9 @@ b { font-weight: 700; }
 .modal--insights .admin-badge { font-size: 8px; padding: 0 4px; }
 
 .authbar { display: flex; align-items: center; justify-content: space-between; gap: 8px; }
+.authbar__contact { display: flex; align-items: center; gap: 6px; margin-top: 12px; padding-top: 12px; border-top: 1px solid var(--hair); font-size: 12.5px; font-weight: 600; color: var(--ink-2); text-decoration: none; }
+.authbar__contact:hover { color: var(--ink); }
+.authbar__contact .muted { font-weight: 500; }
 .authbar__who { font-weight: 600; font-size: 14px; }
 .admin-badge {
   font-family: var(--font-display); text-transform: uppercase; letter-spacing: 1px;
@@ -522,6 +525,11 @@ details.manual[open] summary { margin-bottom: 4px; }
 
 /* photo picker: click a photo → cover (first). drag files from desktop to add. */
 .photo-picker { display: flex; flex-wrap: wrap; gap: 8px; border-radius: var(--r-sm); padding: 2px; transition: background .12s, outline-color .12s; outline: 2px dashed transparent; outline-offset: 2px; }
+/* read-only story photos in the edit modal — visible but not editable/deletable */
+.edit-storyphotos { margin-top: 10px; }
+.edit-storyphotos__label { display: flex; align-items: center; gap: 5px; font-size: 12px; font-weight: 600; color: var(--ink-2); margin-bottom: 6px; }
+.edit-storyphotos__grid { display: flex; flex-wrap: wrap; gap: 8px; }
+.edit-storyphotos__item { width: 64px; height: 64px; border-radius: var(--r-sm); background-size: cover; background-position: center; border: 1px solid var(--hair-strong); opacity: .82; }
 .photo-picker.pp-filedrop { outline-color: var(--ink); background: var(--cool); }
 .pp-item { position: relative; width: 84px; height: 84px; border-radius: var(--r-sm); overflow: hidden; border: 1px solid var(--hair-strong); cursor: pointer; }
 .pp-item:active { cursor: grabbing; }

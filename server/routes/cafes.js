@@ -71,20 +71,20 @@ router.get('/:id', (req, res) => {
   const photosByReview = {};
   for (const p of reviewPhotosStmt.all(cafe.id)) (photosByReview[p.review_id] ||= []).push(p.url);
   for (const r of detail.reviews) r.photos = photosByReview[r.id] || (r.photo_url ? [r.photo_url] : []);
-  // Unified gallery. THE representative photo (photo_url = the cover) is ALWAYS first,
-  // so the map card, the detail hero, and the edit modal all lead with the SAME photo —
-  // they can never disagree. Remaining photos follow, admin UPLOADS before Kakao-scraped.
+  // THE representative photo (photo_url = the cover) is ALWAYS first, so the map card,
+  // the detail hero, and the edit modal all lead with the SAME photo — never disagree.
   const cover = detail.photo_url ? [detail.photo_url] : [];
   const imported = cafePhotosStmt.all(cafe.id).map((p) => p.url);   // cafe_photos (cover + imported/Kakao)
   const stories = galleryStmt.all(cafe.id).map((p) => p.url);       // review_photos (story uploads)
-  const isUpload = (u) => u.startsWith('/uploads/');
-  const rest = [...new Set([...imported, ...stories].filter(Boolean))].filter((u) => u !== detail.photo_url);
-  const restOrdered = [...rest.filter(isUpload), ...rest.filter((u) => !isUpload(u))];
-  detail.gallery = [...new Set([...cover, ...restOrdered])];
+  const own = [...new Set([...cover, ...imported].filter(Boolean))]; // the cafe's OWN photos, cover first
+  // Story-uploaded photos the cafe doesn't own. They belong to their story: shown read-only
+  // in the edit modal, NEVER deletable there (deleting a story photo happens in the story,
+  // so it can't be orphaned). They still appear in the viewing gallery, after the own photos.
+  const storyOnly = [...new Set(stories.filter(Boolean))].filter((u) => !own.includes(u));
+  detail.gallery = [...own, ...storyOnly];  // cover-first → card == hero == gallery[0]
   detail.photos = detail.gallery;
-  // Edit modal shows EVERY photo (same list, same order as the gallery/card) so nothing
-  // is hidden and the lead photo is always the representative one.
-  detail.cafePhotos = detail.gallery;
+  detail.cafePhotos = own;         // EDITABLE in the edit modal (reorder / delete / add). First = cover.
+  detail.storyPhotos = storyOnly;  // READ-ONLY in the edit modal.
   detail.myVotes = {};
   if (req.user) {
     for (const v of myVotesStmt.all(cafe.id, req.user.id)) detail.myVotes[v.category] = v.score;

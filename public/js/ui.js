@@ -18,6 +18,14 @@ function stars(avg) {
 // ---- Auth bar -------------------------------------------------------------
 export function renderAuth(el, me, { onLogout, onGoogleCredential, onLocalLogin, onRegister, onEditName }) {
   el.innerHTML = '';
+  // contact-the-operator link, shown at the bottom of the auth popover either way
+  const contactEl = () => {
+    const a = document.createElement('a');
+    a.className = 'authbar__contact';
+    a.href = 'mailto:skg4078@snu.ac.kr?subject=' + encodeURIComponent('[Cafe in Seoul] 문의');
+    a.innerHTML = `${icon('mail', 13)} ${t('auth.contact')} <span class="muted">skg4078@snu.ac.kr</span>`;
+    return a;
+  };
   if (me.user) {
     const wrap = document.createElement('div');
     wrap.className = 'authbar';
@@ -27,6 +35,7 @@ export function renderAuth(el, me, { onLogout, onGoogleCredential, onLocalLogin,
     wrap.querySelector('#logoutBtn').onclick = onLogout;
     wrap.querySelector('#editNameBtn').onclick = onEditName;
     el.appendChild(wrap);
+    el.appendChild(contactEl());
     return;
   }
 
@@ -83,6 +92,7 @@ export function renderAuth(el, me, { onLogout, onGoogleCredential, onLocalLogin,
   };
   box.appendChild(form);
   el.appendChild(box);
+  el.appendChild(contactEl());
 }
 
 // ---- Admin pending queue --------------------------------------------------
@@ -367,11 +377,20 @@ export function openEditCafeModal(cafe, { onSave, onDraftReview }) {
   const form = back.querySelector('#editForm');
   const hoursEd = createHoursEditor(back.querySelector('#editHoursEd'), cafe);
   const picker = createPhotoPicker(back.querySelector('#editPhotoPicker'), {});
-  // show EVERY photo (cover + imported + story uploads), same order as the card/hero,
-  // so the representative photo is consistent across all three. First = cover.
+  // EDITABLE: the cafe's own photos only (cover + imported). First = cover = card = hero.
   const editPhotos = (cafe.cafePhotos && cafe.cafePhotos.length) ? cafe.cafePhotos
     : (cafe.photos && cafe.photos.length) ? cafe.photos : [cafe.photo_url].filter(Boolean);
   picker.addUrls(editPhotos);
+  // READ-ONLY: story-uploaded photos are shown so every photo is visible here, but they
+  // can't be deleted from this tab — they're managed from their story (never orphaned).
+  const storyPhotos = cafe.storyPhotos || [];
+  if (storyPhotos.length) {
+    const wrap = document.createElement('div');
+    wrap.className = 'edit-storyphotos';
+    wrap.innerHTML = `<div class="edit-storyphotos__label">${icon('lock', 11)} ${t('modal.storyPhotos')} <small class="muted">${t('modal.storyPhotosHint')}</small></div>
+      <div class="edit-storyphotos__grid">${storyPhotos.map((u) => `<div class="edit-storyphotos__item" style="background-image:url('${esc(img(thumb(u)))}')"></div>`).join('')}</div>`;
+    back.querySelector('#editPhotoPicker').after(wrap);
+  }
   const close = () => back.remove();
   back.querySelector('#eClose').onclick = close;
   back.addEventListener('mousedown', (e) => { if (e.target === back) close(); });
