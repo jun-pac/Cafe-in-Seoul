@@ -40,9 +40,6 @@ try {
 
 // ---------- filters ----------
 function readFilters() {
-  const sizes = new Set(
-    ['small', 'medium', 'large'].filter((s) => $(`#f-size-${s}`).checked)
-  );
   return {
     multiFloor: $('#f-multifloor').checked,
     hasView: $('#f-view').checked,
@@ -50,7 +47,7 @@ function readFilters() {
     openNow: $('#f-opennow').checked,
     openLate: $('#f-openlate').checked,
     liked: $('#f-liked').checked,
-    sizes,
+    minSize: $('#f-size').value || null,
     minOutlet: $('#f-outlet').value || null,
     maxPrice: Number($('#f-price').value),
     minQuiet: Number($('#f-quiet').value),
@@ -60,7 +57,7 @@ function readFilters() {
 }
 
 const FILTER_IDS = ['show-cafes', 'show-views', 'f-multifloor', 'f-view', 'f-rainok', 'f-opennow', 'f-openlate',
-  'f-size-small', 'f-size-medium', 'f-size-large', 'f-outlet',
+  'f-size', 'f-outlet',
   'f-price', 'f-quiet', 'f-coffee', 'f-restroom'];
 
 function saveFilters() {
@@ -93,7 +90,7 @@ function applyFilters() {
 
 function wireFilters() {
   const ids = ['show-cafes', 'show-views', 'f-multifloor', 'f-view', 'f-rainok', 'f-opennow', 'f-openlate', 'f-liked',
-    'f-size-small', 'f-size-medium', 'f-size-large', 'f-outlet'];
+    'f-size', 'f-outlet'];
   ids.forEach((id) => $(`#${id}`).addEventListener('change', (e) => {
     if (id === 'f-liked' && e.target.checked && !state.me.user) { // login-gated feature
       e.target.checked = false;
@@ -120,8 +117,8 @@ function wireFilters() {
   bindRange('f-restroom', 'f-restroom-val', ratingFmt);
 
   $('#f-reset').addEventListener('click', () => {
-    ['f-multifloor', 'f-view', 'f-rainok', 'f-opennow', 'f-openlate', 'f-liked',
-     'f-size-small', 'f-size-medium', 'f-size-large'].forEach((id) => ($(`#${id}`).checked = false));
+    ['f-multifloor', 'f-view', 'f-rainok', 'f-opennow', 'f-openlate', 'f-liked'].forEach((id) => ($(`#${id}`).checked = false));
+    $('#f-size').value = '';
     $('#f-outlet').value = '';
     $('#f-price').value = 8000; $('#f-price').dispatchEvent(new Event('input'));
     ['f-quiet', 'f-coffee', 'f-restroom'].forEach((id) => {

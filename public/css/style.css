@@ -84,6 +84,7 @@ b { font-weight: 700; }
 .fbar__range { width: 74px; }
 .fbar__range--sm { width: 72px; }
 .input--sm { width: auto; padding: 5px 8px; font-size: 12px; }
+.input--xs { width: auto; padding: 4px 6px; font-size: 11.5px; }  /* compact self-labeling filter selects */
 .fbar__more { display: inline-flex; align-items: center; gap: 4px; height: 30px; padding: 0 12px; border: 1px solid var(--hair-strong);
   background: var(--surface); border-radius: var(--pill); font-size: 12px; font-weight: 600; color: var(--ink-2); cursor: pointer; }
 .fbar__more:hover { border-color: var(--ink); color: var(--ink); }

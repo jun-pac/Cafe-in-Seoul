@@ -3,6 +3,7 @@
 import { t } from './i18n.js';
 
 export const OUTLET_RANK = { none: 0, few: 1, some: 2, many: 3 };
+export const SIZE_RANK = { small: 1, medium: 2, large: 3 }; // bigger = better for studying
 export const sizeLabel = (s) => t(`size.${s}`);
 export const outletLabel = (o) => t(`outlet.${o}`);
 export const def = (k) => t(`def.${k}`); // field definition tooltip (localized)
@@ -90,7 +91,7 @@ export function passesFilters(cafe, f) {
   if (f.openNow && !isOpenNow(cafe)) return false;
   if (f.openLate && !opensLate(cafe)) return false;
   if (f.liked && !cafe.liked) return false;
-  if (f.sizes && f.sizes.size && !f.sizes.has(cafe.size)) return false;
+  if (f.minSize && SIZE_RANK[cafe.size] < SIZE_RANK[f.minSize]) return false;
   if (f.minOutlet && OUTLET_RANK[cafe.outlets] < OUTLET_RANK[f.minOutlet]) return false;
   if (f.maxPrice != null && cafe.iced_americano_price > f.maxPrice) return false;
 
