@@ -65,6 +65,7 @@ const likedStmt = db.prepare('SELECT 1 FROM viewspot_likes WHERE viewspot_id = ?
 const insertLike = db.prepare('INSERT OR IGNORE INTO viewspot_likes (viewspot_id, user_id) VALUES (?, ?)');
 const deleteLike = db.prepare('DELETE FROM viewspot_likes WHERE viewspot_id = ? AND user_id = ?');
 const allLikeCounts = db.prepare('SELECT viewspot_id, COUNT(*) AS n FROM viewspot_likes GROUP BY viewspot_id');
+const likedByUser = db.prepare('SELECT viewspot_id FROM viewspot_likes WHERE user_id = ?');
 
 // Build ordered photo urls from a manifest (['file'|'url:...']) + uploaded files.
 function orderedPhotos(body, files) {
@@ -88,9 +89,10 @@ router.get('/', (req, res) => {
   const admin = isAdmin(req.user);
   const likes = {};
   allLikeCounts.all().forEach((r) => { likes[r.viewspot_id] = r.n; });
+  const likedSet = uid ? new Set(likedByUser.all(uid).map((r) => r.viewspot_id)) : null;
   res.json(listStmt.all().filter((v) =>
     v.status !== 'rejected' && (v.status === 'approved' || admin || (uid && v.created_by === uid))
-  ).map((v) => ({ ...v, likes: likes[v.id] || 0 })));
+  ).map((v) => ({ ...v, likes: likes[v.id] || 0, liked: !!(likedSet && likedSet.has(v.id)) })));
 });
 
 router.get('/:id', (req, res) => {

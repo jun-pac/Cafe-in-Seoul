@@ -46,6 +46,13 @@ const findDupeCafe = db.prepare(`SELECT id, status FROM cafes
     (kakao_place_id IS NOT NULL AND kakao_place_id = ?) OR
     (name = ? AND ABS(lat - ?) < 0.0005 AND ABS(lng - ?) < 0.0005)
   ) ORDER BY rowid DESC LIMIT 1`);
+// 따봉(likes) on cafes
+const cafeLikeCount = db.prepare('SELECT COUNT(*) AS n FROM cafe_likes WHERE cafe_id = ?');
+const cafeLiked = db.prepare('SELECT 1 FROM cafe_likes WHERE cafe_id = ? AND user_id = ?');
+const cafeInsertLike = db.prepare('INSERT OR IGNORE INTO cafe_likes (cafe_id, user_id) VALUES (?, ?)');
+const cafeDeleteLike = db.prepare('DELETE FROM cafe_likes WHERE cafe_id = ? AND user_id = ?');
+const cafeAllLikes = db.prepare('SELECT cafe_id, COUNT(*) AS n FROM cafe_likes GROUP BY cafe_id');
+const cafeLikedByUser = db.prepare('SELECT cafe_id FROM cafe_likes WHERE user_id = ?');
 
 const insertCafe = db.prepare(`
   INSERT INTO cafes (id, name, address, lat, lng, photo_url, floors, open_time, close_time,
@@ -61,10 +68,12 @@ const insertCafe = db.prepare(`
 router.get('/', (req, res) => {
   const uid = req.user?.id;
   const admin = isAdmin(req.user);
+  const likes = {}; cafeAllLikes.all().forEach((r) => { likes[r.cafe_id] = r.n; });
+  const likedSet = uid ? new Set(cafeLikedByUser.all(uid).map((r) => r.cafe_id)) : null;
   const cafes = listStmt.all()
     .filter((c) => c.status !== 'rejected') // soft-deleted cafes never appear on the map
     .filter((c) => c.status === 'approved' || admin || (uid && c.created_by === uid))
-    .map(decorate);
+    .map((c) => { const d = decorate(c); d.likes = likes[c.id] || 0; d.liked = !!(likedSet && likedSet.has(c.id)); return d; });
   cafes.sort((a, b) => b.score - a.score);
   res.json(cafes);
 });
@@ -96,6 +105,8 @@ router.get('/:id', (req, res) => {
   if (req.user) {
     for (const v of myVotesStmt.all(cafe.id, req.user.id)) detail.myVotes[v.category] = v.score;
   }
+  detail.likes = cafeLikeCount.get(cafe.id).n;
+  detail.liked = !!(req.user && cafeLiked.get(cafe.id, req.user.id));
   res.json(detail);
 });
 
@@ -290,6 +301,15 @@ router.post('/:id/cover', requireAdmin, express.json(), (req, res) => {
   if (!url) return res.status(400).json({ error: 'url이 필요합니다.' });
   setCafeCover(req.params.id, url);
   res.json(decorate(getStmt.get(req.params.id)));
+});
+
+// toggle 따봉(like) on a cafe (any logged-in user)
+router.post('/:id/like', requireAuth, express.json(), (req, res) => {
+  if (!getStmt.get(req.params.id)) return res.status(404).json({ error: 'not found' });
+  const liked = !!cafeLiked.get(req.params.id, req.user.id);
+  if (liked) cafeDeleteLike.run(req.params.id, req.user.id);
+  else cafeInsertLike.run(req.params.id, req.user.id);
+  res.json({ liked: !liked, likes: cafeLikeCount.get(req.params.id).n });
 });
 
 module.exports = router;

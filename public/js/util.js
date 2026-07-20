@@ -89,6 +89,7 @@ export function passesFilters(cafe, f) {
   if (f.rainOk && !cafe.rain_ok) return false;
   if (f.openNow && !isOpenNow(cafe)) return false;
   if (f.openLate && !opensLate(cafe)) return false;
+  if (f.liked && !cafe.liked) return false;
   if (f.sizes && f.sizes.size && !f.sizes.has(cafe.size)) return false;
   if (f.minOutlet && OUTLET_RANK[cafe.outlets] < OUTLET_RANK[f.minOutlet]) return false;
   if (f.maxPrice != null && cafe.iced_americano_price > f.maxPrice) return false;

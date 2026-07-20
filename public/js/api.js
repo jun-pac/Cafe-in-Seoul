@@ -76,6 +76,7 @@ export const api = {
       body: JSON.stringify({ url }),
     }).then(json),
 
+  likeCafe: (id) => fetch(`/api/cafes/${id}/like`, { method: 'POST' }).then(json),
   vote: (id, category, score) =>
     fetch(`/api/cafes/${id}/vote`, {
       method: 'POST',

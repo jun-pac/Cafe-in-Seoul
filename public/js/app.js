@@ -49,6 +49,7 @@ function readFilters() {
     rainOk: $('#f-rainok').checked,
     openNow: $('#f-opennow').checked,
     openLate: $('#f-openlate').checked,
+    liked: $('#f-liked').checked,
     sizes,
     minOutlet: $('#f-outlet').value || null,
     maxPrice: Number($('#f-price').value),
@@ -82,18 +83,24 @@ function applyFilters() {
   const showCafes = $('#show-cafes').checked;
   const showViews = $('#show-views').checked;
   const ids = new Set();
-  let cafeCount = 0;
+  let cafeCount = 0, viewCount = 0;
   if (showCafes) for (const c of state.cafes) if (passesFilters(c, f)) { ids.add(c.id); cafeCount++; }
-  if (showViews) for (const v of state.viewspots) ids.add(v.id);
+  if (showViews) for (const v of state.viewspots) if (!f.liked || v.liked) { ids.add(v.id); viewCount++; }
   map.setFiltered(ids);
-  $('#result-count').textContent = `${t('show.cafes')} ${cafeCount} · ${t('show.views')} ${showViews ? state.viewspots.length : 0}`;
+  $('#result-count').textContent = `${t('show.cafes.short')} ${cafeCount} · ${t('show.views.short')} ${viewCount}`;
   saveFilters();
 }
 
 function wireFilters() {
-  const ids = ['show-cafes', 'show-views', 'f-multifloor', 'f-view', 'f-rainok', 'f-opennow', 'f-openlate',
+  const ids = ['show-cafes', 'show-views', 'f-multifloor', 'f-view', 'f-rainok', 'f-opennow', 'f-openlate', 'f-liked',
     'f-size-small', 'f-size-medium', 'f-size-large', 'f-outlet'];
   ids.forEach((id) => $(`#${id}`).addEventListener('change', (e) => {
+    if (id === 'f-liked' && e.target.checked && !state.me.user) { // login-gated feature
+      e.target.checked = false;
+      alert(t('f.liked.loginNeeded'));
+      openAuthModal();
+      return;
+    }
     applyFilters();
     api.track('filter', id, e.target.type === 'checkbox' ? (e.target.checked ? 'on' : 'off') : e.target.value);
   }));
@@ -113,7 +120,7 @@ function wireFilters() {
   bindRange('f-restroom', 'f-restroom-val', ratingFmt);
 
   $('#f-reset').addEventListener('click', () => {
-    ['f-multifloor', 'f-view', 'f-rainok', 'f-opennow', 'f-openlate',
+    ['f-multifloor', 'f-view', 'f-rainok', 'f-opennow', 'f-openlate', 'f-liked',
      'f-size-small', 'f-size-medium', 'f-size-large'].forEach((id) => ($(`#${id}`).checked = false));
     $('#f-outlet').value = '';
     $('#f-price').value = 8000; $('#f-price').dispatchEvent(new Event('input'));
@@ -162,6 +169,7 @@ async function openDetail(id) {
     onAddReview: (fd) => handleAddReview(id, fd),
     onClose: closeDetail,
     onEdit: (action) => handleAdminEdit(id, cafe, action),
+    onLike: async () => { const r = await api.likeCafe(id); api.track('like', id, cafe.name); loadCafes(); return r; },
     onSetCover: (url) => handleSetCover(id, url),
     onDeleteStory: async (reviewId) => { await api.deleteReview(id, reviewId); await loadCafes(); await openDetail(id); },
     onEditStory: async (reviewId, fd) => { await api.updateReview(id, reviewId, fd); await loadCafes(); await openDetail(id); },
@@ -218,14 +226,14 @@ function handleViewEdit(id, spot) {
   });
 }
 async function handleViewDelete(id) {
-  if (!confirm('이 뷰 맛집을 삭제할까요?')) return;
+  if (!confirm('이 사진을 삭제할까요?')) return;
   try { await api.deleteViewspot(id); closeDetail(); await loadCafes(); }
   catch (e) { alert(e.message); }
 }
 function wireAddView() {
   $('#addViewBtn').innerHTML = `${icon('view', 15)}<span class="tb__label">${t('nav.addView')}</span>`;
   $('#addViewBtn').addEventListener('click', () => {
-    if (!state.me.user) { alert('뷰 맛집을 제안하려면 로그인이 필요합니다.'); return; }
+    if (!state.me.user) { alert('사진을 올리려면 로그인이 필요합니다.'); return; }
     openViewModal({
       mode: 'create',
       onSearch: (q) => api.viewSearch(q),

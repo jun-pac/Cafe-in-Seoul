@@ -60,28 +60,30 @@
         </div>
       </div>
 
-      <!-- Inline filter bar: essentials always visible; the rest under "상세" -->
+      <!-- Category toggles, promoted to the header so they're the first thing you see -->
+      <div id="cattoggle">
+        <label class="cattog"><input type="checkbox" id="show-cafes" checked><span data-i18n="show.cafes">주인장 추천 카페</span></label>
+        <label class="cattog cattog--view"><input type="checkbox" id="show-views" checked><span data-i18n="show.views">주인장이 찍은 사진</span></label>
+      </div>
+
+      <!-- Inline filter bar: essentials; the rest under "상세" (open by default) -->
       <div id="filterbar">
-        <div class="pilltogs">
-          <label class="pilltog"><input type="checkbox" id="show-cafes" checked><span data-i18n="show.cafes">카페</span></label>
-          <label class="pilltog pilltog--view"><input type="checkbox" id="show-views" checked><span data-i18n="show.views">뷰 맛집</span></label>
-        </div>
-        <span class="fbar__sep"></span>
         <label class="pilltog"><input type="checkbox" id="f-opennow" checked><span data-i18n="f.openNow.short">영업중</span></label>
-        <label class="pilltog tip"><input type="checkbox" id="f-multifloor"><span data-i18n="f.multiFloor.short" data-tip-i18n="def.floors">다층</span></label>
+        <label class="pilltog pilltog--like"><input type="checkbox" id="f-liked"><span data-i18n="f.liked">♥ 좋아요</span></label>
         <span class="fbar__sep"></span>
-        <label class="fbar__field fbar__field--price"><span data-i18n="f.price">가격</span>
+        <label class="fbar__field fbar__field--price"><span data-i18n="f.price">아아</span>
           <input type="range" id="f-price" class="fbar__range" min="3000" max="8000" step="100" value="8000">
           <b id="f-price-val" class="fbar__num"></b></label>
-        <button id="filterMore" class="fbar__more" aria-expanded="false">
+        <button id="filterMore" class="fbar__more" aria-expanded="true">
           <span data-i18n="filters.more">상세</span>
           <svg class="ic" width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="m6 9 6 6 6-6"/></svg>
         </button>
         <span class="fbar__result"><span data-i18n="result.shown">표시중</span> <b id="result-count">-</b></span>
       </div>
 
-      <!-- Advanced filters (collapsed by default) -->
-      <div id="filteradv" hidden>
+      <!-- Advanced filters (open by default so people find them) -->
+      <div id="filteradv">
+        <label class="pilltog tip"><input type="checkbox" id="f-multifloor"><span data-i18n="f.multiFloor.short" data-tip-i18n="def.floors">다층</span></label>
         <label class="pilltog tip"><input type="checkbox" id="f-openlate"><span data-i18n="f.openLate.short" data-tip-i18n="def.openLate">늦게까지</span></label>
         <label class="pilltog tip"><input type="checkbox" id="f-view"><span data-i18n="f.view.short" data-tip-i18n="def.view">뷰</span></label>
         <label class="pilltog tip"><input type="checkbox" id="f-rainok"><span data-i18n="f.rainOk.short" data-tip-i18n="def.rain_ok">우천시</span></label>

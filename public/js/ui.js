@@ -167,7 +167,7 @@ export function openLightbox(photos, start = 0) {
 }
 
 // ---- Detail panel ---------------------------------------------------------
-export function renderDetail(el, cafe, { user, onVote, onAddReview, onClose, onEdit, onSetCover, onDeleteStory, onEditStory }) {
+export function renderDetail(el, cafe, { user, onVote, onAddReview, onClose, onEdit, onSetCover, onDeleteStory, onEditStory, onLike }) {
   const openNow = isOpenNow(cafe);
   const floorTxt = cafe.multi_floor ? `${cafe.floors}${t('unit.floor')} · ${t('detail.multiFloor')}` : t('detail.singleFloor');
   const viewTxt = cafe.has_view ? (cafe.view_note ? `${t('detail.viewGood')} · ${esc(cafe.view_note)}` : t('detail.viewGood')) : t('detail.viewMeh');
@@ -188,6 +188,7 @@ export function renderDetail(el, cafe, { user, onVote, onAddReview, onClose, onE
         <div class="detail__addr">${esc(cafe.address || '')}</div>
         ${cafe.status === 'pending' ? `<div class="detail__pending">${icon('shield', 14)} ${t('detail.pending')} <span class="muted">${cafe.moderation_reason ? '- ' + esc(cafe.moderation_reason) : ''}</span></div>` : ''}
         ${user?.isAdmin ? `<div class="detail__adminrow"><button class="btn btn--ghost sm" id="editCafeBtn">${icon('edit', 14)} ${t('detail.edit')}</button>${cafe.status === 'pending' ? `<button class="btn btn--primary sm" id="approveCafeBtn">${t('detail.approve')}</button>` : ''}<button class="btn btn--ghost sm btn--danger" id="removeCafeBtn">${icon('minus', 14)} ${t('detail.remove')}</button></div>` : ''}
+        <button type="button" class="like-btn ${cafe.liked ? 'is-liked' : ''}" id="cLike">${icon('thumbsUp', 15)} <span id="cLikeN">${cafe.likes || 0}</span></button>
 
         <div class="detail__hoursrow">
           <button class="detail__hours ${openNow ? 'is-open' : 'is-closed'}" id="hoursToggle" ${weeklyHours(cafe) ? '' : 'disabled'}>
@@ -235,6 +236,13 @@ export function renderDetail(el, cafe, { user, onVote, onAddReview, onClose, onE
   el.querySelector('#removeCafeBtn')?.addEventListener('click', () => {
     if (confirm(`'${cafe.name}'${t('detail.removeAsk')}`)) onEdit?.('remove');
   });
+  const cLike = el.querySelector('#cLike');
+  if (cLike) cLike.onclick = async () => {
+    if (!user) return alert(t('vote.loginNeeded'));
+    if (!onLike) return;
+    try { const r = await onLike(); cLike.classList.toggle('is-liked', r.liked); el.querySelector('#cLikeN').textContent = r.likes; }
+    catch (e) { alert(e.message); }
+  };
   el.querySelector('#hoursToggle')?.addEventListener('click', () => {
     const w = el.querySelector('#weekHours'); if (w) w.hidden = !w.hidden;
   });

@@ -220,6 +220,13 @@ db.exec(`CREATE TABLE IF NOT EXISTS viewspot_likes (
   created_at  TEXT NOT NULL DEFAULT (datetime('now')),
   PRIMARY KEY (viewspot_id, user_id)
 )`);
+// 따봉(likes) on cafes too — powers the "♥ 좋아요" filter
+db.exec(`CREATE TABLE IF NOT EXISTS cafe_likes (
+  cafe_id    TEXT NOT NULL,
+  user_id    TEXT NOT NULL,
+  created_at TEXT NOT NULL DEFAULT (datetime('now')),
+  PRIMARY KEY (cafe_id, user_id)
+)`);
 
 // --- safety net: timestamped DB backups (keep last 60) ---
 // So no operation is ever irreversible: if data is lost, restore from data/backups/.
