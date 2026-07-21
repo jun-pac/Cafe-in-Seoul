@@ -39,8 +39,25 @@ const many = (sql, ...a) => db.prepare(sql).all(...a);
 const HUMAN = `is_bot = 0 AND is_admin = 0`;
 
 function analytics(day = new Date().toISOString().slice(0, 10)) {
+  // Build each visitor's journey (ordered actions) so you can see what a real person did —
+  // a real user has a varied trail (open cafe → filter → open view …), a bot has just pageviews.
+  const humanEvents = many(`SELECT session_id, user_id, type, label, ip, country, ua, datetime(ts,'+9 hours') AS ts
+    FROM events WHERE day=? AND ${HUMAN} ORDER BY id`, day);
+  const smap = new Map();
+  for (const e of humanEvents) {
+    let s = smap.get(e.session_id);
+    if (!s) { s = { session_id: e.session_id, ip: e.ip, country: e.country, ua: e.ua, user_id: e.user_id, first_seen: e.ts, last_seen: e.ts, events: 0, pageviews: 0, trail: [] }; smap.set(e.session_id, s); }
+    s.last_seen = e.ts; s.events++;
+    if (e.type === 'pageview') s.pageviews++;
+    else if (s.trail.length < 40) s.trail.push({ type: e.type, label: e.label, ts: e.ts });
+    if (e.user_id) s.user_id = e.user_id;
+    if (e.ip) s.ip = e.ip;
+  }
+  const sessions = [...smap.values()].sort((a, b) => b.events - a.events).slice(0, 40);
+
   return {
     day,
+    sessions, // per-visitor with action trail (see above)
     // headline numbers for TODAY
     today: {
       visitors: one(`SELECT COUNT(DISTINCT session_id) AS n FROM events WHERE day=? AND type='pageview' AND ${HUMAN}`, day).n,
@@ -53,15 +70,6 @@ function analytics(day = new Date().toISOString().slice(0, 10)) {
     topCafes: many(`SELECT label, COUNT(*) AS n FROM events WHERE day=? AND type='open_cafe' AND ${HUMAN} GROUP BY label ORDER BY n DESC LIMIT 12`, day),
     topViews: many(`SELECT label, COUNT(*) AS n FROM events WHERE day=? AND type='open_view' AND ${HUMAN} GROUP BY label ORDER BY n DESC LIMIT 12`, day),
     topSearches: many(`SELECT label, COUNT(*) AS n FROM events WHERE day=? AND type='search' AND ${HUMAN} AND label IS NOT NULL GROUP BY label ORDER BY n DESC LIMIT 12`, day),
-    // per-visitor sessions today: how many did each session do, where from (spot one-person vs many)
-    sessions: many(`SELECT session_id,
-        datetime(MIN(ts),'+9 hours') AS first_seen, datetime(MAX(ts),'+9 hours') AS last_seen,
-        COUNT(*) AS events,
-        SUM(CASE WHEN type='pageview' THEN 1 ELSE 0 END) AS pageviews,
-        MAX(ip) AS ip, MAX(country) AS country, MAX(ua) AS ua,
-        MAX(user_id) AS user_id
-      FROM events WHERE day=? AND ${HUMAN}
-      GROUP BY session_id ORDER BY events DESC LIMIT 40`, day),
     // recent raw feed (all, incl. bots, so nothing is hidden)
     recent: many(`SELECT datetime(ts,'+9 hours') AS ts, type, label, target, ip, country, is_bot, is_admin, session_id, user_id
       FROM events WHERE day=? ORDER BY id DESC LIMIT 60`, day),

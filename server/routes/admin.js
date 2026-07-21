@@ -127,9 +127,27 @@ router.get('/insights', requireAdmin, (req, res) => {
       total: one('SELECT COALESCE(SUM(n), 0) AS t FROM daily_visits').t,
       days: many('SELECT day, n FROM daily_visits ORDER BY day DESC LIMIT 14'),
     },
-    recentReviews: many(`SELECT r.body, r.created_at, u.name AS user_name, c.name AS cafe_name
+    recentReviews: many(`SELECT r.body, datetime(r.created_at,'+9 hours') AS created_at, u.name AS user_name, c.name AS cafe_name
       FROM reviews r JOIN users u ON u.id = r.user_id JOIN cafes c ON c.id = r.cafe_id
       ORDER BY r.created_at DESC LIMIT 15`),
+    // "무엇이 새로 추가됐나" — 스토리·댓글·새 장소를 한 피드로 (시간 KST)
+    recentContent: [
+      ...many(`SELECT 'story' AS kind, datetime(r.created_at,'+9 hours') AS at, u.name AS who, c.name AS place, r.body AS text
+        FROM reviews r JOIN users u ON u.id=r.user_id JOIN cafes c ON c.id=r.cafe_id ORDER BY r.created_at DESC LIMIT 15`),
+      ...many(`SELECT 'comment' AS kind, datetime(c.created_at,'+9 hours') AS at, u.name AS who, v.name AS place, c.body AS text
+        FROM viewspot_comments c JOIN users u ON u.id=c.user_id JOIN viewspots v ON v.id=c.viewspot_id ORDER BY c.created_at DESC LIMIT 15`),
+      ...many(`SELECT 'cafe' AS kind, datetime(created_at,'+9 hours') AS at, NULL AS who, name AS place, NULL AS text
+        FROM cafes WHERE status!='rejected' ORDER BY created_at DESC LIMIT 8`),
+      ...many(`SELECT 'view' AS kind, datetime(created_at,'+9 hours') AS at, NULL AS who, name AS place, NULL AS text
+        FROM viewspots WHERE status!='rejected' ORDER BY created_at DESC LIMIT 8`),
+    ].sort((a, b) => (a.at < b.at ? 1 : -1)).slice(0, 30),
+    // 명소 사진은 타임스탬프가 없어 rowid(입력순)로 최근순
+    recentPhotos: many(`SELECT v.name AS place, u.name AS uploader, vp.url
+      FROM viewspot_photos vp JOIN viewspots v ON v.id=vp.viewspot_id LEFT JOIN users u ON u.id=vp.created_by
+      ORDER BY vp.rowid DESC LIMIT 12`),
+    // 모든 카페의 카공총평 — 아직 AI 초안 그대로인지 사람이 훑어보며 확인용
+    studyReviews: many(`SELECT id, name, study_review, datetime(created_at,'+9 hours') AS created
+      FROM cafes WHERE status!='rejected' AND trim(coalesce(study_review,''))!='' ORDER BY created_at DESC`),
   });
 });
 

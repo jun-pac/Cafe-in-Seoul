@@ -1,7 +1,7 @@
 import { declutter, CARD_W, CARD_H } from './declutter.js';
 import { esc, img, thumb } from './util.js';
 import { icon } from './icons.js';
-import { L } from './i18n.js';
+import { L, t } from './i18n.js';
 
 // Minimal light OSM basemap: CARTO Positron (light_all) raster tiles - clean,
 // airy grayscale. No API key required.
@@ -65,7 +65,7 @@ export function initMap(containerId, { onCardClick }) {
     const el = document.createElement('div');
     el.className = 'cafe-card' + (kind === 'view' ? ' cafe-card--view' : '');
     const scoreHtml = kind === 'view'
-      ? `<span class="cafe-card__tag">명소</span><span class="cafe-card__likes" title="따봉">${icon('thumbsUp', 10)} <b>${item.likes || 0}</b></span>`
+      ? `<span class="cafe-card__tag">${t('card.viewTag')}</span><span class="cafe-card__likes" title="따봉">${icon('thumbsUp', 10)} <b>${item.likes || 0}</b></span>`
       : `<span class="cafe-card__score" title="카공 종합점수 (0-100): 다층·콘센트·면적·뷰·영업시간 + 집단지성 투표">${item.score}</span><span class="cafe-card__likes" title="따봉">${icon('thumbsUp', 10)} <b>${item.likes || 0}</b></span>`;
     el.innerHTML = `
       <div class="cafe-card__photo" style="background-image:url('${esc(img(thumb(item.photo_url)))}')">
@@ -106,6 +106,8 @@ export function initMap(containerId, { onCardClick }) {
         if (sc) sc.textContent = item.score;
         const lk = existing.el.querySelector('.cafe-card__likes b');
         if (lk) lk.textContent = item.likes || 0;
+        const tag = existing.el.querySelector('.cafe-card__tag');
+        if (tag) tag.textContent = t('card.viewTag'); // keep VIEW/명소 in the current language
         // reflect edits to the representative photo / name without a full reload
         existing.el.querySelector('.cafe-card__photo').style.backgroundImage = `url('${esc(img(thumb(item.photo_url)))}')`;
         existing.el.querySelector('.cafe-card__name').textContent = L(item, 'name');

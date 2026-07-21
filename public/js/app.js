@@ -2,7 +2,7 @@ import { api } from './api.js';
 import { initMap } from './map.js';
 import { renderAuth, renderDetail, openAddCafeModal, openEditCafeModal, renderPendingQueue, initChat,
   renderViewDetail, openViewModal } from './ui.js';
-import { passesFilters, esc } from './util.js';
+import { passesFilters, esc, img, thumb } from './util.js';
 import { icon } from './icons.js';
 import { t, getLang, setLang, onLangChange, applyStaticI18n } from './i18n.js';
 
@@ -435,10 +435,20 @@ async function openInsightsModal() {
       ${a.topCafes.length ? `<h4 class="in-h4">${ko ? '많이 본 카페' : 'Top cafes'}</h4><div class="in-list">${a.topCafes.map((x) => row(x.label || '?', x.n)).join('')}</div>` : ''}
       ${a.topViews.length ? `<h4 class="in-h4">${ko ? '많이 본 명소' : 'Top views'}</h4><div class="in-list">${a.topViews.map((x) => row(x.label || '?', x.n)).join('')}</div>` : ''}
       ${a.topSearches.length ? `<h4 class="in-h4">${ko ? '검색어' : 'Searches'}</h4><div class="in-list">${a.topSearches.map((x) => row(x.label || '?', x.n)).join('')}</div>` : ''}
-      <h4 class="in-h4">${ko ? '방문자별 (한 명 vs 여러 명 구분)' : 'Per visitor'} <small class="muted">${a.sessions.length}</small></h4>
-      <div class="in-list">${a.sessions.length ? a.sessions.map((s) => `<div class="in-row"><b>${esc(s.country || '?')} · ${esc(s.ip || '?')}</b>${s.user_id ? ' <span class="admin-badge">로그인</span>' : ''} <span class="muted">${s.pageviews}pv · ${s.events}${ko ? '행동' : 'ev'}</span><span class="in-when">${hhmm(s.first_seen)}–${hhmm(s.last_seen)}</span></div>`).join('') : `<p class="muted">${ko ? '없음' : 'none'}</p>`}</div>
+      <h4 class="in-h4">${ko ? '방문자별 여정 (진짜 사람 vs 봇)' : 'Per-visitor journeys'} <small class="muted">${a.sessions.length}</small></h4>
+      <div class="in-list">${a.sessions.length ? a.sessions.map((s) => `<div class="in-session"><div class="in-srow"><b>${esc(s.country || '?')} · ${esc(s.ip || '?')}</b>${s.user_id ? ' <span class="admin-badge">로그인</span>' : ''} <span class="muted">${s.pageviews}pv · ${s.events}${ko ? '행동' : 'ev'}</span><span class="in-when">${hhmm(s.first_seen)}–${hhmm(s.last_seen)}</span></div>${s.trail && s.trail.length ? `<div class="in-trail">${s.trail.map((tr) => `<span class="in-step">${esc(A[tr.type] || tr.type)}${tr.label ? ` <i>${esc(tr.label)}</i>` : ''}</span>`).join('<b class="in-arrow">›</b>')}</div>` : `<div class="in-trail is-empty">${ko ? '(둘러보기만)' : '(just browsed)'}</div>`}</div>`).join('') : `<p class="muted">${ko ? '없음' : 'none'}</p>`}</div>
+
+      <h4 class="in-h4">${ko ? '새로 추가된 것' : 'Newly added'}</h4>
+      <div class="in-list in-feed">${d.recentContent && d.recentContent.length ? d.recentContent.map((c) => { const kl = ({ story: ko ? '스토리' : 'Story', comment: ko ? '댓글' : 'Comment', cafe: ko ? '새 카페' : 'New cafe', view: ko ? '새 명소' : 'New view' })[c.kind] || c.kind; return `<div class="in-row"><span class="ev-type">${kl}</span> ${c.who ? `<b>${esc(c.who)}</b> ` : ''}<span class="muted">${esc(c.place || '')}</span>${c.text ? `<div class="in-body muted">${esc((c.text || '').slice(0, 70))}</div>` : ''}<span class="in-when">${esc((c.at || '').slice(5, 16))}</span></div>`; }).join('') : `<p class="muted">${ko ? '없음' : 'none'}</p>`}</div>
+
+      ${d.recentPhotos && d.recentPhotos.length ? `<h4 class="in-h4">${ko ? '최근 명소 사진' : 'Recent view photos'}</h4><div class="in-photos">${d.recentPhotos.map((p) => `<a href="${esc(img(p.url))}" target="_blank" rel="noopener" class="in-photo" style="background-image:url('${esc(img(thumb(p.url)))}')" title="${esc(p.place || '')} · ${esc(p.uploader || '')}"></a>`).join('')}</div>` : ''}
+
       <h4 class="in-h4">${ko ? '최근 활동 (실시간)' : 'Recent activity'}</h4>
-      <div class="in-list in-feed">${a.recent.length ? a.recent.map((e) => `<div class="in-row ${e.is_bot ? 'is-bot' : ''}"><span class="ev-type">${esc(e.type)}</span> <span class="muted">${esc(e.label || e.target || '')}</span><span class="in-when">${hhmm(e.ts)} ${esc(e.country || '')}${e.is_bot ? ' 🤖' : ''}${e.is_admin ? ' 👑' : ''}</span></div>`).join('') : `<p class="muted">${ko ? '없음' : 'none'}</p>`}</div>
+      <div class="in-list in-feed">${a.recent.length ? a.recent.map((e) => `<div class="in-row ${e.is_bot ? 'is-bot' : ''}"><span class="ev-type">${esc(e.type)}</span> <span class="muted">${esc(e.label || e.target || '')}</span><span class="in-when">${hhmm(e.ts)} ${esc(e.country || '')}${e.is_bot ? (ko ? ' ·봇' : ' ·bot') : ''}${e.is_admin ? (ko ? ' ·관리자' : ' ·admin') : ''}</span></div>`).join('') : `<p class="muted">${ko ? '없음' : 'none'}</p>`}</div>
+
+      <h4 class="in-h4">${ko ? '카공총평 검토 (AI 초안 확인용)' : 'Study reviews'} <small class="muted">${d.studyReviews ? d.studyReviews.length : 0}</small></h4>
+      <div class="in-list in-feed">${d.studyReviews && d.studyReviews.length ? d.studyReviews.map((c) => `<div class="in-row"><b>${esc(c.name)}</b><div class="in-body muted">${esc((c.study_review || '').slice(0, 140))}</div></div>`).join('') : `<p class="muted">${ko ? '없음' : 'none'}</p>`}</div>
+
       <h4 class="in-h4">${ko ? '가입 유저' : 'Signups'}</h4>
       <div class="in-list">${d.users.recent.map((u) => `<div class="in-row"><b>${esc(u.name || u.provider_id)}</b>${u.is_admin ? ' <span class="admin-badge">ADMIN</span>' : ''} <span class="muted">${esc(u.provider)}</span><span class="in-when">${esc((u.created_at || '').slice(0, 10))}</span></div>`).join('')}</div>`;
   } catch (e) { back.querySelector('#inBody').innerHTML = `<p class="err">${esc(e.message)}</p>`; }

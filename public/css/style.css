@@ -157,6 +157,18 @@ b { font-weight: 700; }
 .in-feed { max-height: 260px; overflow-y: auto; }
 .in-feed .ev-type { font-weight: 700; font-size: 11px; padding: 1px 6px; border-radius: var(--pill); background: var(--cool); color: var(--ink); }
 .in-row.is-bot { opacity: .5; }
+/* per-visitor journey (session + its action trail) */
+.in-session { padding: 7px 0; border-top: 1px solid var(--hair); }
+.in-session:first-child { border-top: 0; }
+.in-srow { display: flex; flex-wrap: wrap; align-items: baseline; gap: 6px; font-size: 12.5px; }
+.in-trail { margin-top: 4px; display: flex; flex-wrap: wrap; align-items: center; gap: 3px 4px; font-size: 11px; color: var(--ink-2); }
+.in-trail.is-empty { color: var(--mute); font-style: italic; }
+.in-step { background: var(--cool); border-radius: var(--r-sm); padding: 1px 6px; white-space: nowrap; }
+.in-step i { color: var(--ink); font-style: normal; }
+.in-arrow { color: var(--mute); font-weight: 400; }
+/* recent view-spot photo thumbnails */
+.in-photos { display: flex; flex-wrap: wrap; gap: 6px; }
+.in-photo { width: 62px; height: 62px; border-radius: var(--r-sm); background-size: cover; background-position: center; border: 1px solid var(--hair-strong); }
 .in-body { flex-basis: 100%; font-size: 11.5px; line-height: 1.4; }
 .modal--insights .admin-badge { font-size: 8px; padding: 0 4px; }
 
