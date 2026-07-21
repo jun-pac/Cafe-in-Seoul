@@ -197,7 +197,15 @@ const DICT = {
   },
 };
 
-let lang = (typeof localStorage !== 'undefined' && localStorage.getItem('lang')) || 'ko';
+// language priority: ?lang= in the URL (shareable EN link, e.g. cafe-in-seoul.com/?lang=en)
+// > saved preference > Korean default. A URL choice is remembered so the toggle stays in sync.
+let lang = (() => {
+  try {
+    const q = new URLSearchParams(location.search).get('lang');
+    if (q && DICT[q]) { try { localStorage.setItem('lang', q); } catch { /* ignore */ } return q; }
+  } catch { /* no location (e.g. tests) */ }
+  return (typeof localStorage !== 'undefined' && localStorage.getItem('lang')) || 'ko';
+})();
 const listeners = [];
 
 export function getLang() { return lang; }
