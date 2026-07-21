@@ -208,6 +208,19 @@ let lang = (() => {
 })();
 const listeners = [];
 
+// keep ?lang= in the address bar always matching the current language (no reload), so any URL
+// the user copies reflects what they're actually seeing.
+function syncLangUrl() {
+  try {
+    const u = new URL(location.href);
+    if (u.searchParams.get('lang') !== lang) {
+      u.searchParams.set('lang', lang);
+      history.replaceState(null, '', u.pathname + u.search + u.hash);
+    }
+  } catch { /* no location/history (e.g. tests) */ }
+}
+syncLangUrl(); // reflect the initial language in the URL on load
+
 export function getLang() { return lang; }
 export function t(key) { return (DICT[lang] && DICT[lang][key]) ?? DICT.ko[key] ?? key; }
 export function onLangChange(cb) { listeners.push(cb); }
@@ -215,6 +228,7 @@ export function setLang(l) {
   lang = DICT[l] ? l : 'ko';
   try { localStorage.setItem('lang', lang); } catch { /* ignore */ }
   if (typeof document !== 'undefined') document.documentElement.lang = lang;
+  syncLangUrl();
   listeners.forEach((cb) => cb(lang));
 }
 // apply to static elements: <x data-i18n="key"> textContent, [data-i18n-ph] placeholder
