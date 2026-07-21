@@ -141,8 +141,8 @@ router.post('/', requireAuth, upload.array('photos', 30), async (req, res) => {
   })();
   if (!admin) {
     sendAdminAlert(
-      `[Cafe in Seoul] 새 사진 스팟 제안: ${name}`,
-      `${req.user.name || req.user.id} 님이 사진 스팟을 제안했습니다.\n\n이름: ${name}\n좌표: ${lat}, ${lng}\n\n관리자로 로그인해 심사 대기열에서 승인/거절하세요:\n${process.env.BASE_URL || ''}`
+      `[Cafe in Seoul] 새 명소 제안: ${name}`,
+      `${req.user.name || req.user.id} 님이 명소를 제안했습니다.\n\n이름: ${name}\n좌표: ${lat}, ${lng}\n\n관리자로 로그인해 심사 대기열에서 승인/거절하세요:\n${process.env.BASE_URL || ''}`
     ).catch(() => {});
   }
   i18nContent.translateViewspot(id).catch(() => {}); // fill name_en in the background

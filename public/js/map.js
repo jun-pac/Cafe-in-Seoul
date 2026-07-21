@@ -65,7 +65,7 @@ export function initMap(containerId, { onCardClick }) {
     const el = document.createElement('div');
     el.className = 'cafe-card' + (kind === 'view' ? ' cafe-card--view' : '');
     const scoreHtml = kind === 'view'
-      ? `<span class="cafe-card__tag">사진</span><span class="cafe-card__likes" title="따봉">${icon('thumbsUp', 10)} <b>${item.likes || 0}</b></span>`
+      ? `<span class="cafe-card__tag">명소</span><span class="cafe-card__likes" title="따봉">${icon('thumbsUp', 10)} <b>${item.likes || 0}</b></span>`
       : `<span class="cafe-card__score" title="카공 종합점수 (0-100): 다층·콘센트·면적·뷰·영업시간 + 집단지성 투표">${item.score}</span><span class="cafe-card__likes" title="따봉">${icon('thumbsUp', 10)} <b>${item.likes || 0}</b></span>`;
     el.innerHTML = `
       <div class="cafe-card__photo" style="background-image:url('${esc(img(thumb(item.photo_url)))}')">
