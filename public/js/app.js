@@ -62,8 +62,8 @@ const FILTER_IDS = ['show-cafes', 'show-views', 'f-multifloor', 'f-view', 'f-rai
   'f-size', 'f-outlet',
   'f-price', 'f-quiet', 'f-coffee', 'f-restroom'];
 
-// bump when a filter's range/meaning changes so stale saved values are dropped, not misread
-// (v2: f-price max 8000→12000, top position now means "no cap")
+// bump when a filter's range/meaning changes so stale saved values are dropped, not misread.
+// v2: f-price top position now means "no cap" (real caps 3000–7000원, slider end = 제한없음).
 const FILTER_VERSION = 2;
 function saveFilters() {
   const s = { _v: FILTER_VERSION };
