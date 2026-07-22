@@ -95,7 +95,9 @@ app.use(express.static(path.join(__dirname, '..', 'public'), {
   // revalidate code assets so a code update is never masked by a stale browser cache
   // (ETag → cheap 304 when unchanged); images/fonts still cache normally
   setHeaders: (res, filePath) => {
-    if (/\.(js|css|html)$/.test(filePath)) res.setHeader('Cache-Control', 'no-cache');
+    // no-store so Cloudflare/browsers never serve a stale build (a Browser-Cache-TTL
+    // override was masking code updates); images/fonts still cache via maxAge above
+    if (/\.(js|css|html)$/.test(filePath)) res.setHeader('Cache-Control', 'no-store');
   },
 }));
 
