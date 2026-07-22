@@ -17,7 +17,7 @@ function stars(avg) {
 }
 
 // ---- Auth bar -------------------------------------------------------------
-export function renderAuth(el, me, { onLogout, onGoogleCredential, onLocalLogin, onRegister, onEditName }) {
+export function renderAuth(el, me, { onLogout, onGoogleCredential, onLocalLogin, onRegister, onEditName, onScoreWeights }) {
   el.innerHTML = '';
   // contact-the-operator link, shown at the bottom of the auth popover either way
   const contactEl = () => {
@@ -36,6 +36,14 @@ export function renderAuth(el, me, { onLogout, onGoogleCredential, onLocalLogin,
     wrap.querySelector('#logoutBtn').onclick = onLogout;
     wrap.querySelector('#editNameBtn').onclick = onEditName;
     el.appendChild(wrap);
+    if (onScoreWeights) {
+      const sw = document.createElement('button');
+      sw.type = 'button';
+      sw.className = 'authbar__link';
+      sw.innerHTML = `${icon('info', 13)} ${t('detail.scoreAdjust')}`;
+      sw.onclick = onScoreWeights;
+      el.appendChild(sw);
+    }
     el.appendChild(contactEl());
     return;
   }

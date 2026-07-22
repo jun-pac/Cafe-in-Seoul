@@ -396,6 +396,7 @@ function openAuthModal() {
     onLocalLogin: async (u, p) => { await api.login(u, p); await done(); },
     onRegister: async (u, p) => { await api.register(u, p); await done(); },
     onLogout: async () => { await api.logout(); await done(); },
+    onScoreWeights: () => { close(); openScoreWeightsModal(); },
     onEditName: async () => {
       const name = prompt('표시할 닉네임을 입력하세요', state.me.user?.name || '');
       if (name == null || !name.trim()) return;
