@@ -280,16 +280,17 @@ export function renderDetail(el, cafe, { user, onVote, onAddReview, onClose, onE
         </div>
 
         ${(() => {
-          const bd = scoreBreakdown(cafe), w = bd.weights;
+          const bd = scoreBreakdown(cafe);
           const bar = (p, m) => `<span class="sb-bar"><i style="width:${m ? Math.max(0, Math.min(100, p / m * 100)) : 0}%"></i></span>`;
-          const vrow = (key, wt, avg) => `<div class="sb-row"><span class="sb-l">${t('vote.' + key)} <b class="sb-w">×${wt}</b></span>${bar(((avg ?? 3) - 1) / 4 * 100, 100)}<span class="sb-v">${avg != null ? avg.toFixed(1) : '–'}<small>/5</small></span></div>`;
+          const prow = (label, wt, p) => `<div class="sb-row"><span class="sb-l">${label}${wt != null ? ` <b class="sb-w">×${wt}</b>` : ''}</span>${bar(p.points, p.max)}<span class="sb-v">${p.points}<small>/${p.max}</small></span></div>`;
           return `<details class="scorebox">
             <summary><span class="sb-total">${bd.total}</span> <span class="muted">${t('detail.scoreWhy')}</span>${isCustomized() ? `<span class="sb-custom">${t('detail.scoreCustom')}</span>` : ''}</summary>
             <div class="sb-body">
-              <div class="sb-half">${t('detail.scoreFields')} <b>${bd.discrete}</b>/50</div>
-              ${bd.parts.map((p) => `<div class="sb-row"><span class="sb-l">${t(SCORE_LABELS[p.key] || p.key)} <b class="sb-w">${p.max}</b></span>${bar(p.points, p.max)}<span class="sb-v">${p.points}</span></div>`).join('')}
-              <div class="sb-half">${t('detail.scoreVotes')} <b>${bd.crowd}</b>/50</div>
-              ${vrow('quiet', w.quiet, bd.votes.quiet)}${vrow('coffee', w.coffee, bd.votes.coffee)}${vrow('restroom', w.restroom, bd.votes.restroom)}
+              <div class="sb-formula">${t('detail.scoreFormula')}</div>
+              <div class="sb-half">① ${t('detail.scoreFields')} <b>${bd.objective}</b> / 50</div>
+              ${bd.parts.map((p) => prow(t(SCORE_LABELS[p.key] || p.key), null, p)).join('')}
+              <div class="sb-half">② ${t('detail.scoreVotes')} <b>${bd.crowd}</b> / 50</div>
+              ${bd.crowdParts.map((p) => prow(t('vote.' + p.key), p.weight, p)).join('')}
               ${user ? `<button type="button" class="btn btn--ghost sm sb-edit" id="scoreWeightsBtn">${icon('info', 13)} ${t('detail.scoreAdjust')}</button>` : `<div class="muted sb-hint">${t('detail.scoreLoginHint')}</div>`}
             </div>
           </details>`;

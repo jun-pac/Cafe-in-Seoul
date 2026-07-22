@@ -472,20 +472,30 @@ function openScoreWeightsModal() {
   back.className = 'modal-back';
   const sliders = (half) => WEIGHT_META.filter((m) => m.half === half).map((m) => `
     <label class="sw-row"><span class="sw-l">${ko ? m.label : m.labelEn}</span>
-      <input type="range" class="sw-range" data-key="${m.key}" min="0" max="${m.max}" step="1" value="${w[m.key]}">
-      <b class="sw-v" data-for="${m.key}">${w[m.key]}</b></label>`).join('');
-  back.innerHTML = `<div class="modal modal--weights"><div class="modal__head"><h2>${ko ? '내 점수 가중치' : 'My score weights'}</h2><button class="detail__close" id="swClose">${icon('x', 16)}</button></div>
+      <input type="range" class="sw-range" data-key="${m.key}" data-half="${m.half}" min="0" max="${m.max}" step="1" value="${w[m.key]}">
+      <b class="sw-pct" data-for="${m.key}"></b></label>`).join('');
+  back.innerHTML = `<div class="modal modal--weights"><div class="modal__head"><h2>${ko ? '카공 점수 가중치' : 'Study-score weights'}</h2><button class="detail__close" id="swClose">${icon('x', 16)}</button></div>
     <div class="sw-body">
-      <p class="muted sw-note">${ko ? '나에게만 적용되고 다른 사람에겐 공유되지 않아요. 값이 클수록 그 요소가 점수에 크게 반영됩니다.' : 'Applies only to you — never shared. Higher = that factor counts more.'}</p>
-      <div class="sw-half">${ko ? '객관 필드 (합 50 기준)' : 'Facts (out of ~50)'}</div>${sliders('field')}
-      <div class="sw-half">${ko ? '집단지성 투표 (상대 가중치)' : 'Crowd votes (relative)'}</div>${sliders('vote')}
+      <div class="sb-formula">${t('detail.scoreFormula')}</div>
+      <p class="muted sw-note">${ko ? '나에게만 적용 · 남에겐 공유 안 됨. 각 요소가 그 절반(50점)에서 차지하는 비중(%)을 정합니다.' : 'Only you, never shared. Sets each factor’s share (%) of its 50-pt half.'}</p>
+      <div class="sw-half">① ${ko ? '객관 필드 — 50점 배분' : 'Facts — split of 50'}</div>${sliders('field')}
+      <div class="sw-half">② ${ko ? '집단지성 투표 — 50점 배분' : 'Crowd votes — split of 50'}</div>${sliders('vote')}
       <div class="modal__foot"><button class="btn btn--ghost sm" id="swReset">${ko ? '기본값으로' : 'Reset'}</button><button class="btn btn--primary" id="swSave">${ko ? '적용' : 'Apply'}</button></div>
     </div></div>`;
   document.body.appendChild(back);
   const close = () => back.remove();
   back.querySelector('#swClose').onclick = close;
   back.addEventListener('mousedown', (e) => { if (e.target === back) close(); });
-  back.querySelectorAll('.sw-range').forEach((r) => r.addEventListener('input', () => { back.querySelector(`.sw-v[data-for="${r.dataset.key}"]`).textContent = r.value; }));
+  const updatePct = () => { // show each factor's % of its 50-pt half (the actual point weighting)
+    const sums = { field: 0, vote: 0 };
+    back.querySelectorAll('.sw-range').forEach((r) => { sums[r.dataset.half] += Number(r.value); });
+    back.querySelectorAll('.sw-range').forEach((r) => {
+      const tot = sums[r.dataset.half];
+      back.querySelector(`.sw-pct[data-for="${r.dataset.key}"]`).textContent = tot ? `${Math.round(Number(r.value) / tot * 50)}점` : '0점';
+    });
+  };
+  back.querySelectorAll('.sw-range').forEach((r) => r.addEventListener('input', updatePct));
+  updatePct();
   const collect = () => { const nw = {}; back.querySelectorAll('.sw-range').forEach((r) => { nw[r.dataset.key] = Number(r.value); }); return nw; };
   const applyAndReload = async () => {
     rescoreCafes(state.cafes); map.setCafes(state.cafes); applyFilters();
