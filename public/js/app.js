@@ -3,6 +3,7 @@ import { initMap } from './map.js';
 import { renderAuth, renderDetail, openAddCafeModal, openEditCafeModal, renderPendingQueue, initChat,
   renderViewDetail, openViewModal } from './ui.js';
 import { passesFilters, esc, img, thumb } from './util.js';
+import { getWeights, setWeights, resetWeights, computeScore, isCustomized, DEFAULT_WEIGHTS, WEIGHT_META } from './score.js';
 import { icon } from './icons.js';
 import { t, getLang, setLang, onLangChange, applyStaticI18n } from './i18n.js';
 
@@ -131,12 +132,19 @@ function wireFilters() {
 // ---------- data ----------
 async function loadCafes() {
   const [cafes, views] = await Promise.all([api.listCafes(), api.listViewspots()]);
+  rescoreCafes(cafes);   // apply the user's score weights (default → same as server)
   state.cafes = cafes;
   state.viewspots = views;
   map.setCafes(cafes);
   map.setViewspots(views);
   applyFilters();
   await refreshPendingQueue();
+}
+
+// recompute each cafe's study score with the user's weights; the map card + declutter use it
+function rescoreCafes(cafes) {
+  const w = getWeights();
+  for (const c of cafes) c.score = computeScore(c, w);
 }
 
 async function refreshPendingQueue() {
@@ -166,6 +174,7 @@ async function openDetail(id) {
     onAddReview: (fd) => handleAddReview(id, fd),
     onClose: closeDetail,
     onEdit: (action) => handleAdminEdit(id, cafe, action),
+    onScoreWeights: () => openScoreWeightsModal(),
     onLike: async () => { const r = await api.likeCafe(id); api.track('like', id, cafe.name); loadCafes(); return r; },
     onSetCover: (url) => handleSetCover(id, url),
     onDeleteStory: async (reviewId) => { await api.deleteReview(id, reviewId); await loadCafes(); await openDetail(id); },
@@ -452,6 +461,38 @@ async function openInsightsModal() {
       <h4 class="in-h4">${ko ? '가입 유저' : 'Signups'}</h4>
       <div class="in-list">${d.users.recent.map((u) => `<div class="in-row"><b>${esc(u.name || u.provider_id)}</b>${u.is_admin ? ' <span class="admin-badge">ADMIN</span>' : ''} <span class="muted">${esc(u.provider)}</span><span class="in-when">${esc((u.created_at || '').slice(0, 10))}</span></div>`).join('')}</div>`;
   } catch (e) { back.querySelector('#inBody').innerHTML = `<p class="err">${esc(e.message)}</p>`; }
+}
+
+// personal score-weight editor (logged-in users). Stored in localStorage, never shared.
+function openScoreWeightsModal() {
+  const ko = getLang() === 'ko';
+  const w = getWeights();
+  const back = document.createElement('div');
+  back.className = 'modal-back';
+  const sliders = (half) => WEIGHT_META.filter((m) => m.half === half).map((m) => `
+    <label class="sw-row"><span class="sw-l">${ko ? m.label : m.labelEn}</span>
+      <input type="range" class="sw-range" data-key="${m.key}" min="0" max="${m.max}" step="1" value="${w[m.key]}">
+      <b class="sw-v" data-for="${m.key}">${w[m.key]}</b></label>`).join('');
+  back.innerHTML = `<div class="modal modal--weights"><div class="modal__head"><h2>${ko ? '내 점수 가중치' : 'My score weights'}</h2><button class="detail__close" id="swClose">${icon('x', 16)}</button></div>
+    <div class="sw-body">
+      <p class="muted sw-note">${ko ? '나에게만 적용되고 다른 사람에겐 공유되지 않아요. 값이 클수록 그 요소가 점수에 크게 반영됩니다.' : 'Applies only to you — never shared. Higher = that factor counts more.'}</p>
+      <div class="sw-half">${ko ? '객관 필드 (합 50 기준)' : 'Facts (out of ~50)'}</div>${sliders('field')}
+      <div class="sw-half">${ko ? '집단지성 투표 (상대 가중치)' : 'Crowd votes (relative)'}</div>${sliders('vote')}
+      <div class="modal__foot"><button class="btn btn--ghost sm" id="swReset">${ko ? '기본값으로' : 'Reset'}</button><button class="btn btn--primary" id="swSave">${ko ? '적용' : 'Apply'}</button></div>
+    </div></div>`;
+  document.body.appendChild(back);
+  const close = () => back.remove();
+  back.querySelector('#swClose').onclick = close;
+  back.addEventListener('mousedown', (e) => { if (e.target === back) close(); });
+  back.querySelectorAll('.sw-range').forEach((r) => r.addEventListener('input', () => { back.querySelector(`.sw-v[data-for="${r.dataset.key}"]`).textContent = r.value; }));
+  const collect = () => { const nw = {}; back.querySelectorAll('.sw-range').forEach((r) => { nw[r.dataset.key] = Number(r.value); }); return nw; };
+  const applyAndReload = async () => {
+    rescoreCafes(state.cafes); map.setCafes(state.cafes); applyFilters();
+    close();
+    if (state.openCafeId) await openDetail(state.openCafeId); // refresh the breakdown + card score
+  };
+  back.querySelector('#swSave').onclick = () => { setWeights(collect()); applyAndReload(); };
+  back.querySelector('#swReset').onclick = () => { resetWeights(); applyAndReload(); };
 }
 
 // keep the detail panel anchored right below the (variable-height) header

@@ -169,6 +169,33 @@ b { font-weight: 700; }
 /* recent view-spot photo thumbnails */
 .in-photos { display: flex; flex-wrap: wrap; gap: 6px; }
 .in-photo { width: 62px; height: 62px; border-radius: var(--r-sm); background-size: cover; background-position: center; border: 1px solid var(--hair-strong); }
+/* score breakdown (why this score) in the detail panel */
+.scorebox { margin: 10px 0 2px; border: 1px solid var(--hair); border-radius: var(--r-sm); background: var(--surface-2); }
+.scorebox > summary { cursor: pointer; padding: 9px 12px; display: flex; align-items: center; gap: 7px; list-style: none; }
+.scorebox > summary::-webkit-details-marker { display: none; }
+.sb-total { font-family: var(--font-display); font-weight: 800; font-size: 17px; }
+.sb-custom { margin-left: auto; font-size: 10px; font-weight: 700; color: #fff; background: var(--view); padding: 1px 7px; border-radius: var(--pill); }
+.sb-body { padding: 2px 12px 12px; }
+.sb-half { font-size: 11px; font-weight: 800; text-transform: uppercase; letter-spacing: .5px; color: var(--ink-2); margin: 11px 0 4px; }
+.sb-half b { color: var(--ink); }
+.sb-row { display: flex; align-items: center; gap: 8px; font-size: 12px; padding: 2px 0; }
+.sb-l { flex: 0 0 92px; color: var(--ink-2); }
+.sb-w { color: var(--mute); font-weight: 700; font-size: 10.5px; }
+.sb-bar { flex: 1; height: 5px; background: var(--hair); border-radius: 3px; overflow: hidden; }
+.sb-bar i { display: block; height: 100%; background: var(--ink); }
+.sb-v { flex: 0 0 36px; text-align: right; font-weight: 700; }
+.sb-v small { color: var(--mute); font-weight: 400; }
+.sb-edit { margin-top: 11px; }
+.sb-hint { margin-top: 9px; font-size: 11.5px; }
+/* personal score-weight editor */
+.modal--weights { width: 380px; max-width: calc(100vw - 32px); }
+.sw-body { padding: 16px 20px; }
+.sw-note { font-size: 12px; margin-bottom: 4px; }
+.sw-half { font-size: 11px; font-weight: 800; text-transform: uppercase; letter-spacing: .5px; color: var(--ink-2); margin: 14px 0 6px; }
+.sw-row { display: flex; align-items: center; gap: 10px; padding: 4px 0; font-size: 13px; }
+.sw-l { flex: 0 0 82px; }
+.sw-range { flex: 1; min-width: 0; }
+.sw-v { flex: 0 0 24px; text-align: right; font-family: var(--font-display); font-weight: 800; }
 .in-body { flex-basis: 100%; font-size: 11.5px; line-height: 1.4; }
 .modal--insights .admin-badge { font-size: 8px; padding: 0 4px; }
 

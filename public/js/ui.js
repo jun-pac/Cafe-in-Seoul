@@ -3,6 +3,7 @@ import {
 } from './util.js';
 import { icon } from './icons.js';
 import { t, L } from './i18n.js';
+import { scoreBreakdown, isCustomized } from './score.js';
 
 const VOTE_CATS = [
   { key: 'coffee', icon: 'coffee' },
@@ -230,7 +231,8 @@ function setupHero(el, gallery, { onIndex } = {}) {
 }
 
 // ---- Detail panel ---------------------------------------------------------
-export function renderDetail(el, cafe, { user, onVote, onAddReview, onClose, onEdit, onSetCover, onDeleteStory, onEditStory, onLike }) {
+const SCORE_LABELS = { price: 'f.price', outlets: 'f.outlet', floors: 'f.multiFloor.short', late: 'f.openLate.short', size: 'f.area', view: 'f.view.short' };
+export function renderDetail(el, cafe, { user, onVote, onAddReview, onClose, onEdit, onSetCover, onDeleteStory, onEditStory, onLike, onScoreWeights }) {
   const openNow = isOpenNow(cafe);
   const floorTxt = cafe.multi_floor ? `${cafe.floors}${t('unit.floor')} · ${t('detail.multiFloor')}` : t('detail.singleFloor');
   const viewTxt = cafe.has_view ? (cafe.view_note ? `${t('detail.viewGood')} · ${esc(cafe.view_note)}` : t('detail.viewGood')) : t('detail.viewMeh');
@@ -269,6 +271,22 @@ export function renderDetail(el, cafe, { user, onVote, onAddReview, onClose, onE
           ${cafe.rain_ok ? `<span class="chip chip--rain tip" data-tip="${esc(def('rain_ok'))}">${icon('umbrella', 14)} ${t('detail.rainOk')}</span>` : ''}
         </div>
 
+        ${(() => {
+          const bd = scoreBreakdown(cafe), w = bd.weights;
+          const bar = (p, m) => `<span class="sb-bar"><i style="width:${m ? Math.max(0, Math.min(100, p / m * 100)) : 0}%"></i></span>`;
+          const vrow = (key, wt, avg) => `<div class="sb-row"><span class="sb-l">${t('vote.' + key)} <b class="sb-w">×${wt}</b></span>${bar(((avg ?? 3) - 1) / 4 * 100, 100)}<span class="sb-v">${avg != null ? avg.toFixed(1) : '–'}<small>/5</small></span></div>`;
+          return `<details class="scorebox">
+            <summary><span class="sb-total">${bd.total}</span> <span class="muted">${t('detail.scoreWhy')}</span>${isCustomized() ? `<span class="sb-custom">${t('detail.scoreCustom')}</span>` : ''}</summary>
+            <div class="sb-body">
+              <div class="sb-half">${t('detail.scoreFields')} <b>${bd.discrete}</b>/50</div>
+              ${bd.parts.map((p) => `<div class="sb-row"><span class="sb-l">${t(SCORE_LABELS[p.key] || p.key)} <b class="sb-w">${p.max}</b></span>${bar(p.points, p.max)}<span class="sb-v">${p.points}</span></div>`).join('')}
+              <div class="sb-half">${t('detail.scoreVotes')} <b>${bd.crowd}</b>/50</div>
+              ${vrow('quiet', w.quiet, bd.votes.quiet)}${vrow('coffee', w.coffee, bd.votes.coffee)}${vrow('restroom', w.restroom, bd.votes.restroom)}
+              ${user ? `<button type="button" class="btn btn--ghost sm sb-edit" id="scoreWeightsBtn">${icon('info', 13)} ${t('detail.scoreAdjust')}</button>` : `<div class="muted sb-hint">${t('detail.scoreLoginHint')}</div>`}
+            </div>
+          </details>`;
+        })()}
+
         <div class="detail__links">
           ${cafe.naver_url ? `<a class="btn btn--map naver" href="${esc(cafe.naver_url)}" target="_blank" rel="noopener">${t('detail.naver')}</a>` : ''}
           ${cafe.kakao_url ? `<a class="btn btn--map kakao" href="${esc(cafe.kakao_url)}" target="_blank" rel="noopener">${t('detail.kakao')}</a>` : ''}
@@ -299,6 +317,7 @@ export function renderDetail(el, cafe, { user, onVote, onAddReview, onClose, onE
   el.querySelector('#removeCafeBtn')?.addEventListener('click', () => {
     if (confirm(`'${cafe.name}'${t('detail.removeAsk')}`)) onEdit?.('remove');
   });
+  el.querySelector('#scoreWeightsBtn')?.addEventListener('click', (e) => { e.preventDefault(); onScoreWeights?.(); });
   const cLike = el.querySelector('#cLike');
   if (cLike) cLike.onclick = async () => {
     if (!user) return alert(t('vote.loginNeeded'));
