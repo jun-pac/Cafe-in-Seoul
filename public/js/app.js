@@ -50,7 +50,8 @@ function readFilters() {
     liked: $('#f-liked').checked,
     minSize: $('#f-size').value || null,
     minOutlet: $('#f-outlet').value || null,
-    maxPrice: Number($('#f-price').value),
+    // slider at its max = "no price limit" (else cafes above the cap, e.g. 9000원, are unreachable)
+    maxPrice: (() => { const el = $('#f-price'); const v = Number(el.value); return v >= Number(el.max) ? null : v; })(),
     minQuiet: Number($('#f-quiet').value),
     minCoffee: Number($('#f-coffee').value),
     minRestroom: Number($('#f-restroom').value),
@@ -61,14 +62,17 @@ const FILTER_IDS = ['show-cafes', 'show-views', 'f-multifloor', 'f-view', 'f-rai
   'f-size', 'f-outlet',
   'f-price', 'f-quiet', 'f-coffee', 'f-restroom'];
 
+// bump when a filter's range/meaning changes so stale saved values are dropped, not misread
+// (v2: f-price max 8000→12000, top position now means "no cap")
+const FILTER_VERSION = 2;
 function saveFilters() {
-  const s = {};
+  const s = { _v: FILTER_VERSION };
   for (const id of FILTER_IDS) { const el = $(`#${id}`); s[id] = el.type === 'checkbox' ? el.checked : el.value; }
   try { localStorage.setItem('filters', JSON.stringify(s)); } catch { /* ignore */ }
 }
 function loadFilters() {
   let s; try { s = JSON.parse(localStorage.getItem('filters') || 'null'); } catch { return; }
-  if (!s) return;
+  if (!s || s._v !== FILTER_VERSION) return; // old schema → use HTML defaults (all visible)
   for (const id of FILTER_IDS) {
     const el = $(`#${id}`); if (!el || !(id in s)) continue;
     if (el.type === 'checkbox') el.checked = !!s[id]; else el.value = s[id];
@@ -110,7 +114,10 @@ function wireFilters() {
     el.addEventListener('input', update);
     label.textContent = fmt(el.value);
   };
-  const priceFmt = (v) => (getLang() === 'ko' ? `${Number(v).toLocaleString('ko-KR')}원 이하` : `≤ ₩${Number(v).toLocaleString('en-US')}`);
+  const priceFmt = (v) => {
+    if (Number(v) >= Number($('#f-price').max)) return getLang() === 'ko' ? '제한 없음' : 'Any'; // top = no cap
+    return getLang() === 'ko' ? `${Number(v).toLocaleString('ko-KR')}원 이하` : `≤ ₩${Number(v).toLocaleString('en-US')}`;
+  };
   const ratingFmt = (v) => (+v ? (getLang() === 'ko' ? `${v}점 이상` : `${v}+`) : (getLang() === 'ko' ? '전체' : 'Any'));
   bindRange('f-price', 'f-price-val', priceFmt);
   bindRange('f-quiet', 'f-quiet-val', ratingFmt);
@@ -121,7 +128,7 @@ function wireFilters() {
     ['f-multifloor', 'f-view', 'f-rainok', 'f-opennow', 'f-openlate', 'f-liked'].forEach((id) => ($(`#${id}`).checked = false));
     $('#f-size').value = '';
     $('#f-outlet').value = '';
-    $('#f-price').value = 8000; $('#f-price').dispatchEvent(new Event('input'));
+    $('#f-price').value = $('#f-price').max; $('#f-price').dispatchEvent(new Event('input'));
     ['f-quiet', 'f-coffee', 'f-restroom'].forEach((id) => {
       $(`#${id}`).value = 0; $(`#${id}`).dispatchEvent(new Event('input'));
     });
