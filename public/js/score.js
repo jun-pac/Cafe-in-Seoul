@@ -7,7 +7,12 @@
 //
 // Each half is a WEIGHTED AVERAGE scaled to 50, so each half is always ≤ 50 no matter the
 // weights — the 50/50 split is enforced; the weights only redistribute points WITHIN a half.
-// Weights are personal (localStorage), never shared; defaults below == the server's.
+//
+// Weight precedence (highest first):
+//   1. personal weights   — localStorage 'scoreWeights' (only you)
+//   2. site default       — admin-set global (setSiteDefault), everyone
+//   3. built-in DEFAULT_WEIGHTS
+// The built-in defaults below == the server's original scoring.
 
 export const DEFAULT_WEIGHTS = { price: 18, outlets: 9, floors: 7, late: 6, size: 6, view: 4, quiet: 3, coffee: 1, restroom: 1 };
 export const OBJ_KEYS = ['price', 'outlets', 'floors', 'late', 'size', 'view'];
@@ -24,13 +29,21 @@ export const WEIGHT_META = [
   { key: 'restroom', label: '화장실', labelEn: 'Restroom', half: 'vote', max: 6 },
 ];
 
+// admin-set global default (from /api/auth/me). null → use built-in DEFAULT_WEIGHTS.
+let SITE_DEFAULT = null;
+export function setSiteDefault(w) { SITE_DEFAULT = (w && typeof w === 'object') ? { ...DEFAULT_WEIGHTS, ...w } : null; }
+export function siteDefault() { return SITE_DEFAULT ? { ...SITE_DEFAULT } : { ...DEFAULT_WEIGHTS }; }
+export function hasSiteDefault() { return !!SITE_DEFAULT; }
+
+function personalWeights() { try { const w = JSON.parse(localStorage.getItem('scoreWeights') || 'null'); if (w && typeof w === 'object') return w; } catch { /* */ } return null; }
+
 export function getWeights() {
-  try { const w = JSON.parse(localStorage.getItem('scoreWeights') || 'null'); if (w && typeof w === 'object') return { ...DEFAULT_WEIGHTS, ...w }; } catch { /* */ }
-  return { ...DEFAULT_WEIGHTS };
+  const p = personalWeights();
+  return p ? { ...siteDefault(), ...p } : siteDefault();
 }
 export function setWeights(w) { try { localStorage.setItem('scoreWeights', JSON.stringify(w)); } catch { /* */ } }
 export function resetWeights() { try { localStorage.removeItem('scoreWeights'); } catch { /* */ } }
-export function isCustomized() { try { return !!localStorage.getItem('scoreWeights'); } catch { return false; } }
+export function isCustomized() { return !!personalWeights(); }
 
 const P_CHEAP = 3500, P_EXP = 7000;
 function priceFrac(price) { // iced-americano price → 0..1 (cheap = 1)

@@ -60,6 +60,9 @@ export const api = {
       body: JSON.stringify(payload),
     }).then(json),
   adminInsights: () => fetch('/api/admin/insights').then(json),
+  adminSetScoreWeights: (weights) =>
+    fetch('/api/admin/score-weights', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ weights }) }).then(json),
+  adminResetScoreWeights: () => fetch('/api/admin/score-weights', { method: 'DELETE' }).then(json),
   adminPending: () => fetch('/api/admin/pending').then(json),
   adminApprove: (id) => fetch(`/api/admin/cafes/${id}/approve`, { method: 'POST' }).then(json),
   adminReject: (id) => fetch(`/api/admin/cafes/${id}/reject`, { method: 'POST' }).then(json),

@@ -65,6 +65,7 @@ const router = express.Router();
 router.get('/me', (req, res) => {
   res.json({
     googleClientId: GIS_ENABLED ? GOOGLE_CLIENT_ID : null,
+    scoreWeights: require('./settings').getScoreWeights(), // admin-set global default (null = built-in)
     localEnabled: true, // username/password accounts always available
     user: req.user
       ? {

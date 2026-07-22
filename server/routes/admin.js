@@ -158,4 +158,17 @@ router.get('/analytics', requireAdmin, (req, res) => {
   res.json(analytics(day));
 });
 
+// Admin sets the GLOBAL default score weights everyone sees (personal weights still override locally).
+const settings = require('../settings');
+router.post('/score-weights', requireAdmin, express.json(), (req, res) => {
+  const saved = settings.setScoreWeights(req.body && req.body.weights);
+  if (!saved) return res.status(400).json({ error: 'invalid weights' });
+  res.json({ ok: true, weights: saved });
+});
+// Revert to the built-in default for everyone.
+router.delete('/score-weights', requireAdmin, (req, res) => {
+  settings.set('score_weights', null);
+  res.json({ ok: true, weights: null });
+});
+
 module.exports = router;

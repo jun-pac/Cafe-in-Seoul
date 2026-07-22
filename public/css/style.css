@@ -575,6 +575,8 @@ details.manual[open] summary { margin-bottom: 4px; }
 .grid2 { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; }
 .loc-row { display: grid; grid-template-columns: 1fr 1fr auto; gap: 8px; }
 .modal__foot { display: flex; align-items: center; justify-content: flex-end; gap: 14px; margin-top: 6px; }
+.sw-foot { flex-wrap: wrap; gap: 8px 10px; }
+.sw-foot .btn--ghost.sm { margin-right: auto; } /* keep Reset pinned left, apply/global on the right */
 .err { color: #b00020; font-size: 12px; margin-right: auto; }
 
 /* autofill / fetch */

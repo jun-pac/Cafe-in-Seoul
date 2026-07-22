@@ -3,7 +3,7 @@ import { initMap } from './map.js';
 import { renderAuth, renderDetail, openAddCafeModal, openEditCafeModal, renderPendingQueue, initChat,
   renderViewDetail, openViewModal } from './ui.js';
 import { passesFilters, esc, img, thumb } from './util.js';
-import { getWeights, setWeights, resetWeights, computeScore, isCustomized, DEFAULT_WEIGHTS, WEIGHT_META } from './score.js';
+import { getWeights, setWeights, resetWeights, computeScore, isCustomized, DEFAULT_WEIGHTS, WEIGHT_META, setSiteDefault, siteDefault, hasSiteDefault } from './score.js';
 import { icon } from './icons.js';
 import { t, getLang, setLang, onLangChange, applyStaticI18n } from './i18n.js';
 
@@ -310,6 +310,7 @@ async function handleSetCover(id, url) {
 // keeps the header's account button in sync with login state.
 async function refreshMe() {
   state.me = await api.me();
+  setSiteDefault(state.me.scoreWeights || null); // admin-set global default score weights
   state.capabilities = { kakao: false, ai: false };
   if (state.me.user) { // any logged-in user can propose cafes/view-spots (kakao autofill too)
     state.capabilities = await api.adminCapabilities().catch(() => state.capabilities);
@@ -464,9 +465,11 @@ async function openInsightsModal() {
   } catch (e) { back.querySelector('#inBody').innerHTML = `<p class="err">${esc(e.message)}</p>`; }
 }
 
-// personal score-weight editor (logged-in users). Stored in localStorage, never shared.
+// score-weight editor. Personal weights (localStorage) override the site default for you only.
+// Admins can additionally push the current weights as the GLOBAL default everyone sees.
 function openScoreWeightsModal() {
   const ko = getLang() === 'ko';
+  const admin = !!(state.me && state.me.user && state.me.user.isAdmin);
   const w = getWeights();
   const back = document.createElement('div');
   back.className = 'modal-back';
@@ -474,13 +477,23 @@ function openScoreWeightsModal() {
     <label class="sw-row"><span class="sw-l">${ko ? m.label : m.labelEn}</span>
       <input type="range" class="sw-range" data-key="${m.key}" data-half="${m.half}" min="0" max="${m.max}" step="1" value="${w[m.key]}">
       <b class="sw-pct" data-for="${m.key}"></b></label>`).join('');
+  const note = admin
+    ? (ko ? '슬라이더는 나에게만 적용됩니다. <b>모두에게 기본값으로</b>를 누르면 지금 값이 모든 사용자의 기본 점수식이 됩니다 (각자 개인 설정은 그대로 우선).'
+          : 'Sliders apply to you only. <b>Set as site default</b> makes these the default score for everyone (each user’s personal weights still win).')
+    : (ko ? '나에게만 적용 · 남에겐 공유 안 됨. 각 요소가 그 절반(50점)에서 차지하는 비중(%)을 정합니다.'
+          : 'Only you, never shared. Sets each factor’s share (%) of its 50-pt half.');
+  const foot = admin
+    ? `<div class="modal__foot sw-foot"><button class="btn btn--ghost sm" id="swReset">${ko ? '기본값으로' : 'Reset'}</button>
+         <button class="btn btn--ghost" id="swSave">${ko ? '적용 (나만)' : 'Apply (me)'}</button>
+         <button class="btn btn--primary" id="swGlobal">${ko ? '모두에게 기본값으로' : 'Set as site default'}</button></div>`
+    : `<div class="modal__foot"><button class="btn btn--ghost sm" id="swReset">${ko ? '기본값으로' : 'Reset'}</button><button class="btn btn--primary" id="swSave">${ko ? '적용' : 'Apply'}</button></div>`;
   back.innerHTML = `<div class="modal modal--weights"><div class="modal__head"><h2>${ko ? '카공 점수 가중치' : 'Study-score weights'}</h2><button class="detail__close" id="swClose">${icon('x', 16)}</button></div>
     <div class="sw-body">
       <div class="sb-formula">${t('detail.scoreFormula')}</div>
-      <p class="muted sw-note">${ko ? '나에게만 적용 · 남에겐 공유 안 됨. 각 요소가 그 절반(50점)에서 차지하는 비중(%)을 정합니다.' : 'Only you, never shared. Sets each factor’s share (%) of its 50-pt half.'}</p>
+      <p class="muted sw-note">${note}</p>
       <div class="sw-half">① ${ko ? '객관 필드 — 50점 배분' : 'Facts — split of 50'}</div>${sliders('field')}
       <div class="sw-half">② ${ko ? '집단지성 투표 — 50점 배분' : 'Crowd votes — split of 50'}</div>${sliders('vote')}
-      <div class="modal__foot"><button class="btn btn--ghost sm" id="swReset">${ko ? '기본값으로' : 'Reset'}</button><button class="btn btn--primary" id="swSave">${ko ? '적용' : 'Apply'}</button></div>
+      ${foot}
     </div></div>`;
   document.body.appendChild(back);
   const close = () => back.remove();
@@ -504,6 +517,15 @@ function openScoreWeightsModal() {
   };
   back.querySelector('#swSave').onclick = () => { setWeights(collect()); applyAndReload(); };
   back.querySelector('#swReset').onclick = () => { resetWeights(); applyAndReload(); };
+  const globalBtn = back.querySelector('#swGlobal');
+  if (globalBtn) globalBtn.onclick = async () => {
+    globalBtn.disabled = true; // guard against double-submit
+    const r = await api.adminSetScoreWeights(collect()).catch(() => null);
+    if (!r || !r.ok) { globalBtn.disabled = false; alert(ko ? '전역 기본값 저장 실패' : 'Failed to save site default'); return; }
+    setSiteDefault(r.weights); // everyone (including me) now defaults to this
+    resetWeights();            // clear my personal override so I see the default I just set
+    applyAndReload();
+  };
 }
 
 // keep the detail panel anchored right below the (variable-height) header

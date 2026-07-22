@@ -201,6 +201,9 @@ if (!vcCols.has('body_en')) db.exec(`ALTER TABLE viewspot_comments ADD COLUMN bo
 // daily unique-visitor tally (one bump per visitor session per day)
 db.exec(`CREATE TABLE IF NOT EXISTS daily_visits (day TEXT PRIMARY KEY, n INTEGER NOT NULL DEFAULT 0)`);
 
+// small key/value store for admin-set site settings (e.g. the global default score weights)
+db.exec(`CREATE TABLE IF NOT EXISTS app_settings (key TEXT PRIMARY KEY, value TEXT)`);
+
 // Per-action analytics: one row per tracked event (page view, opening a cafe/view-spot,
 // applying a filter, searching, liking, ...). session_id (the express-session id) tells
 // apart distinct visitors; user_id links logged-in users. Query this to analyze traffic.
