@@ -10,7 +10,7 @@
 - **주인장 추천 카페** — 카공 관점에서 큐레이션한 카페 (종합점수 기반).
 - **주인장 추천 명소** — 뷰·경치 좋은 장소 (필름/DSLR 사진, 따봉·댓글).
 
-> ⚠️ **"뷰 맛집"이라는 표현은 폐기됨.** 위 두 이름을 사용("명소"는 경치 좋은 곳).
+> **"뷰 맛집"이라는 표현은 폐기됨.** 위 두 이름을 사용("명소"는 경치 좋은 곳).
 
 ## 핵심 기능
 
@@ -68,7 +68,7 @@ BASE_URL=https://cafe-in-seoul.com  SESSION_SECRET=<랜덤>
 
 - **로컬 아이디/비밀번호**(scrypt) — **대소문자 구분**(case-sensitive). 관리자: `sejun`, `damhiya`, `YGH`(=`ygh`).
 - **Google SSO(GIS 토큰 방식)** — client **ID만** 필요, **secret 불필요**, **리디렉션 URI 불필요**. Google Cloud Console에서 **"승인된 자바스크립트 원본"** 에 `https://cafe-in-seoul.com` 추가. 관리자는 `.env`의 `ADMIN_EMAILS`에 이메일 등록.
-- **📍 동네 토크(GPS 채팅)** — 카페별 채팅. 읽기는 누구나, 쓰기는 GPS 1km 이내 인증 시(서버 재검증).
+- **동네 토크(GPS 채팅)** — 카페별 채팅. 읽기는 누구나, 쓰기는 GPS 1km 이내 인증 시(서버 재검증).
 
 ## 배포 (Cloudflare Tunnel)
 
