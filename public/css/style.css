@@ -682,6 +682,14 @@ details.manual[open] summary { margin-bottom: 4px; }
   .adv-primary .pilltog span { padding: 3px 7px; font-size: 11px; }
   .adv-primary select { padding: 3px 4px; font-size: 10.5px; }
   .fbar__result { display: none; }              /* count is shown in the map cards */
+  .fbar__sep { display: none; }                 /* desktop-only divider (아아 shares its row there); rows differ on mobile */
+  /* price field grows to fill its row and the slider stretches, so "상세" stays on the same row
+     (not bumped down) and the line fits any label width (KO 아아 / EN Iced Am.) */
+  .fbar__field--price { flex: 1 1 auto; min-width: 0; }
+  /* basis:0 so the field's base width is just label+value (not the slider's ~130px intrinsic width) —
+     keeps price + 상세 on one row even on narrow phones; the slider then grows to fill the slack */
+  .fbar__field--price .fbar__range { flex: 1 1 0; width: auto; min-width: 40px; }
+  .fbar__more { flex: none; }                   /* 상세 never shrinks/wraps off its row */
   .modal-back { padding: 16px; }                /* matches .modal--auth max-width → centers, not right-shifted */
 
   /* detail = full-width sheet, slides up from the bottom (swipe-down to dismiss) */
