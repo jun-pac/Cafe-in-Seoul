@@ -109,11 +109,11 @@ router.post('/draft-review', requireAuth, express.json(), async (req, res, next)
 router.get('/insights', requireAdmin, (req, res) => {
   const one = (sql, ...p) => db.prepare(sql).get(...p);
   const many = (sql, ...p) => db.prepare(sql).all(...p);
-  const today = new Date().toISOString().slice(0, 10);
+  const today = require('../analytics').kstToday(); // every date/time in this payload is KST
   res.json({
     users: {
       total: one('SELECT COUNT(*) AS c FROM users').c,
-      recent: many(`SELECT provider, provider_id, name, is_admin, created_at FROM users ORDER BY created_at DESC LIMIT 25`),
+      recent: many(`SELECT provider, provider_id, name, is_admin, datetime(created_at,'+9 hours') AS created_at FROM users ORDER BY created_at DESC LIMIT 25`),
     },
     content: {
       // count LIVE (approved) content so these match the map exactly; pending items live in the review queue

@@ -46,7 +46,9 @@ app.use('/api', (req, res, next) => { res.setHeader('Cache-Control', 'no-store')
 // daily visitor tally: count only real PAGE loads (not API/asset/script traffic),
 // once per visitor session per day, and never count admins (so dev refreshes don't inflate it).
 const db = require('./db');
-const { recordEvent, isBotUA } = require('./analytics');
+// days are KST calendar days everywhere — with UTC days the public "오늘 방문자" counter
+// reset at 09:00 KST, in the middle of the Korean morning.
+const { recordEvent, isBotUA, kstToday } = require('./analytics');
 const bumpVisit = db.prepare(`INSERT INTO daily_visits (day, n) VALUES (?, 1) ON CONFLICT(day) DO UPDATE SET n = n + 1`);
 app.use((req, res, next) => {
   try {
@@ -54,7 +56,7 @@ app.use((req, res, next) => {
     if (isPageLoad) {
       const ua = req.get('user-agent') || '';
       const isBot = isBotUA(ua);
-      const today = new Date().toISOString().slice(0, 10);
+      const today = kstToday();
       const reason = req.user?.is_admin ? 'admin'
         : isBot ? 'bot'
         : (req.session && req.session.visitDay === today) ? 'dupe'
@@ -85,7 +87,7 @@ app.post('/api/track', express.json({ limit: '4kb' }), (req, res) => {
 const todayVisits = db.prepare('SELECT n FROM daily_visits WHERE day = ?');
 const totalVisits = db.prepare('SELECT COALESCE(SUM(n), 0) AS t FROM daily_visits');
 app.get('/api/stats', (req, res) => {
-  const today = new Date().toISOString().slice(0, 10);
+  const today = kstToday();
   res.json({ date: today, today: todayVisits.get(today)?.n || 0, total: totalVisits.get().t });
 });
 

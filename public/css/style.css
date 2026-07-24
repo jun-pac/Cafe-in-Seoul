@@ -143,8 +143,44 @@ b { font-weight: 700; }
 .modal--auth #authBody { padding: 20px; }
 
 /* admin insights modal */
-.modal--insights { width: 460px; max-width: calc(100vw - 32px); }
-.modal--insights #inBody { padding: 18px 20px; }
+.modal--insights { width: 500px; max-width: calc(100vw - 32px); }
+/* body scrolls on its own so the day navigator + tabs stay put while you read */
+.modal--insights #inBody { padding: 12px 2px 0 0; max-height: min(64vh, 620px); overflow-y: auto; }
+/* which KST day you are looking at */
+.in-daybar { display: flex; align-items: center; gap: 8px; margin-top: 14px; }
+.in-daybar b { font-family: var(--font-display); font-size: 14px; font-weight: 800; letter-spacing: .3px; }
+.in-nav { display: grid; place-items: center; width: 26px; height: 26px; padding: 0; border: 1px solid var(--hair-strong);
+  background: var(--surface); border-radius: var(--r-sm); color: var(--ink-2); cursor: pointer; }
+.in-nav:hover:not(:disabled) { background: var(--cool); color: var(--ink); }
+.in-nav:disabled { opacity: .3; cursor: default; }
+.in-tz { margin-left: auto; font-size: 10px; font-weight: 800; letter-spacing: .6px; color: var(--mute);
+  border: 1px solid var(--hair); border-radius: var(--pill); padding: 1px 7px; }
+.in-tabs { display: flex; gap: 2px; margin-top: 12px; border-bottom: 1px solid var(--hair); }
+.in-tab { border: 0; background: none; font: inherit; font-size: 12px; font-weight: 700; color: var(--mute);
+  padding: 7px 9px; margin-bottom: -1px; border-bottom: 2px solid transparent; cursor: pointer; }
+.in-tab:hover { color: var(--ink-2); }
+.in-tab.is-on { color: var(--ink); border-bottom-color: var(--ink); }
+/* column charts: 14-day trend (clickable) and hour-of-day */
+.in-chart { display: flex; align-items: flex-end; gap: 3px; height: 74px; margin-top: 8px; }
+.in-col { flex: 1; min-width: 0; height: 100%; display: flex; flex-direction: column; justify-content: flex-end;
+  align-items: center; gap: 3px; padding: 0; border: 0; background: none; cursor: default; }
+.in-col[data-day] { cursor: pointer; }
+.in-col i { display: block; width: 100%; background: var(--hair-strong); border-radius: 2px 2px 0 0; }
+.in-col:hover i { background: var(--ink-2); }
+.in-col.is-on i { background: var(--ink); }
+.in-col span { font-size: 9px; line-height: 1; color: var(--mute); }
+.in-chart--hours { height: 52px; }
+/* horizontal bar list — same visual language as the score breakdown bars */
+.in-bars { display: flex; flex-direction: column; gap: 3px; margin-top: 6px; }
+.in-bar { display: flex; align-items: center; gap: 8px; font-size: 12.5px; }
+.in-bl { flex: 0 0 42%; min-width: 0; color: var(--ink-2); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.in-bt { flex: 1; height: 6px; background: var(--hair); border-radius: 3px; overflow: hidden; }
+.in-bt b { display: block; height: 100%; background: var(--ink); }
+.in-bn { flex: 0 0 34px; text-align: right; font-weight: 700; font-size: 11.5px; }
+.in-tag { font-size: 9px; font-weight: 700; letter-spacing: .3px; text-transform: uppercase; color: var(--ink-2);
+  background: var(--cool); border-radius: var(--pill); padding: 1px 6px; }
+.in-note { font-size: 11.5px; color: var(--ink-2); margin: 8px 0 2px; }
+.in-check { display: flex; align-items: center; gap: 6px; cursor: pointer; }
 .in-stats { display: grid; grid-template-columns: repeat(auto-fit, minmax(78px, 1fr)); gap: 8px; }
 .in-stat { background: var(--surface-2); border: 1px solid var(--hair); border-radius: var(--r-sm); padding: 10px 6px; text-align: center; }
 .in-stat b { display: block; font-family: var(--font-display); font-size: 20px; font-weight: 800; }
@@ -154,8 +190,7 @@ b { font-weight: 700; }
 .in-row:first-child { border-top: 0; }
 .in-when { margin-left: auto; font-size: 11px; color: var(--mute); }
 .in-h4 { margin: 16px 0 2px; font-size: 12px; font-weight: 800; letter-spacing: .3px; color: var(--ink-2); text-transform: uppercase; }
-.in-feed { max-height: 260px; overflow-y: auto; }
-.in-feed .ev-type { font-weight: 700; font-size: 11px; padding: 1px 6px; border-radius: var(--pill); background: var(--cool); color: var(--ink); }
+.modal--insights .ev-type { font-weight: 700; font-size: 11px; padding: 1px 6px; border-radius: var(--pill); background: var(--cool); color: var(--ink); }
 .in-row.is-bot { opacity: .5; }
 /* per-visitor journey (session + its action trail) */
 .in-session { padding: 7px 0; border-top: 1px solid var(--hair); }

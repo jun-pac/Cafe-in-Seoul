@@ -423,54 +423,174 @@ function openAuthModal() {
   }
 }
 
+// Admin insights. Everything here is Korea time (the server buckets days in KST too), and the
+// day you are looking at is explicit — mixing a UTC day boundary with KST clock times is what
+// used to make one day's feed look like two different days spliced together.
 async function openInsightsModal() {
   const back = document.createElement('div');
   back.className = 'modal-back';
   const ko = getLang() === 'ko';
-  back.innerHTML = `<div class="modal modal--insights"><div class="modal__head"><h2>${ko ? '관리자 통계' : 'Admin insights'}</h2><button class="detail__close" id="inClose">${icon('x', 16)}</button></div><div id="inBody"><p class="muted">${ko ? '불러오는 중…' : 'Loading…'}</p></div></div>`;
+  const L = (k, e) => (ko ? k : e);
+  back.innerHTML = `<div class="modal modal--insights">
+    <div class="modal__head"><h2>${L('관리자 통계', 'Admin insights')}</h2><button class="detail__close" id="inClose">${icon('x', 16)}</button></div>
+    <div class="in-daybar">
+      <button class="in-nav" id="inPrev" title="${L('이전 날', 'Previous day')}">${icon('chevronLeft', 15)}</button>
+      <b id="inDay">…</b>
+      <button class="in-nav" id="inNext" title="${L('다음 날', 'Next day')}">${icon('chevronRight', 15)}</button>
+      <span class="in-tz" title="${L('모든 시각은 한국시간 기준입니다', 'All times are Korea time')}">KST</span>
+    </div>
+    <div class="in-tabs">
+      <button class="in-tab is-on" data-tab="sum">${L('요약', 'Summary')}</button>
+      <button class="in-tab" data-tab="who">${L('방문자', 'Visitors')}</button>
+      <button class="in-tab" data-tab="con">${L('콘텐츠', 'Content')}</button>
+      <button class="in-tab" data-tab="log">${L('원본 로그', 'Raw log')}</button>
+    </div>
+    <div id="inBody"><p class="muted">${L('불러오는 중…', 'Loading…')}</p></div>
+  </div>`;
   document.body.appendChild(back);
   const close = () => back.remove();
   back.querySelector('#inClose').onclick = close;
   back.addEventListener('mousedown', (e) => { if (e.target === back) close(); });
-  try {
-    const [d, a] = await Promise.all([api.adminInsights(), api.adminAnalytics()]);
-    const stat = (n, label) => `<div class="in-stat"><b>${n}</b><span>${label}</span></div>`;
-    const row = (label, n) => `<div class="in-row">${esc(label)}<span class="in-when">${n}</span></div>`;
-    const A = { pageview: ko ? '페이지뷰' : 'Pageview', open_cafe: ko ? '카페 열람' : 'Open cafe', open_view: ko ? '명소 열람' : 'Open view', filter: ko ? '필터' : 'Filter', search: ko ? '검색' : 'Search', like: ko ? '따봉' : 'Like', add_cafe: ko ? '카페 제안' : 'Add cafe', add_view: ko ? '명소 제안' : 'Add view', lang: ko ? '언어변경' : 'Lang', locate: ko ? '내 위치' : 'Locate', install: ko ? '앱설치' : 'Install' };
-    const hhmm = (s) => esc((s || '').slice(11, 16));
-    back.querySelector('#inBody').innerHTML = `
+
+  const body = back.querySelector('#inBody');
+  const A = { pageview: L('페이지뷰', 'Pageview'), open_cafe: L('카페 열람', 'Open cafe'), open_view: L('명소 열람', 'Open view'), filter: L('필터', 'Filter'), search: L('검색', 'Search'), like: L('따봉', 'Like'), add_cafe: L('카페 제안', 'Add cafe'), add_view: L('명소 제안', 'Add view'), lang: L('언어변경', 'Lang'), locate: L('내 위치', 'Locate'), install: L('앱설치', 'Install') };
+  const DOW = ko ? ['일', '월', '화', '수', '목', '금', '토'] : ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'];
+  const stat = (n, label, hint) => `<div class="in-stat"${hint ? ` title="${esc(hint)}"` : ''}><b>${n}</b><span>${esc(label)}</span></div>`;
+  const row = (label, n, sub) => `<div class="in-row">${esc(label)}${sub ? ` <span class="muted">${esc(sub)}</span>` : ''}<span class="in-when">${n}</span></div>`;
+  const hhmm = (s) => esc((s || '').slice(11, 16));
+  const mmddhhmm = (s) => esc((s || '').slice(5, 16).replace('T', ' '));
+  // horizontal bar list — same shape as the score breakdown bars, so it reads as one system
+  const bars = (items) => {
+    const max = Math.max(1, ...items.map((i) => i.n));
+    return `<div class="in-bars">${items.map((i) => `<div class="in-bar"><span class="in-bl">${esc(i.label)}</span><i class="in-bt"><b style="width:${Math.round((i.n / max) * 100)}%"></b></i><span class="in-bn">${i.n}${i.suffix || ''}</span></div>`).join('')}</div>`;
+  };
+  const list = (items) => (items && items.length ? `<div class="in-list">${items.join('')}</div>` : `<p class="muted">${L('없음', 'none')}</p>`);
+
+  let day = null;          // currently viewed KST day
+  let d = null, a = null;  // insights payload (day-independent) + analytics payload (per day)
+  let tab = 'sum';
+  let showBots = false;
+
+  // weekday from the date string via UTC, so it doesn't shift for an admin outside Korea
+  const dayLabel = () => {
+    const dow = DOW[new Date(day + 'T00:00:00Z').getUTCDay()];
+    return `${day} (${dow})${a && day === a.today ? ` · ${L('오늘', 'today')}` : ''}`;
+  };
+  const shift = (n) => {
+    const dt = new Date(day + 'T00:00:00Z');
+    dt.setUTCDate(dt.getUTCDate() + n);
+    return dt.toISOString().slice(0, 10);
+  };
+
+  // ---- tab renderers --------------------------------------------------------
+  function summaryTab() {
+    const k = a.kpi;
+    const trendMax = Math.max(1, ...a.trend.map((x) => x.visitors));
+    const hourMax = Math.max(1, ...a.hours.map((x) => x.events));
+    const depthLabel = { bounce: L('그냥 나감 (페이지만)', 'Bounced (page only)'), browse: L('둘러봄 (필터·검색)', 'Browsed (filter/search)'), open: L('장소 열어봄', 'Opened a place'), act: L('참여 (따봉·제안)', 'Engaged (like/propose)') };
+    return `
       <div class="in-stats">
-        ${stat(a.today.visitors, ko ? '오늘 방문자(고유)' : 'Visitors today')}
-        ${stat(a.today.pageviews, ko ? '페이지뷰' : 'Pageviews')}
-        ${stat(a.today.botPageviews, ko ? '봇 조회' : 'Bot views')}
-        ${stat(d.visits.total, ko ? '누적(구지표)' : 'Legacy total')}
-        ${stat(d.users.total, ko ? '가입 유저' : 'Users')}
-        ${stat(d.content.cafes, ko ? '카페' : 'Cafes')}
-        ${stat(d.content.viewspots, ko ? '명소' : 'Views')}
+        ${stat(k.visitors, L('방문자', 'Visitors'), L('이 날 방문한 고유 세션 (봇·관리자 제외)', 'Unique human sessions this day'))}
+        ${stat(k.pageviews, L('페이지뷰', 'Pageviews'))}
+        ${stat(k.actions, L('행동', 'Actions'), L('페이지뷰를 뺀 실제 클릭 수', 'Clicks other than page loads'))}
+        ${stat(k.engagedPct + '%', L('열람 전환', 'Open rate'), L('방문자 중 장소를 하나라도 열어본 비율', 'Share of visitors who opened a place'))}
+        ${stat(k.returning, L('재방문', 'Returning'), L('이전 날에도 왔던 IP', 'IP seen on an earlier day'))}
+        ${stat(k.mobilePct + '%', L('모바일', 'Mobile'))}
+        ${stat(k.botPageviews, L('봇 조회', 'Bot views'))}
       </div>
-      ${a.today.countries.length ? `<h4 class="in-h4">${ko ? '국가별 방문자' : 'Visitors by country'}</h4><div class="in-list">${a.today.countries.map((c) => row(c.country || '?', c.n)).join('')}</div>` : ''}
-      <h4 class="in-h4">${ko ? '오늘 행동' : 'Actions today'}</h4>
-      <div class="in-list">${a.actions.length ? a.actions.map((x) => row(A[x.type] || x.type, x.n)).join('') : `<p class="muted">${ko ? '아직 없음' : 'none yet'}</p>`}</div>
-      ${a.topCafes.length ? `<h4 class="in-h4">${ko ? '많이 본 카페' : 'Top cafes'}</h4><div class="in-list">${a.topCafes.map((x) => row(x.label || '?', x.n)).join('')}</div>` : ''}
-      ${a.topViews.length ? `<h4 class="in-h4">${ko ? '많이 본 명소' : 'Top views'}</h4><div class="in-list">${a.topViews.map((x) => row(x.label || '?', x.n)).join('')}</div>` : ''}
-      ${a.topSearches.length ? `<h4 class="in-h4">${ko ? '검색어' : 'Searches'}</h4><div class="in-list">${a.topSearches.map((x) => row(x.label || '?', x.n)).join('')}</div>` : ''}
-      <h4 class="in-h4">${ko ? '방문자별 여정 (진짜 사람 vs 봇)' : 'Per-visitor journeys'} <small class="muted">${a.sessions.length}</small></h4>
-      <div class="in-list">${a.sessions.length ? a.sessions.map((s) => `<div class="in-session"><div class="in-srow"><b>${esc(s.country || '?')} · ${esc(s.ip || '?')}</b>${s.user_id ? ' <span class="admin-badge">로그인</span>' : ''} <span class="muted">${s.pageviews}pv · ${s.events}${ko ? '행동' : 'ev'}</span><span class="in-when">${hhmm(s.first_seen)}–${hhmm(s.last_seen)}</span></div>${s.trail && s.trail.length ? `<div class="in-trail">${s.trail.map((tr) => `<span class="in-step">${esc(A[tr.type] || tr.type)}${tr.label ? ` <i>${esc(tr.label)}</i>` : ''}</span>`).join('<b class="in-arrow">›</b>')}</div>` : `<div class="in-trail is-empty">${ko ? '(둘러보기만)' : '(just browsed)'}</div>`}</div>`).join('') : `<p class="muted">${ko ? '없음' : 'none'}</p>`}</div>
 
-      <h4 class="in-h4">${ko ? '새로 추가된 것' : 'Newly added'}</h4>
-      <div class="in-list in-feed">${d.recentContent && d.recentContent.length ? d.recentContent.map((c) => { const kl = ({ story: ko ? '스토리' : 'Story', comment: ko ? '댓글' : 'Comment', cafe: ko ? '새 카페' : 'New cafe', view: ko ? '새 명소' : 'New view' })[c.kind] || c.kind; return `<div class="in-row"><span class="ev-type">${kl}</span> ${c.who ? `<b>${esc(c.who)}</b> ` : ''}<span class="muted">${esc(c.place || '')}</span>${c.text ? `<div class="in-body muted">${esc((c.text || '').slice(0, 70))}</div>` : ''}<span class="in-when">${esc((c.at || '').slice(5, 16))}</span></div>`; }).join('') : `<p class="muted">${ko ? '없음' : 'none'}</p>`}</div>
+      <h4 class="in-h4">${L('최근 14일 방문자', 'Visitors, last 14 days')} <small class="muted">${L('막대를 누르면 그 날로', 'tap a bar to jump')}</small></h4>
+      <div class="in-chart">${a.trend.map((x) => `<button class="in-col${x.day === day ? ' is-on' : ''}" data-day="${x.day}" title="${x.day} · ${x.visitors}${L('명', ' visitors')} / ${x.pageviews}pv / ${x.actions}${L('행동', ' actions')}"><i style="height:${Math.max(2, Math.round((x.visitors / trendMax) * 100))}%"></i><span>${x.day.slice(8)}</span></button>`).join('')}</div>
 
-      ${d.recentPhotos && d.recentPhotos.length ? `<h4 class="in-h4">${ko ? '최근 명소 사진' : 'Recent view photos'}</h4><div class="in-photos">${d.recentPhotos.map((p) => `<a href="${esc(img(p.url))}" target="_blank" rel="noopener" class="in-photo" style="background-image:url('${esc(img(thumb(p.url)))}')" title="${esc(p.place || '')} · ${esc(p.uploader || '')}"></a>`).join('')}</div>` : ''}
+      <h4 class="in-h4">${L('시간대별 활동', 'By hour of day')} <small class="muted">KST</small></h4>
+      <div class="in-chart in-chart--hours">${a.hours.map((x) => `<button class="in-col" title="${String(x.h).padStart(2, '0')}:00 · ${x.visitors}${L('명', ' visitors')} / ${x.events}${L('건', ' events')}"><i style="height:${Math.max(2, Math.round((x.events / hourMax) * 100))}%"></i><span>${x.h % 6 === 0 ? x.h : ''}</span></button>`).join('')}</div>
 
-      <h4 class="in-h4">${ko ? '최근 활동 (실시간)' : 'Recent activity'}</h4>
-      <div class="in-list in-feed">${a.recent.length ? a.recent.map((e) => `<div class="in-row ${e.is_bot ? 'is-bot' : ''}"><span class="ev-type">${esc(e.type)}</span> <span class="muted">${esc(e.label || e.target || '')}</span><span class="in-when">${hhmm(e.ts)} ${esc(e.country || '')}${e.is_bot ? (ko ? ' ·봇' : ' ·bot') : ''}${e.is_admin ? (ko ? ' ·관리자' : ' ·admin') : ''}</span></div>`).join('') : `<p class="muted">${ko ? '없음' : 'none'}</p>`}</div>
+      <h4 class="in-h4">${L('방문자가 어디까지 갔나', 'How far visitors got')}</h4>
+      ${bars(a.depth.map((x) => ({ label: depthLabel[x.key] || x.key, n: x.n })))}
 
-      <h4 class="in-h4">${ko ? '카공총평 검토 (AI 초안 확인용)' : 'Study reviews'} <small class="muted">${d.studyReviews ? d.studyReviews.length : 0}</small></h4>
-      <div class="in-list in-feed">${d.studyReviews && d.studyReviews.length ? d.studyReviews.map((c) => `<div class="in-row"><b>${esc(c.name)}</b><div class="in-body muted">${esc((c.study_review || '').slice(0, 140))}</div></div>`).join('') : `<p class="muted">${ko ? '없음' : 'none'}</p>`}</div>
+      <h4 class="in-h4">${L('행동 내역', 'Actions')}</h4>
+      ${a.actionTypes.length ? bars(a.actionTypes.map((x) => ({ label: A[x.type] || x.type, n: x.n }))) : `<p class="muted">${L('아직 없음', 'none yet')}</p>`}
 
-      <h4 class="in-h4">${ko ? '가입 유저' : 'Signups'}</h4>
-      <div class="in-list">${d.users.recent.map((u) => `<div class="in-row"><b>${esc(u.name || u.provider_id)}</b>${u.is_admin ? ' <span class="admin-badge">ADMIN</span>' : ''} <span class="muted">${esc(u.provider)}</span><span class="in-when">${esc((u.created_at || '').slice(0, 10))}</span></div>`).join('')}</div>`;
-  } catch (e) { back.querySelector('#inBody').innerHTML = `<p class="err">${esc(e.message)}</p>`; }
+      <h4 class="in-h4">${L('많이 본 카페', 'Top cafes')} <small class="muted">${L('최근 7일', 'last 7 days')} · ${a.week.from.slice(5)}~${a.week.to.slice(5)}</small></h4>
+      ${a.week.topCafes.length ? bars(a.week.topCafes.map((x) => ({ label: x.label || '?', n: x.n }))) : `<p class="muted">${L('없음', 'none')}</p>`}
+
+      ${a.week.topViews.length ? `<h4 class="in-h4">${L('많이 본 명소', 'Top views')} <small class="muted">${L('최근 7일', 'last 7 days')}</small></h4>${bars(a.week.topViews.map((x) => ({ label: x.label || '?', n: x.n })))}` : ''}
+      ${a.week.topSearches.length ? `<h4 class="in-h4">${L('검색어', 'Searches')} <small class="muted">${L('최근 7일', 'last 7 days')}</small></h4>${bars(a.week.topSearches.map((x) => ({ label: x.label || '?', n: x.n })))}` : ''}
+      ${a.countries.length ? `<h4 class="in-h4">${L('국가별 방문자', 'Visitors by country')}</h4>${bars(a.countries.map((c) => ({ label: c.country || '?', n: c.n })))}` : ''}
+
+      <h4 class="in-h4">${L('전체 규모', 'Totals')}</h4>
+      <div class="in-stats">
+        ${stat(a.week.visitors, L('7일 방문자', '7-day visitors'))}
+        ${stat(d.visits.total, L('누적 방문', 'All-time visits'))}
+        ${stat(d.users.total, L('가입 유저', 'Users'))}
+        ${stat(d.content.cafes, L('카페', 'Cafes'))}
+        ${stat(d.content.viewspots, L('명소', 'Views'))}
+        ${stat(d.content.reviews, L('스토리', 'Stories'))}
+        ${stat(d.content.votes, L('투표', 'Votes'))}
+      </div>`;
+  }
+
+  function visitorsTab() {
+    const badge = (s) => [
+      s.user_id ? `<span class="admin-badge">${L('로그인', 'signed in')}</span>` : '',
+      s.returning ? `<span class="in-tag">${L('재방문', 'returning')}</span>` : '',
+      `<span class="in-tag">${s.mobile ? L('모바일', 'mobile') : L('데스크탑', 'desktop')}</span>`,
+    ].join('');
+    return `<p class="in-note">${L('깊이 들어간 방문자부터 보여줍니다. 봇과 관리자는 제외.', 'Deepest-engaged visitors first. Bots and admins excluded.')}</p>
+      ${list(a.sessions.map((s) => `<div class="in-session"><div class="in-srow"><b>${esc(s.country || '?')} · ${esc(s.ip || '?')}</b>${badge(s)} <span class="muted">${s.pageviews}pv · ${s.actions}${L('행동', ' actions')}${s.minutes ? ` · ${s.minutes}${L('분', 'min')}` : ''}</span><span class="in-when">${hhmm(s.first_seen)}–${hhmm(s.last_seen)}</span></div>${s.trail && s.trail.length ? `<div class="in-trail">${s.trail.map((tr) => `<span class="in-step">${esc(A[tr.type] || tr.type)}${tr.label ? ` <i>${esc(tr.label)}</i>` : ''}</span>`).join('<b class="in-arrow">›</b>')}</div>` : `<div class="in-trail is-empty">${L('(둘러보기만)', '(just browsed)')}</div>`}</div>`))}`;
+  }
+
+  function contentTab() {
+    const kind = { story: L('스토리', 'Story'), comment: L('댓글', 'Comment'), cafe: L('새 카페', 'New cafe'), view: L('새 명소', 'New view') };
+    return `
+      <h4 class="in-h4">${L('새로 추가된 것', 'Newly added')}</h4>
+      ${list((d.recentContent || []).map((c) => `<div class="in-row"><span class="ev-type">${esc(kind[c.kind] || c.kind)}</span> ${c.who ? `<b>${esc(c.who)}</b> ` : ''}<span class="muted">${esc(c.place || '')}</span>${c.text ? `<div class="in-body muted">${esc((c.text || '').slice(0, 70))}</div>` : ''}<span class="in-when">${mmddhhmm(c.at)}</span></div>`))}
+
+      ${d.recentPhotos && d.recentPhotos.length ? `<h4 class="in-h4">${L('최근 명소 사진', 'Recent view photos')}</h4><div class="in-photos">${d.recentPhotos.map((p) => `<a href="${esc(img(p.url))}" target="_blank" rel="noopener" class="in-photo" style="background-image:url('${esc(img(thumb(p.url)))}')" title="${esc(p.place || '')} · ${esc(p.uploader || '')}"></a>`).join('')}</div>` : ''}
+
+      <h4 class="in-h4">${L('카공총평 검토 (AI 초안 확인용)', 'Study reviews')} <small class="muted">${d.studyReviews ? d.studyReviews.length : 0}</small></h4>
+      ${list((d.studyReviews || []).map((c) => `<div class="in-row"><b>${esc(c.name)}</b><div class="in-body muted">${esc((c.study_review || '').slice(0, 140))}</div></div>`))}
+
+      <h4 class="in-h4">${L('가입 유저', 'Signups')}</h4>
+      ${list((d.users.recent || []).map((u) => `<div class="in-row"><b>${esc(u.name || u.provider_id)}</b>${u.is_admin ? ` <span class="admin-badge">ADMIN</span>` : ''} <span class="muted">${esc(u.provider)}</span><span class="in-when">${mmddhhmm(u.created_at)}</span></div>`))}`;
+  }
+
+  function logTab() {
+    const rows = a.recent.filter((e) => showBots || !e.is_bot);
+    return `<label class="in-note in-check"><input type="checkbox" id="inBots"${showBots ? ' checked' : ''}> ${L('봇·관리자 트래픽도 보기', 'Include bot / admin traffic')}</label>
+      <p class="in-note muted">${L(`이 날(00:00–24:00 KST)의 이벤트 ${rows.length}건, 최신순.`, `${rows.length} events on this day (00:00–24:00 KST), newest first.`)}</p>
+      ${list(rows.map((e) => `<div class="in-row ${e.is_bot ? 'is-bot' : ''}"><span class="ev-type">${esc(A[e.type] || e.type)}</span> <span class="muted">${esc(e.label || e.target || '')}</span><span class="in-when">${hhmm(e.ts)} ${esc(e.country || '')}${e.is_bot ? L(' ·봇', ' ·bot') : ''}${e.is_admin ? L(' ·관리자', ' ·admin') : ''}</span></div>`))}`;
+  }
+
+  function paint() {
+    back.querySelector('#inDay').textContent = dayLabel();
+    back.querySelector('#inNext').disabled = day >= a.today;
+    back.querySelectorAll('.in-tab').forEach((b) => b.classList.toggle('is-on', b.dataset.tab === tab));
+    body.innerHTML = tab === 'sum' ? summaryTab() : tab === 'who' ? visitorsTab() : tab === 'con' ? contentTab() : logTab();
+    body.scrollTop = 0;
+    body.querySelectorAll('.in-col[data-day]').forEach((b) => { b.onclick = () => load(b.dataset.day); });
+    const bots = body.querySelector('#inBots');
+    if (bots) bots.onchange = () => { showBots = bots.checked; paint(); };
+  }
+
+  async function load(nextDay) {
+    body.innerHTML = `<p class="muted">${L('불러오는 중…', 'Loading…')}</p>`;
+    try {
+      a = await api.adminAnalytics(nextDay);
+      day = a.day;
+      paint();
+    } catch (e) { body.innerHTML = `<p class="err">${esc(e.message)}</p>`; }
+  }
+
+  back.querySelectorAll('.in-tab').forEach((b) => { b.onclick = () => { tab = b.dataset.tab; paint(); }; });
+  back.querySelector('#inPrev').onclick = () => load(shift(-1));
+  back.querySelector('#inNext').onclick = () => { if (day < a.today) load(shift(1)); };
+
+  try {
+    [d, a] = await Promise.all([api.adminInsights(), api.adminAnalytics()]);
+    day = a.day;
+    paint();
+  } catch (e) { body.innerHTML = `<p class="err">${esc(e.message)}</p>`; }
 }
 
 // score-weight editor. Personal weights (localStorage) override the site default for you only.
