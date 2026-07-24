@@ -48,7 +48,7 @@ app.use('/api', (req, res, next) => { res.setHeader('Cache-Control', 'no-store')
 const db = require('./db');
 // days are KST calendar days everywhere — with UTC days the public "오늘 방문자" counter
 // reset at 09:00 KST, in the middle of the Korean morning.
-const { recordEvent, isBotUA, kstToday } = require('./analytics');
+const { recordEvent, isBotUA, kstToday, visitorsOn } = require('./analytics');
 const bumpVisit = db.prepare(`INSERT INTO daily_visits (day, n) VALUES (?, 1) ON CONFLICT(day) DO UPDATE SET n = n + 1`);
 app.use((req, res, next) => {
   try {
@@ -84,11 +84,13 @@ app.post('/api/track', express.json({ limit: '4kb' }), (req, res) => {
   if (TRACK_TYPES.has(type)) recordEvent(req, { type, target, label });
   res.json({ ok: true });
 });
-const todayVisits = db.prepare('SELECT n FROM daily_visits WHERE day = ?');
+// "오늘" comes from the events table via visitorsOn() — the same query the admin panel uses, so
+// the counter on the map and the admin number are the same number by construction. daily_visits
+// stays as the all-time tally (it predates event logging); its per-day rows are legacy.
 const totalVisits = db.prepare('SELECT COALESCE(SUM(n), 0) AS t FROM daily_visits');
 app.get('/api/stats', (req, res) => {
   const today = kstToday();
-  res.json({ date: today, today: todayVisits.get(today)?.n || 0, total: totalVisits.get().t });
+  res.json({ date: today, today: visitorsOn(today), total: totalVisits.get().t });
 });
 
 // static assets

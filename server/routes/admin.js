@@ -124,7 +124,7 @@ router.get('/insights', requireAdmin, (req, res) => {
       comments: one('SELECT COUNT(*) AS c FROM viewspot_comments').c,
     },
     visits: {
-      today: one('SELECT n FROM daily_visits WHERE day = ?', today)?.n || 0,
+      today: require('../analytics').visitorsOn(today), // same source as /api/stats and the panel
       total: one('SELECT COALESCE(SUM(n), 0) AS t FROM daily_visits').t,
       days: many('SELECT day, n FROM daily_visits ORDER BY day DESC LIMIT 14'),
     },

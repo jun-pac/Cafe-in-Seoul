@@ -57,6 +57,13 @@ const DEPTH = { filter: 1, search: 1, locate: 1, lang: 1, open_cafe: 2, open_vie
 const DEPTH_KEYS = ['bounce', 'browse', 'open', 'act'];
 const isMobileUA = (ua) => /Mobi|Android|iPhone|iPad|iPod/i.test(ua || '');
 
+// THE definition of "visitors on a day" — distinct real people who loaded the page, on the KST
+// calendar day. /api/stats (the counter on the map) and the admin panel both read this, so they
+// cannot drift apart. Derived from events, so it is retroactively correct: the old daily_visits
+// per-day rows were tallied live under a UTC day boundary and can't be recomputed.
+const visitorsOn = (day) => one(`SELECT COUNT(DISTINCT session_id) AS n
+  FROM events WHERE ${KDAY}=? AND type='pageview' AND ${HUMAN}`, day).n;
+
 function analytics(day = kstToday()) {
   // Build each visitor's journey (ordered actions) so you can see what a real person did —
   // a real user has a varied trail (open cafe → filter → open view …), a bot has just pageviews.
@@ -89,15 +96,22 @@ function analytics(day = kstToday()) {
   // whoever merely reloaded the page the most
   const sessions = all.slice().sort((a, b) => (b.depth - a.depth) || (b.events - a.events)).slice(0, 40);
 
-  const depth = DEPTH_KEYS.map((key, i) => ({ key, n: all.filter((s) => s.depth === i).length }));
-  const engaged = all.filter((s) => s.depth >= 2).length;
-  const visitors = all.length;
+  // A VISITOR is a session that loaded the page on this day — the same thing the public
+  // "오늘 방문자" counter shows, so the two numbers can never disagree. A session can also be
+  // active without a page load (a tab left open since yesterday still fires action beacons);
+  // those are counted as `active`, not as visitors, and every per-visitor rate below is over
+  // the visitor set so the buckets add up to it.
+  const visitorSet = all.filter((s) => s.pageviews > 0);
+  const visitors = visitorSet.length;
+  const depth = DEPTH_KEYS.map((key, i) => ({ key, n: visitorSet.filter((s) => s.depth === i).length }));
+  const engaged = visitorSet.filter((s) => s.depth >= 2).length;
+  const pct = (n) => (visitors ? Math.round((n / visitors) * 100) : 0);
 
   // Last 14 KST days, oldest → newest, so the UI can draw a trend and let you pick a day.
   // GROUP BY/ORDER BY repeat the expression on purpose: `day` is also a real column here, and
   // SQLite would resolve the bare name to that (UTC) column instead of this alias.
   const trend = many(`SELECT ${KDAY} AS day,
-      COUNT(DISTINCT session_id) AS visitors,
+      COUNT(DISTINCT CASE WHEN type='pageview' THEN session_id END) AS visitors,
       SUM(CASE WHEN type='pageview' THEN 1 ELSE 0 END) AS pageviews,
       SUM(CASE WHEN type='pageview' THEN 0 ELSE 1 END) AS actions
     FROM events WHERE ${HUMAN} GROUP BY ${KDAY} ORDER BY ${KDAY} DESC LIMIT 14`).reverse();
@@ -122,13 +136,14 @@ function analytics(day = kstToday()) {
     sessions, // per-visitor with action trail (see above)
     // headline numbers for the selected KST day
     kpi: {
-      visitors,
+      visitors,                                 // sessions that loaded the page today (KST)
+      active: all.length,                       // + sessions acting without a fresh page load
       pageviews: all.reduce((a, s) => a + s.pageviews, 0),
       actions: all.reduce((a, s) => a + s.actions, 0),
       engaged,                                  // visitors who opened at least one place
-      engagedPct: visitors ? Math.round((engaged / visitors) * 100) : 0,
-      returning: all.filter((s) => s.returning).length,
-      mobilePct: visitors ? Math.round((all.filter((s) => s.mobile).length / visitors) * 100) : 0,
+      engagedPct: pct(engaged),
+      returning: visitorSet.filter((s) => s.returning).length,
+      mobilePct: pct(visitorSet.filter((s) => s.mobile).length),
       botPageviews: one(`SELECT COUNT(*) AS n FROM events WHERE ${KDAY}=? AND type='pageview' AND is_bot=1`, day).n,
     },
     depth,
@@ -143,7 +158,7 @@ function analytics(day = kstToday()) {
     week: {
       from: one(`SELECT date(?, '-6 days') AS d`, day).d,
       to: day,
-      visitors: one(`SELECT COUNT(DISTINCT session_id) AS n FROM events WHERE ${RANGE} AND ${HUMAN}`, day, day).n,
+      visitors: one(`SELECT COUNT(DISTINCT session_id) AS n FROM events WHERE ${RANGE} AND type='pageview' AND ${HUMAN}`, day, day).n,
       pageviews: one(`SELECT COUNT(*) AS n FROM events WHERE ${RANGE} AND type='pageview' AND ${HUMAN}`, day, day).n,
       topCafes: topWeek('open_cafe'),
       topViews: topWeek('open_view'),
@@ -155,4 +170,4 @@ function analytics(day = kstToday()) {
   };
 }
 
-module.exports = { recordEvent, analytics, isBotUA, BOT_UA, kstToday };
+module.exports = { recordEvent, analytics, isBotUA, BOT_UA, kstToday, visitorsOn };

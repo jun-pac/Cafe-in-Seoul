@@ -490,13 +490,14 @@ async function openInsightsModal() {
     const depthLabel = { bounce: L('그냥 나감 (페이지만)', 'Bounced (page only)'), browse: L('둘러봄 (필터·검색)', 'Browsed (filter/search)'), open: L('장소 열어봄', 'Opened a place'), act: L('참여 (따봉·제안)', 'Engaged (like/propose)') };
     return `
       <div class="in-stats">
-        ${stat(k.visitors, L('방문자', 'Visitors'), L('이 날 방문한 고유 세션 (봇·관리자 제외)', 'Unique human sessions this day'))}
+        ${stat(k.visitors, L('방문자', 'Visitors'), L('이 날 페이지를 연 고유 세션 (봇·관리자 제외). 지도 화면의 "오늘" 숫자와 같은 값입니다.', 'Unique human sessions that loaded the page this day — the same number the map counter shows.'))}
         ${stat(k.pageviews, L('페이지뷰', 'Pageviews'))}
         ${stat(k.actions, L('행동', 'Actions'), L('페이지뷰를 뺀 실제 클릭 수', 'Clicks other than page loads'))}
         ${stat(k.engagedPct + '%', L('열람 전환', 'Open rate'), L('방문자 중 장소를 하나라도 열어본 비율', 'Share of visitors who opened a place'))}
         ${stat(k.returning, L('재방문', 'Returning'), L('이전 날에도 왔던 IP', 'IP seen on an earlier day'))}
         ${stat(k.mobilePct + '%', L('모바일', 'Mobile'))}
         ${stat(k.botPageviews, L('봇 조회', 'Bot views'))}
+        ${k.active > k.visitors ? stat(k.active, L('활동 세션', 'Active'), L('페이지를 새로 열지 않고 행동만 한 세션까지 포함 (어제 열어둔 탭 등). 방문자에는 안 셉니다.', 'Includes sessions that acted without a fresh page load (e.g. a tab left open). Not counted as visitors.')) : ''}
       </div>
 
       <h4 class="in-h4">${L('최근 14일 방문자', 'Visitors, last 14 days')} <small class="muted">${L('막대를 누르면 그 날로', 'tap a bar to jump')}</small></h4>
