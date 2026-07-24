@@ -116,8 +116,9 @@ router.get('/insights', requireAdmin, (req, res) => {
       recent: many(`SELECT provider, provider_id, name, is_admin, created_at FROM users ORDER BY created_at DESC LIMIT 25`),
     },
     content: {
-      cafes: one("SELECT COUNT(*) AS c FROM cafes WHERE status != 'rejected'").c,
-      viewspots: one('SELECT COUNT(*) AS c FROM viewspots').c,
+      // count LIVE (approved) content so these match the map exactly; pending items live in the review queue
+      cafes: one("SELECT COUNT(*) AS c FROM cafes WHERE status = 'approved'").c,
+      viewspots: one("SELECT COUNT(*) AS c FROM viewspots WHERE status = 'approved'").c,
       reviews: one('SELECT COUNT(*) AS c FROM reviews').c,
       votes: one('SELECT COUNT(*) AS c FROM votes').c,
       comments: one('SELECT COUNT(*) AS c FROM viewspot_comments').c,
