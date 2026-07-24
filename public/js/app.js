@@ -173,6 +173,7 @@ async function refreshPendingQueue() {
 // ---------- detail ----------
 async function openDetail(id) {
   const cafe = await api.getCafe(id);
+  cafe.score = computeScore(cafe, getWeights()); // rescore with the user's weights so the big badge == map card == breakdown
   api.track('open_cafe', id, cafe.name);
   state.openCafeId = id;
   renderDetail(detailEl, cafe, {
