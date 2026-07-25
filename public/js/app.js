@@ -537,7 +537,7 @@ async function openInsightsModal() {
       s.returning ? `<span class="in-tag">${L('재방문', 'returning')}</span>` : '',
       `<span class="in-tag">${s.mobile ? L('모바일', 'mobile') : L('데스크탑', 'desktop')}</span>`,
     ].join('');
-    return `<p class="in-note">${L('깊이 들어간 방문자부터 보여줍니다. 봇과 관리자는 제외.', 'Deepest-engaged visitors first. Bots and admins excluded.')}</p>
+    return `<p class="in-note">${L('최근 활동 순 (최신이 위). 봇·관리자·내부 테스트 트래픽은 제외.', 'Most recent activity first. Bots, admins and internal test traffic excluded.')}</p>
       ${list(a.sessions.map((s) => `<div class="in-session"><div class="in-srow"><b>${esc(s.country || '?')} · ${esc(s.ip || '?')}</b>${badge(s)} <span class="muted">${s.pageviews}pv · ${s.actions}${L('행동', ' actions')}${s.minutes ? ` · ${s.minutes}${L('분', 'min')}` : ''}</span><span class="in-when">${hhmm(s.first_seen)}–${hhmm(s.last_seen)}</span></div>${s.trail && s.trail.length ? `<div class="in-trail">${s.trail.map((tr) => `<span class="in-step">${esc(A[tr.type] || tr.type)}${tr.label ? ` <i>${esc(tr.label)}</i>` : ''}</span>`).join('<b class="in-arrow">›</b>')}</div>` : `<div class="in-trail is-empty">${L('(둘러보기만)', '(just browsed)')}</div>`}</div>`))}`;
   }
 

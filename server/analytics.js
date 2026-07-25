@@ -4,7 +4,8 @@ const db = require('./db');
 
 // crawlers/monitors/link-preview fetchers hit the site without keeping cookies, so each
 // hit looks like a new visitor. Flag them (and empty UAs) so real-people stats exclude them.
-const BOT_UA = /bot|crawler|spider|crawling|slurp|mediapartners|bingpreview|facebookexternalhit|facebot|ia_archiver|embedly|quora link|pinterest|vkshare|whatsapp|telegram|discordbot|slackbot|twitterbot|linkedinbot|petalbot|yandex|baiduspider|duckduckbot|applebot|semrush|ahrefs|mj12bot|dotbot|curl|wget|python-requests|go-http|java\/|okhttp|axios|node-fetch|headless|phantomjs|puppeteer|playwright|lighthouse|gtmetrix|pingdom|uptime|statuscake|monitor|healthcheck|cloudflare|preview/i;
+// `\bnode\b` catches our own jsdom test harness, whose beacons carry the bare UA "node".
+const BOT_UA = /bot|crawler|spider|crawling|slurp|mediapartners|bingpreview|facebookexternalhit|facebot|ia_archiver|embedly|quora link|pinterest|vkshare|whatsapp|telegram|discordbot|slackbot|twitterbot|linkedinbot|petalbot|yandex|baiduspider|duckduckbot|applebot|semrush|ahrefs|mj12bot|dotbot|curl|wget|python-requests|go-http|java\/|okhttp|axios|node-fetch|\bnode\b|headless|phantomjs|puppeteer|playwright|lighthouse|gtmetrix|pingdom|uptime|statuscake|monitor|healthcheck|cloudflare|preview/i;
 
 const isBotUA = (ua) => !ua || BOT_UA.test(ua);
 
@@ -38,10 +39,19 @@ function recordEvent(req, { type, target = null, label = null }) {
   } catch { /* analytics must never break a request */ }
 }
 
-// ---- analysis queries (real people only: is_bot=0, is_admin=0) ---------------
+// ---- analysis queries (real people only) -------------------------------------
 const one = (sql, ...a) => db.prepare(sql).get(...a);
 const many = (sql, ...a) => db.prepare(sql).all(...a);
-const HUMAN = `is_bot = 0 AND is_admin = 0`;
+// Real traffic only ever reaches the site through Cloudflare, which always sets a public
+// cf-connecting-ip. So a private / loopback IP means local or test traffic (our jsdom harness
+// hitting localhost:8001), never a real visitor. Excluding it here fixes the stats for rows
+// already in the table too — no is_bot backfill, nothing rewritten.
+const PUBLIC_IP = `ip IS NOT NULL
+  AND ip NOT LIKE '127.%' AND ip NOT LIKE '::1' AND ip NOT LIKE '10.%' AND ip NOT LIKE '192.168.%'
+  AND ip NOT GLOB '172.1[6-9].*' AND ip NOT GLOB '172.2[0-9].*' AND ip NOT GLOB '172.3[01].*'
+  AND ip NOT LIKE '::ffff:127.%' AND ip NOT LIKE '::ffff:10.%' AND ip NOT LIKE '::ffff:192.168.%'
+  AND ip NOT GLOB '::ffff:172.1[6-9].*' AND ip NOT GLOB '::ffff:172.2[0-9].*' AND ip NOT GLOB '::ffff:172.3[01].*'`;
+const HUMAN = `is_bot = 0 AND is_admin = 0 AND ${PUBLIC_IP}`;
 
 // EVERY number and timestamp below is Korea time (UTC+9), including the day buckets.
 // `ts` is stored as UTC and the legacy `day` column was bucketed by the UTC *date*, so its
@@ -92,9 +102,9 @@ function analytics(day = kstToday()) {
     s.minutes = Math.round((Date.parse(s.last_seen + 'Z') - Date.parse(s.first_seen + 'Z')) / 60000) || 0;
   }
   const all = [...smap.values()];
-  // deepest first, then busiest — the interesting visitors float to the top instead of
-  // whoever merely reloaded the page the most
-  const sessions = all.slice().sort((a, b) => (b.depth - a.depth) || (b.events - a.events)).slice(0, 40);
+  // most recent activity first — reads chronologically like the raw log, newest at the top.
+  // (depth still shows per-row via the action trail; it just isn't the sort key.)
+  const sessions = all.slice().sort((a, b) => (a.last_seen < b.last_seen ? 1 : a.last_seen > b.last_seen ? -1 : 0)).slice(0, 40);
 
   // A VISITOR is a session that loaded the page on this day — the same thing the public
   // "오늘 방문자" counter shows, so the two numbers can never disagree. A session can also be
