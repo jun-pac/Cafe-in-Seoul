@@ -142,7 +142,9 @@ function shell({ lang, title, desc, canonical, alternates, jsonLd, body, ogImage
     .seo-gallery { display: grid; grid-template-columns: repeat(3, 1fr); gap: 6px; }
     .seo-gallery img { width: 100%; aspect-ratio: 1; object-fit: cover; border-radius: var(--r-sm); background: var(--surface-2); }
     .seo-story { border-left: 3px solid var(--hair-strong); padding: 2px 0 2px 14px; margin: 12px 0; font-size: 14.5px; line-height: 1.65; color: var(--ink-2); }
-    .seo-cta { display: inline-flex; align-items: center; gap: 7px; margin: 8px 0; padding: 11px 18px; border-radius: var(--pill); background: var(--ink); color: #fff; font-weight: 700; text-decoration: none; }
+    /* a.seo-cta (not .seo-cta) so it outweighs ".seo a { color: inherit }" — else white text loses to inherited ink and the button is black-on-black */
+    .seo a.seo-cta { display: inline-flex; align-items: center; gap: 7px; margin: 8px 0; padding: 11px 18px; border-radius: var(--pill); background: var(--ink); color: #fff; font-weight: 700; text-decoration: none; }
+    .seo a.seo-cta:hover { opacity: .9; }
     .seo-links { display: flex; flex-wrap: wrap; gap: 8px; }
     .seo-links a { text-decoration: none; border: 1px solid var(--hair-strong); border-radius: var(--pill); padding: 6px 13px; font-size: 13px; }
     .seo-dir { list-style: none; padding: 0; margin: 0; display: grid; grid-template-columns: repeat(auto-fill, minmax(220px, 1fr)); gap: 12px; }
