@@ -95,32 +95,15 @@ function districtEn(addr) {
 // the district label to show for the given language
 const guOf = (row, ko) => (ko ? district(row.address) : (districtEn(row.address_en) || district(row.address)));
 
-// ---- region (city/metro), so pages don't all claim "Seoul" -----------------
-// Cafes carry an address → trust it. View-spots have only lat/lng → resolve by
-// coordinate box. Boxes are calibrated to the data (Busan/Gyeongju/Incheon/…);
-// a point outside every box returns null and the copy just omits the city
-// rather than guessing wrong. [ko, en, latMin, latMax, lngMin, lngMax]
-const REGION_BOXES = [
-  ['부산', 'Busan', 34.90, 35.45, 128.70, 129.35],
-  ['경주', 'Gyeongju', 35.60, 36.10, 129.10, 129.65],
-  ['청주', 'Cheongju', 36.30, 36.75, 127.30, 127.70], // 청남대 (충북)
-  ['수원', 'Suwon', 37.20, 37.36, 126.95, 127.10],
-  // Incheon incl. its Ongjin-gun islands to the SW (노가리해변 등) — kept below 37.52 so it
-  // doesn't reach Gimpo. Verified against Kakao's reverse geocoder.
-  ['인천', 'Incheon', 37.00, 37.52, 125.40, 126.76],
-  ['고양', 'Goyang', 37.60, 37.72, 126.72, 126.92],
-  ['김포', 'Gimpo', 37.53, 37.70, 126.54, 126.75],
-  ['서울', 'Seoul', 37.41, 37.72, 126.76, 127.20],
-];
+// ---- region (city/district) ------------------------------------------------
+// No coordinate guessing: cafes carry a Korean address, and view-spots store a
+// `region` (+ `region_en`) that was reverse-geocoded from their lat/lng at
+// registration ("인천 제물포구"). We just read those.
 const METRO_KO = { 서울: 'Seoul', 부산: 'Busan', 인천: 'Incheon', 대구: 'Daegu', 대전: 'Daejeon', 광주: 'Gwangju', 울산: 'Ulsan', 세종: 'Sejong' };
+// province/metro → English, for the EN fallback when a view-spot's region_en isn't translated yet
+const SIDO_EN = { ...METRO_KO, 경기: 'Gyeonggi', 강원: 'Gangwon', 충북: 'Chungcheongbuk-do', 충남: 'Chungcheongnam-do', 전북: 'Jeollabuk-do', 전남: 'Jeollanam-do', 경북: 'Gyeongsangbuk-do', 경남: 'Gyeongsangnam-do', 제주: 'Jeju' };
+const regionEnFallback = (ko) => SIDO_EN[(ko || '').split(/\s+/)[0]] || ko || '';
 
-function regionFromCoords(lat, lng) {
-  if (lat == null || lng == null) return null;
-  for (const [ko, en, la0, la1, ln0, ln1] of REGION_BOXES) {
-    if (lat >= la0 && lat <= la1 && lng >= ln0 && lng <= ln1) return { ko, en, isMetro: false };
-  }
-  return null;
-}
 function regionFromAddress(addr, addrEn) {
   const t = (addr || '').trim().split(/\s+/);
   if (!t[0]) return null;
@@ -130,8 +113,12 @@ function regionFromAddress(addr, addrEn) {
   const cityEn = (addrEn || '').split(',').map((s) => s.trim()).find((x) => /-(si|gun)$/i.test(x));
   return { ko: cityKo.replace(/시$/, ''), en: cityEn ? cityEn.replace(/-si$/i, '') : cityKo.replace(/시$/, ''), isMetro: false };
 }
-// { ko, en, isMetro } or null. Address wins (cafes); coords are the fallback (view-spots).
-const regionOf = (row) => regionFromAddress(row.address, row.address_en) || regionFromCoords(row.lat, row.lng);
+// { ko, en, isMetro } or null. Cafe → its address; view-spot → its stored region.
+function regionOf(row) {
+  if (row.address) return regionFromAddress(row.address, row.address_en);
+  if (row.region) return { ko: row.region, en: row.region_en || regionEnFallback(row.region), isMetro: false };
+  return null;
+}
 // "서울 용산구" / "Yongsan-gu, Seoul" for metros; just the city otherwise. null → ''.
 function regionPhrase(row, ko) {
   const r = regionOf(row);
@@ -367,7 +354,7 @@ function renderView(row, lang) {
   const cityKo = regionCity(row, true);   // from coordinates (view-spots have no address)
   const cityEn = regionCity(row, false);
   const lead = ko
-    ? `${name}${eunNeun(name)} ${cityKo ? `${cityKo}에서 ` : ''}사진 찍기 좋은 장소입니다. 직접 방문해 촬영한 사진을 모았습니다.`
+    ? `${name}${eunNeun(name)} ${cityKo ? `${cityKo}에 위치한 ` : ''}사진 찍기 좋은 장소입니다. 직접 방문해 촬영한 사진을 모았습니다.`
     : `${name} is a scenic photo spot${cityEn ? ` in ${cityEn}` : ''}. These are photos taken there in person.`;
   const title = ko
     ? `${name} — ${cityKo ? cityKo + ' ' : ''}사진 명소 | Cafe in Seoul`

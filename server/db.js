@@ -192,6 +192,9 @@ if (!vsCols.has('status')) {
   db.exec(`ALTER TABLE viewspots ADD COLUMN status TEXT NOT NULL DEFAULT 'approved'`);
 }
 if (!vsCols.has('name_en')) db.exec(`ALTER TABLE viewspots ADD COLUMN name_en TEXT`);
+// real location, reverse-geocoded from lat/lng at registration ("인천 제물포구") + its EN
+if (!vsCols.has('region')) db.exec(`ALTER TABLE viewspots ADD COLUMN region TEXT`);
+if (!vsCols.has('region_en')) db.exec(`ALTER TABLE viewspots ADD COLUMN region_en TEXT`);
 // English translations of user text: story bodies + view-spot comments
 const reviewCols2 = new Set(db.prepare(`PRAGMA table_info(reviews)`).all().map((c) => c.name));
 if (!reviewCols2.has('body_en')) db.exec(`ALTER TABLE reviews ADD COLUMN body_en TEXT`);

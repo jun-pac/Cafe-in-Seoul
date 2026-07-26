@@ -147,4 +147,26 @@ async function fetchDetail(id) {
   };
 }
 
-module.exports = { searchPlaces, fetchDetail, resolvePlaceId, extractPlaceId, HAS_KAKAO };
+// 시/도 full name → the usual 2-letter abbreviation ("인천광역시" → "인천")
+const SIDO_ABBR = {
+  서울특별시: '서울', 부산광역시: '부산', 대구광역시: '대구', 인천광역시: '인천', 광주광역시: '광주',
+  대전광역시: '대전', 울산광역시: '울산', 세종특별자치시: '세종', 경기도: '경기', 강원도: '강원',
+  강원특별자치도: '강원', 충청북도: '충북', 충청남도: '충남', 전라북도: '전북', 전북특별자치도: '전북',
+  전라남도: '전남', 경상북도: '경북', 경상남도: '경남', 제주특별자치도: '제주', 제주도: '제주',
+};
+
+// Reverse-geocode lat/lng to a human region like "인천 제물포구" (시/도 축약 + 시군구).
+// Used at registration so each place stores its real location — no coordinate guessing.
+async function reverseRegion(lng, lat) {
+  if (!HAS_KAKAO) return null;
+  const url = `https://dapi.kakao.com/v2/local/geo/coord2regioncode.json?x=${lng}&y=${lat}`;
+  const r = await fetch(url, { headers: { Authorization: `KakaoAK ${KEY}` } });
+  if (!r.ok) throw new Error(`Kakao 역지오코딩 실패 (HTTP ${r.status})`);
+  const { documents = [] } = await r.json();
+  const d = documents.find((x) => x.region_type === 'B') || documents[0];
+  if (!d || !d.region_1depth_name) return null;
+  const sido = SIDO_ABBR[d.region_1depth_name] || d.region_1depth_name;
+  return [sido, d.region_2depth_name].filter(Boolean).join(' ').trim() || null;
+}
+
+module.exports = { searchPlaces, fetchDetail, resolvePlaceId, extractPlaceId, reverseRegion, HAS_KAKAO };

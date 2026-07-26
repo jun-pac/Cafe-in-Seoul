@@ -42,7 +42,7 @@ const photosMetaStmt = db.prepare(`SELECT vp.url, u.name AS uploader
   WHERE vp.viewspot_id = ? ORDER BY vp.ord`);
 const photoOwnersStmt = db.prepare('SELECT url, created_by FROM viewspot_photos WHERE viewspot_id = ?');
 const userNameStmt = db.prepare('SELECT name FROM users WHERE id = ?');
-const insertSpot = db.prepare(`INSERT INTO viewspots (id, name, lat, lng, photo_url, created_by, status) VALUES (@id,@name,@lat,@lng,@photo_url,@created_by,@status)`);
+const insertSpot = db.prepare(`INSERT INTO viewspots (id, name, lat, lng, photo_url, created_by, status, region) VALUES (@id,@name,@lat,@lng,@photo_url,@created_by,@status,@region)`);
 const setVsApproved = db.prepare(`UPDATE viewspots SET status='approved' WHERE id=?`);
 const setVsRejected = db.prepare(`UPDATE viewspots SET status='rejected' WHERE id=?`);
 const insertPhoto = db.prepare('INSERT INTO viewspot_photos (id, viewspot_id, url, ord, created_by) VALUES (?,?,?,?,?)');
@@ -124,6 +124,11 @@ router.post('/', requireAuth, upload.array('photos', 30), async (req, res) => {
   if (!Number.isFinite(lat) || !Number.isFinite(lng)) { cleanup(); return res.status(400).json({ error: '위치를 지정하세요.' }); }
   if (!photos.length) { cleanup(); return res.status(400).json({ error: '사진을 한 장 이상 올려주세요.' }); }
 
+  // real location from the coordinates, stored once so pages never have to guess it.
+  // Done BEFORE the dupe check so the check→insert stays await-free (idempotency, see below).
+  let region = null;
+  try { region = await kakao.reverseRegion(lng, lat); } catch { /* best-effort */ }
+
   // Idempotency guard — the structural fix for double-submits. There is NO awaited work
   // between this check and the synchronous insert below, and better-sqlite3 is synchronous,
   // so two racing requests can't both pass: whichever runs its check+insert first wins, and
@@ -136,7 +141,7 @@ router.post('/', requireAuth, upload.array('photos', 30), async (req, res) => {
   const status = admin ? 'approved' : 'pending';
   const id = crypto.randomUUID();
   db.transaction(() => {
-    insertSpot.run({ id, name, lat, lng, photo_url: photos[0], created_by: req.user.id, status });
+    insertSpot.run({ id, name, lat, lng, photo_url: photos[0], created_by: req.user.id, status, region });
     photos.forEach((url, i) => insertPhoto.run(crypto.randomUUID(), id, url, i, req.user.id));
   })();
   if (!admin) {
@@ -164,6 +169,11 @@ router.patch('/:id', requireAuth, upload.array('photos', 30), async (req, res) =
   const photos = ('photo_manifest' in b) ? orderedPhotos(b, files) : null;
   if (photos && !photos.length) { cleanup(); return res.status(400).json({ error: '사진을 한 장 이상 남겨주세요.' }); }
 
+  // re-resolve the region only if the location actually moved
+  const moved = lat !== spot.lat || lng !== spot.lng;
+  let region = spot.region;
+  if (moved) { try { region = await kakao.reverseRegion(lng, lat); } catch { /* keep old */ region = spot.region; } }
+
   // keep each kept photo's original uploader; new photos are attributed to the editor
   const currentRows = photoOwnersStmt.all(spot.id);
   const owners = new Map(currentRows.map((r) => [r.url, r.created_by]));
@@ -180,14 +190,14 @@ router.patch('/:id', requireAuth, upload.array('photos', 30), async (req, res) =
         .map((r) => r.url);
       finalPhotos = [...photos, ...protectedExtras];
     }
-    db.prepare('UPDATE viewspots SET name = ?, lat = ?, lng = ?, photo_url = ? WHERE id = ?')
-      .run(name, lat, lng, photos ? photos[0] : spot.photo_url, spot.id);
+    db.prepare('UPDATE viewspots SET name = ?, lat = ?, lng = ?, photo_url = ?, region = ? WHERE id = ?')
+      .run(name, lat, lng, photos ? photos[0] : spot.photo_url, region, spot.id);
     if (photos) {
       delPhotos.run(spot.id);
       finalPhotos.forEach((url, i) => insertPhoto.run(crypto.randomUUID(), spot.id, url, i, owners.get(url) || req.user.id));
     }
   })();
-  if (name !== spot.name) i18nContent.translateViewspot(spot.id).catch(() => {}); // re-translate if renamed
+  if (name !== spot.name || region !== spot.region) i18nContent.translateViewspot(spot.id).catch(() => {}); // re-translate name/region if changed
   res.json(getStmt.get(spot.id));
 });
 

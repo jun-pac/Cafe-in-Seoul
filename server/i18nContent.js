@@ -7,6 +7,10 @@ const ai = require('./ai');
 
 const CAFE_FIELDS = ['name', 'address', 'study_review', 'view_note', 'review_summary'];
 
+// Deterministic English for regions the model romanizes wrong — e.g. brand-new
+// admin districts it hasn't seen (인천 제물포구, created 2026, → hallucinated "Jeongneung-dong").
+const REGION_EN = { '인천 제물포구': 'Jemulpo-gu, Incheon' };
+
 // Translate the given (Korean) fields of one row and write them to their _en columns.
 async function translateRow(table, id, fields) {
   if (!ai.HAS_AI) return;
@@ -17,13 +21,16 @@ async function translateRow(table, id, fields) {
     if (!todo.length) return;
     const outs = await ai.translateBatch(todo.map((f) => row[f]));
     const sets = [], params = { id };
-    todo.forEach((f, i) => { if (outs[i]) { sets.push(`${f}_en = @p${i}`); params[`p${i}`] = outs[i]; } });
+    todo.forEach((f, i) => {
+      const out = (f === 'region' && REGION_EN[row[f]]) || outs[i]; // known-wrong regions overridden
+      if (out) { sets.push(`${f}_en = @p${i}`); params[`p${i}`] = out; }
+    });
     if (sets.length) db.prepare(`UPDATE ${table} SET ${sets.join(', ')} WHERE id = @id`).run(params);
   } catch { /* translation is best-effort */ }
 }
 
 const translateCafe = (id) => translateRow('cafes', id, CAFE_FIELDS);
-const translateViewspot = (id) => translateRow('viewspots', id, ['name']);
+const translateViewspot = (id) => translateRow('viewspots', id, ['name', 'region']);
 const translateReview = (id) => translateRow('reviews', id, ['body']);
 const translateComment = (id) => translateRow('viewspot_comments', id, ['body']);
 
