@@ -445,6 +445,7 @@ async function openInsightsModal() {
     <div class="in-tabs">
       <button class="in-tab is-on" data-tab="sum">${L('요약', 'Summary')}</button>
       <button class="in-tab" data-tab="who">${L('방문자', 'Visitors')}</button>
+      <button class="in-tab" data-tab="src">${L('유입·AI', 'Traffic & AI')}</button>
       <button class="in-tab" data-tab="con">${L('콘텐츠', 'Content')}</button>
       <button class="in-tab" data-tab="log">${L('원본 로그', 'Raw log')}</button>
     </div>
@@ -465,7 +466,7 @@ async function openInsightsModal() {
   // horizontal bar list — same shape as the score breakdown bars, so it reads as one system
   const bars = (items) => {
     const max = Math.max(1, ...items.map((i) => i.n));
-    return `<div class="in-bars">${items.map((i) => `<div class="in-bar"><span class="in-bl">${esc(i.label)}</span><i class="in-bt"><b style="width:${Math.round((i.n / max) * 100)}%"></b></i><span class="in-bn">${i.n}${i.suffix || ''}</span></div>`).join('')}</div>`;
+    return `<div class="in-bars">${items.map((i) => `<div class="in-bar"><span class="in-bl">${esc(i.label)}${i.ai ? ' <span class="in-tag in-tag--ai">AI</span>' : ''}</span><i class="in-bt"><b class="${i.ai ? 'is-ai' : ''}" style="width:${Math.round((i.n / max) * 100)}%"></b></i><span class="in-bn">${i.n}${i.suffix || ''}</span></div>`).join('')}</div>`;
   };
   const list = (items) => (items && items.length ? `<div class="in-list">${items.join('')}</div>` : `<p class="muted">${L('없음', 'none')}</p>`);
 
@@ -500,6 +501,7 @@ async function openInsightsModal() {
         ${stat(k.returning, L('재방문', 'Returning'), L('이전 날에도 왔던 IP', 'IP seen on an earlier day'))}
         ${stat(k.mobilePct + '%', L('모바일', 'Mobile'))}
         ${stat(k.botPageviews, L('봇 조회', 'Bot views'))}
+        ${stat(k.aiCrawls || 0, L('AI 크롤', 'AI crawls'), L('AI 크롤러(ChatGPT 등)의 페이지 조회. 자세히는 유입·AI 탭.', 'AI crawler fetches (ChatGPT etc). See the Traffic & AI tab.'))}
         ${k.active > k.visitors ? stat(k.active, L('활동 세션', 'Active'), L('페이지를 새로 열지 않고 행동만 한 세션까지 포함 (어제 열어둔 탭 등). 방문자에는 안 셉니다.', 'Includes sessions that acted without a fresh page load (e.g. a tab left open). Not counted as visitors.')) : ''}
       </div>
 
@@ -544,6 +546,25 @@ async function openInsightsModal() {
       ${list(a.sessions.map((s) => `<div class="in-session"><div class="in-srow"><b>${esc(s.country || '?')} · ${esc(s.ip || '?')}</b>${badge(s)} <span class="muted">${s.pageviews}pv · ${s.actions}${L('행동', ' actions')}${s.minutes ? ` · ${s.minutes}${L('분', 'min')}` : ''}</span><span class="in-when">${hhmm(s.first_seen)}–${hhmm(s.last_seen)}</span></div>${s.trail && s.trail.length ? `<div class="in-trail">${s.trail.map((tr) => `<span class="in-step">${esc(A[tr.type] || tr.type)}${tr.label ? ` <i>${esc(tr.label)}</i>` : ''}</span>`).join('<b class="in-arrow">›</b>')}</div>` : `<div class="in-trail is-empty">${L('(둘러보기만)', '(just browsed)')}</div>`}</div>`))}`;
   }
 
+  function sourcesTab() {
+    const k = a.kpi;
+    const srcItems = (a.sources || []).map((s) => ({ label: s.name, n: s.n, ai: s.ai }));
+    const crawlItems = (a.crawlers || []).map((c) => ({ label: c.name, n: c.n, ai: c.ai }));
+    return `
+      <div class="in-stats">
+        ${stat(k.aiCrawls || 0, L('AI 크롤 (오늘)', 'AI crawls today'), L('ChatGPT·Perplexity 등 AI 크롤러가 페이지를 가져간 횟수입니다. 봇이며 방문자로는 안 셉니다.', 'How many times an AI crawler fetched a page. A bot, not counted as a visit.'))}
+        ${stat(k.aiReferrals || 0, L('AI 유입 방문', 'From AI'), L('AI 답변의 링크를 눌러 실제로 들어온 사람. utm/referer로 집계하며, 이 기능 배포 이후부터 쌓입니다.', 'People who actually clicked through from an AI answer. From utm/referer, accumulating since this shipped.'))}
+      </div>
+
+      <h4 class="in-h4">${L('사람 유입 경로', 'Where visitors came from')} <small class="muted">${L('방문자 기준', 'by visitor')}</small></h4>
+      ${srcItems.length ? bars(srcItems) : `<p class="muted">${L('아직 없음', 'none yet')}</p>`}
+      <p class="in-note muted">${L('referer·utm 기반. 이 기능 배포 전 방문과, 앱·북마크·직접입력은 Direct로 잡힙니다.', 'From referer/utm. Visits before this shipped — and app/bookmark/typed visits — show as Direct.')}</p>
+
+      <h4 class="in-h4">${L('누가 우리를 크롤링하나', 'Who crawls us')} <small class="muted">${L('AI·검색·봇', 'AI / search / bots')}</small></h4>
+      ${crawlItems.length ? bars(crawlItems) : `<p class="muted">${L('아직 없음', 'none yet')}</p>`}
+      <p class="in-note muted">${L('크롤러 = 페이지를 긁어가는 봇으로, 방문자와 별개입니다. GPTBot·ClaudeBot 등은 Cloudflare가 엣지에서 막아 여기 안 보일 수 있어요(그래도 ChatGPT 검색용 OAI-SearchBot·ChatGPT-User는 통과).', 'Crawlers are bots fetching pages, separate from visitors. Cloudflare may block GPTBot/ClaudeBot at the edge, so they can be absent here (ChatGPT-User / OAI-SearchBot still get through).')}</p>`;
+  }
+
   function contentTab() {
     const kind = { story: L('스토리', 'Story'), comment: L('댓글', 'Comment'), cafe: L('새 카페', 'New cafe'), view: L('새 명소', 'New view') };
     return `
@@ -570,7 +591,7 @@ async function openInsightsModal() {
     back.querySelector('#inDay').textContent = dayLabel();
     back.querySelector('#inNext').disabled = day >= a.today;
     back.querySelectorAll('.in-tab').forEach((b) => b.classList.toggle('is-on', b.dataset.tab === tab));
-    body.innerHTML = tab === 'sum' ? summaryTab() : tab === 'who' ? visitorsTab() : tab === 'con' ? contentTab() : logTab();
+    body.innerHTML = tab === 'sum' ? summaryTab() : tab === 'who' ? visitorsTab() : tab === 'src' ? sourcesTab() : tab === 'con' ? contentTab() : logTab();
     body.scrollTop = 0;
     body.querySelectorAll('.in-col[data-day]').forEach((b) => { b.onclick = () => load(b.dataset.day); });
     const bots = body.querySelector('#inBots');

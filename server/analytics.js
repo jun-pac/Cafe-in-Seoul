@@ -9,18 +9,70 @@ const BOT_UA = /bot|crawler|spider|crawling|slurp|mediapartners|bingpreview|face
 
 const isBotUA = (ua) => !ua || BOT_UA.test(ua);
 
+// ---- traffic-source classification ----------------------------------------
+// Which AI / search engine a crawler UA belongs to (for "who is indexing us").
+// Retroactive: runs over the ua we already store, so old rows classify too.
+function classifyCrawler(ua) {
+  ua = ua || '';
+  if (/OAI-SearchBot|ChatGPT-User|GPTBot/i.test(ua)) return 'ChatGPT';
+  if (/PerplexityBot|Perplexity-User/i.test(ua)) return 'Perplexity';
+  if (/ClaudeBot|Claude-User|Claude-SearchBot|anthropic/i.test(ua)) return 'Claude';
+  if (/Google-Extended/i.test(ua)) return 'Gemini';
+  if (/Applebot-Extended|Bytespider|Amazonbot|CCBot|cohere|Diffbot|meta-externalagent|YouBot|Meltwater|Timpibot/i.test(ua)) return 'Other AI';
+  if (/Googlebot|Google-InspectionTool|Storebot-Google/i.test(ua)) return 'Google';
+  if (/bingbot|BingPreview|msnbot/i.test(ua)) return 'Bing';
+  if (/YandexBot|Baiduspider|DuckDuckBot|NaverBot|Yeti|Daum/i.test(ua)) return 'Other search';
+  if (/facebookexternalhit|kakaotalk-scrap|Twitterbot|Slackbot|Discordbot|TelegramBot|LinkedInBot|WhatsApp|Pinterest|redditbot/i.test(ua)) return 'Social preview';
+  if (/AhrefsBot|SemrushBot|DotBot|MJ12bot|serpstat|trendiction|DomainArrivals|S33D|Spill|petalbot|dataforseo/i.test(ua)) return 'SEO tools';
+  return 'Other bot';
+}
+const AI_CRAWLERS = new Set(['ChatGPT', 'Perplexity', 'Claude', 'Gemini', 'Other AI']);
+
+// Where a human came from, from the utm_source param and/or the Referer host.
+// Our own domain (a reload/internal click) counts as no source, so entry pages win.
+const SELF_HOST = /(^|\.)cafe-in-seoul\.com$|localhost|127\.0\.0\.1/i;
+function classifySource(referer, utm) {
+  let host = '';
+  try { host = referer ? new URL(referer).hostname : ''; } catch { /* malformed */ }
+  const internal = host && SELF_HOST.test(host);
+  const hay = `${(utm || '').toLowerCase()} ${internal ? '' : host.toLowerCase()}`;
+  if (/chatgpt|openai|\boai\b/.test(hay)) return 'ChatGPT';
+  if (/perplexity/.test(hay)) return 'Perplexity';
+  if (/gemini|bard/.test(hay)) return 'Gemini';
+  if (/claude|anthropic/.test(hay)) return 'Claude';
+  if (/copilot|bingchat/.test(hay)) return 'Copilot';
+  if (/google\./.test(host) && !internal) return 'Google';
+  if (/naver\./.test(host)) return 'Naver';
+  if (/bing\./.test(host)) return 'Bing';
+  if (/daum\.|kakao/.test(host)) return 'Daum/Kakao';
+  if (/instagram/.test(hay)) return 'Instagram';
+  if (/facebook|fb\.com|fb\.me/.test(hay)) return 'Facebook';
+  if (/t\.co|twitter|x\.com/.test(hay)) return 'X';
+  if (/threads\.net/.test(hay)) return 'Threads';
+  if (/youtube|youtu\.be/.test(hay)) return 'YouTube';
+  if (/reddit/.test(hay)) return 'Reddit';
+  if (/everytime/.test(hay)) return 'Everytime';
+  if (utm) return utm.slice(0, 24);
+  if (host && !internal) return host.replace(/^www\./, '').slice(0, 24);
+  return 'Direct';   // no utm, no external referer (typed/bookmarked/app)
+}
+const AI_SOURCES = new Set(['ChatGPT', 'Perplexity', 'Gemini', 'Claude', 'Copilot']);
+
 // The site is Korean, so a "day" always means a KST calendar day (00:00–24:00 KST).
 const kstToday = () => new Date(Date.now() + 9 * 3600 * 1000).toISOString().slice(0, 10);
 
 // store ts as UTC explicitly (container TZ is UTC); analytics queries convert to KST (+9h)
 const insertEvent = db.prepare(`INSERT INTO events
-  (ts, day, session_id, user_id, type, target, label, ip, country, ua, is_bot, is_admin)
-  VALUES (datetime('now'),@day,@session_id,@user_id,@type,@target,@label,@ip,@country,@ua,@is_bot,@is_admin)`);
+  (ts, day, session_id, user_id, type, target, label, ip, country, ua, is_bot, is_admin, referer, source)
+  VALUES (datetime('now'),@day,@session_id,@user_id,@type,@target,@label,@ip,@country,@ua,@is_bot,@is_admin,@referer,@source)`);
 
 // Record one event from an Express request. type is required; target/label optional.
 function recordEvent(req, { type, target = null, label = null }) {
   try {
     const ua = req.get('user-agent') || '';
+    const referer = req.get('referer') || null;
+    // OpenAI/ChatGPT tags outbound links with utm_source=chatgpt.com; other engines set Referer.
+    const utm = (req.query && (req.query.utm_source || req.query.ref)) || null;
     insertEvent.run({
       // convenience column only — analytics derives the day from ts (see KDAY below), which
       // keeps rows written before this was KST bucketed correctly too.
@@ -35,6 +87,8 @@ function recordEvent(req, { type, target = null, label = null }) {
       ua: ua.slice(0, 200),
       is_bot: isBotUA(ua) ? 1 : 0,
       is_admin: req.user?.is_admin ? 1 : 0,
+      referer: referer ? String(referer).slice(0, 300) : null,
+      source: classifySource(referer, utm),
     });
   } catch { /* analytics must never break a request */ }
 }
@@ -77,7 +131,7 @@ const visitorsOn = (day) => one(`SELECT COUNT(DISTINCT session_id) AS n
 function analytics(day = kstToday()) {
   // Build each visitor's journey (ordered actions) so you can see what a real person did —
   // a real user has a varied trail (open cafe → filter → open view …), a bot has just pageviews.
-  const humanEvents = many(`SELECT session_id, user_id, type, label, ip, country, ua, ${KTS} AS ts
+  const humanEvents = many(`SELECT session_id, user_id, type, label, ip, country, ua, source, ${KTS} AS ts
     FROM events WHERE ${KDAY}=? AND ${HUMAN} ORDER BY id`, day);
   // ips seen on any EARLIER day → this session is a returning visitor, not a first-timer
   const seenBefore = new Set(many(`SELECT DISTINCT ip FROM events WHERE ${KDAY}<? AND ip IS NOT NULL AND ${HUMAN}`, day).map((r) => r.ip));
@@ -85,8 +139,11 @@ function analytics(day = kstToday()) {
   const smap = new Map();
   for (const e of humanEvents) {
     let s = smap.get(e.session_id);
-    if (!s) { s = { session_id: e.session_id, ip: e.ip, country: e.country, ua: e.ua, user_id: e.user_id, first_seen: e.ts, last_seen: e.ts, events: 0, pageviews: 0, actions: 0, depth: 0, trail: [] }; smap.set(e.session_id, s); }
+    if (!s) { s = { session_id: e.session_id, ip: e.ip, country: e.country, ua: e.ua, user_id: e.user_id, first_seen: e.ts, last_seen: e.ts, events: 0, pageviews: 0, actions: 0, depth: 0, trail: [], source: 'Direct' }; smap.set(e.session_id, s); }
     s.last_seen = e.ts; s.events++;
+    // the session's source is the first non-Direct one seen — the real entry point,
+    // not a later same-site reload (which classifies as Direct)
+    if (s.source === 'Direct' && e.source && e.source !== 'Direct') s.source = e.source;
     if (e.type === 'pageview') s.pageviews++;
     else {
       s.actions++;
@@ -139,6 +196,25 @@ function analytics(day = kstToday()) {
   const topDay = (type) => many(topSql(`${KDAY}=?`), day, type);
   const topWeek = (type) => many(topSql(RANGE), day, day, type);
 
+  // where the humans came from (this day), by distinct visitor. AI answer engines flagged.
+  const srcMap = new Map();
+  for (const s of visitorSet) srcMap.set(s.source, (srcMap.get(s.source) || 0) + 1);
+  const sources = [...srcMap.entries()].map(([name, n]) => ({ name, n, ai: AI_SOURCES.has(name) })).sort((a, b) => b.n - a.n);
+  const aiReferrals = visitorSet.filter((s) => AI_SOURCES.has(s.source)).length;
+
+  // who CRAWLED us (bots), classified from UA — retroactive, answers "누가 우리를 색인하나".
+  // This is separate from human traffic: an AI crawl is not a visit.
+  const crawlerRows = many(`SELECT ua, COUNT(*) AS n, COUNT(DISTINCT session_id) AS s
+    FROM events WHERE ${KDAY}=? AND type='pageview' AND is_bot=1 GROUP BY ua`, day);
+  const crawlMap = new Map();
+  for (const r of crawlerRows) {
+    const name = classifyCrawler(r.ua);
+    const c = crawlMap.get(name) || { name, n: 0, ai: AI_CRAWLERS.has(name) };
+    c.n += r.n; crawlMap.set(name, c);
+  }
+  const crawlers = [...crawlMap.values()].sort((a, b) => b.n - a.n);
+  const aiCrawls = crawlers.filter((c) => c.ai).reduce((a, c) => a + c.n, 0);
+
   return {
     day,
     today: kstToday(),
@@ -155,10 +231,14 @@ function analytics(day = kstToday()) {
       returning: visitorSet.filter((s) => s.returning).length,
       mobilePct: pct(visitorSet.filter((s) => s.mobile).length),
       botPageviews: one(`SELECT COUNT(*) AS n FROM events WHERE ${KDAY}=? AND type='pageview' AND is_bot=1`, day).n,
+      aiReferrals,   // human visitors who arrived from an AI answer engine
+      aiCrawls,      // times an AI crawler fetched a page (bot, not a visit)
     },
     depth,
     trend,
     hours,
+    sources,        // human traffic sources (Direct/Google/Naver/ChatGPT/…)
+    crawlers,       // bot page fetches by crawler family (Google/ChatGPT/Perplexity/…)
     countries: many(`SELECT country, COUNT(DISTINCT session_id) AS n FROM events WHERE ${KDAY}=? AND type='pageview' AND ${HUMAN} AND country IS NOT NULL GROUP BY country ORDER BY n DESC LIMIT 8`, day),
     // what people actually did on this day
     actionTypes: many(`SELECT type, COUNT(*) AS n, COUNT(DISTINCT session_id) AS people FROM events WHERE ${KDAY}=? AND ${HUMAN} AND type!='pageview' GROUP BY type ORDER BY n DESC`, day),
@@ -180,4 +260,4 @@ function analytics(day = kstToday()) {
   };
 }
 
-module.exports = { recordEvent, analytics, isBotUA, BOT_UA, kstToday, visitorsOn };
+module.exports = { recordEvent, analytics, isBotUA, BOT_UA, kstToday, visitorsOn, classifySource, classifyCrawler };

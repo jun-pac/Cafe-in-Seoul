@@ -179,6 +179,8 @@ b { font-weight: 700; }
 .in-bn { flex: 0 0 34px; text-align: right; font-weight: 700; font-size: 11.5px; }
 .in-tag { font-size: 9px; font-weight: 700; letter-spacing: .3px; text-transform: uppercase; color: var(--ink-2);
   background: var(--cool); border-radius: var(--pill); padding: 1px 6px; }
+.in-tag--ai { color: #fff; background: var(--view); }   /* AI source/crawler accent */
+.in-bt b.is-ai { background: var(--view); }
 .in-note { font-size: 11.5px; color: var(--ink-2); margin: 8px 0 2px; }
 .in-check { display: flex; align-items: center; gap: 6px; cursor: pointer; }
 .in-stats { display: grid; grid-template-columns: repeat(auto-fit, minmax(78px, 1fr)); gap: 8px; }

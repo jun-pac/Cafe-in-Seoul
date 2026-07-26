@@ -225,6 +225,11 @@ db.exec(`CREATE TABLE IF NOT EXISTS events (
 db.exec(`CREATE INDEX IF NOT EXISTS idx_events_day ON events(day)`);
 db.exec(`CREATE INDEX IF NOT EXISTS idx_events_type ON events(type)`);
 db.exec(`CREATE INDEX IF NOT EXISTS idx_events_session ON events(session_id)`);
+// where a visitor came from: raw Referer + a normalized source (Google/Naver/ChatGPT/…).
+// Added later, so old rows are NULL — traffic-source stats start from when this shipped.
+const evCols = new Set(db.prepare(`PRAGMA table_info(events)`).all().map((c) => c.name));
+if (!evCols.has('referer')) db.exec(`ALTER TABLE events ADD COLUMN referer TEXT`);
+if (!evCols.has('source')) db.exec(`ALTER TABLE events ADD COLUMN source TEXT`);
 
 // 따봉(likes) on view-spots — the count decides which survives when cards overlap
 db.exec(`CREATE TABLE IF NOT EXISTS viewspot_likes (
