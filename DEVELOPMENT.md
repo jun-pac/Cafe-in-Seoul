@@ -42,6 +42,7 @@
 - **영어 트윈** — `/en/cafes/...`, `/en/views/...` (기존 `*_en` 컬럼 사용). ko↔en `hreflang` 상호 연결.
 - **디렉터리** — `/cafes` `/views` (+ `/en/...`)에 전체 목록. 각 상세/디렉터리가 서로 링크 → 크롤 그래프.
 - **`/sitemap.xml`** — DB에서 동적 생성(홈+디렉터리+전 장소, `<image:image>`·ko/en `hreflang` 포함). **`/robots.txt`** — 전체 허용 + `OAI-SearchBot`(ChatGPT 검색) 명시 + sitemap.
+- **지역명은 하드코딩 금지** — 카페는 `address`(예: "부산 해운대구…")로, 명소는 좌표로 지역을 뽑는다(`regionOf`). 좌표→지역은 `REGION_BOXES`(부산/경주/청주/수원/인천(옹진 섬 포함)/고양/김포/서울, Kakao 역지오코딩으로 검증)로 판정하고, 어느 박스에도 안 맞으면 지역명을 **생략**(틀린 "서울" 대신). 명소 문장의 은/는 조사는 `eunNeun`으로 받침 판정. 새 지역의 명소가 들어오면 박스를 추가.
 - **슬러그** = `slugify(name_en||name)` + `-` + `id`앞 8자. 이름 부분이 달라도 8자 id로 행을 찾고 **정식 슬러그로 301**. 미존재 → 404(정적으로 폴백).
 - **www→apex 301** (`index.js` 최상단 미들웨어, 세션 이전). https는 Cloudflare가 처리.
 - **딥링크** — `/?cafe=<id>` / `/?view=<id>`로 지도에서 해당 상세 자동 오픈(`app.js openFromUrl`); 카드 클릭 시 `history.replaceState`로 URL 공유 가능. SEO 페이지의 "지도에서 열기"가 여기로 연결.

@@ -95,6 +95,60 @@ function districtEn(addr) {
 // the district label to show for the given language
 const guOf = (row, ko) => (ko ? district(row.address) : (districtEn(row.address_en) || district(row.address)));
 
+// ---- region (city/metro), so pages don't all claim "Seoul" -----------------
+// Cafes carry an address → trust it. View-spots have only lat/lng → resolve by
+// coordinate box. Boxes are calibrated to the data (Busan/Gyeongju/Incheon/…);
+// a point outside every box returns null and the copy just omits the city
+// rather than guessing wrong. [ko, en, latMin, latMax, lngMin, lngMax]
+const REGION_BOXES = [
+  ['부산', 'Busan', 34.90, 35.45, 128.70, 129.35],
+  ['경주', 'Gyeongju', 35.60, 36.10, 129.10, 129.65],
+  ['청주', 'Cheongju', 36.30, 36.75, 127.30, 127.70], // 청남대 (충북)
+  ['수원', 'Suwon', 37.20, 37.36, 126.95, 127.10],
+  // Incheon incl. its Ongjin-gun islands to the SW (노가리해변 등) — kept below 37.52 so it
+  // doesn't reach Gimpo. Verified against Kakao's reverse geocoder.
+  ['인천', 'Incheon', 37.00, 37.52, 125.40, 126.76],
+  ['고양', 'Goyang', 37.60, 37.72, 126.72, 126.92],
+  ['김포', 'Gimpo', 37.53, 37.70, 126.54, 126.75],
+  ['서울', 'Seoul', 37.41, 37.72, 126.76, 127.20],
+];
+const METRO_KO = { 서울: 'Seoul', 부산: 'Busan', 인천: 'Incheon', 대구: 'Daegu', 대전: 'Daejeon', 광주: 'Gwangju', 울산: 'Ulsan', 세종: 'Sejong' };
+
+function regionFromCoords(lat, lng) {
+  if (lat == null || lng == null) return null;
+  for (const [ko, en, la0, la1, ln0, ln1] of REGION_BOXES) {
+    if (lat >= la0 && lat <= la1 && lng >= ln0 && lng <= ln1) return { ko, en, isMetro: false };
+  }
+  return null;
+}
+function regionFromAddress(addr, addrEn) {
+  const t = (addr || '').trim().split(/\s+/);
+  if (!t[0]) return null;
+  for (const ko of Object.keys(METRO_KO)) if (t[0].startsWith(ko)) return { ko, en: METRO_KO[ko], isMetro: true };
+  // a province address → use the city (…시 / …군), matched in both languages
+  const cityKo = t.find((x) => /(시|군)$/.test(x)) || t[1] || t[0];
+  const cityEn = (addrEn || '').split(',').map((s) => s.trim()).find((x) => /-(si|gun)$/i.test(x));
+  return { ko: cityKo.replace(/시$/, ''), en: cityEn ? cityEn.replace(/-si$/i, '') : cityKo.replace(/시$/, ''), isMetro: false };
+}
+// { ko, en, isMetro } or null. Address wins (cafes); coords are the fallback (view-spots).
+const regionOf = (row) => regionFromAddress(row.address, row.address_en) || regionFromCoords(row.lat, row.lng);
+// "서울 용산구" / "Yongsan-gu, Seoul" for metros; just the city otherwise. null → ''.
+function regionPhrase(row, ko) {
+  const r = regionOf(row);
+  if (!r) return '';
+  if (!r.isMetro) return ko ? r.ko : r.en;
+  const gu = ko ? district(row.address) : (districtEn(row.address_en) || district(row.address));
+  return ko ? `${r.ko}${gu ? ' ' + gu : ''}` : `${gu ? gu + ', ' : ''}${r.en}`;
+}
+const regionCity = (row, ko) => { const r = regionOf(row); return r ? (ko ? r.ko : r.en) : ''; };
+
+// pick the right Korean subject particle (은/는) for a word by its final consonant
+function eunNeun(word) {
+  const c = (word || '').trim().slice(-1).charCodeAt(0);
+  if (c < 0xac00 || c > 0xd7a3) return '는';        // not Hangul → default
+  return (c - 0xac00) % 28 !== 0 ? '은' : '는';       // has a final consonant → 은
+}
+
 // ---- page chrome -----------------------------------------------------------
 // One HTML skeleton for every page. Reuses the site stylesheet so the pages look
 // native, plus a little page-specific CSS for the article layout.
@@ -192,15 +246,19 @@ function renderCafe(row, lang) {
   const photos = cafePhotos(row.id);
   const hero = photos[0] || row.photo_url;
 
+  // actual city/district from the address (or coords) — not a hardcoded "Seoul"
+  const regKo = regionPhrase(row, true);
+  const regEn = regionPhrase(row, false);
+
   // natural-language lead, so the crawler (and ChatGPT) sees the key facts as prose
   const lead = ko
-    ? `${gu ? `서울 ${gu}` : '서울'}에 있는 ${sizeTxt} 카공 카페입니다. `
+    ? `${regKo ? `${regKo}에 있는 ` : ''}${sizeTxt} 카공 카페입니다. `
       + `아이스 아메리카노는 ${price}원이고 ${row.open_time}–${row.close_time}에 영업합니다. `
       + `${OUTLET_KO[row.outlets] || OUTLET_KO.some}. `
       + (row.floors >= 2 ? `${row.floors}층 규모입니다. ` : '')
       + (hasView ? '창밖 뷰가 좋습니다. ' : '')
       + `Cafe in Seoul 카공 점수는 ${d.score}점입니다.`
-    : `A ${sizeTxt} study-friendly cafe in ${gu ? `${gu}, Seoul` : 'Seoul'}. `
+    : `A ${sizeTxt} study-friendly cafe${regEn ? ` in ${regEn}` : ''}. `
       + `An iced americano is ₩${price}, and it's open ${row.open_time}–${row.close_time}. `
       + `There are ${OUTLET_EN[row.outlets] || OUTLET_EN.some}`
       + (row.floors >= 2 ? `, across ${row.floors} floors` : '')
@@ -228,8 +286,8 @@ function renderCafe(row, lang) {
   const nearby = nearbyCafes(row);
 
   const title = ko
-    ? `${name} — ${gu ? gu + ' ' : ''}카공 카페 (아메리카노 ${price}원, ${d.score}점) | Cafe in Seoul`
-    : `${name} — study cafe in ${gu ? gu + ', ' : ''}Seoul (₩${price}, score ${d.score}) | Cafe in Seoul`;
+    ? `${name} — ${regKo ? regKo + ' ' : ''}카공 카페 (아메리카노 ${price}원, ${d.score}점) | Cafe in Seoul`
+    : `${name} — study cafe${regEn ? ' in ' + regEn : ''} (₩${price}, score ${d.score}) | Cafe in Seoul`;
   const desc = ko
     ? `직접 방문한 ${name} 카공 후기. 조용함·콘센트·좌석·아메리카노 가격·영업시간·화장실까지 정리했습니다.`
     : `A first-hand study-cafe review of ${name}: quiet, outlets, seating, americano price, hours and restrooms.`;
@@ -247,7 +305,7 @@ function renderCafe(row, lang) {
     name,
     url: canonical,
     image: photos.slice(0, 6).map(absImg).filter(Boolean),
-    address: { '@type': 'PostalAddress', streetAddress: addr, addressLocality: gu || undefined, addressRegion: ko ? '서울특별시' : 'Seoul', addressCountry: 'KR' },
+    address: { '@type': 'PostalAddress', streetAddress: addr, addressLocality: (ko ? district(row.address) : (districtEn(row.address_en) || district(row.address))) || regionCity(row, ko) || undefined, addressRegion: regionCity(row, ko) || undefined, addressCountry: 'KR' },
     geo: { '@type': 'GeoCoordinates', latitude: row.lat, longitude: row.lng },
     priceRange: `₩${price}`,
     servesCuisine: 'Coffee',
@@ -279,7 +337,7 @@ function renderCafe(row, lang) {
     <h2>${ko ? '지도·길찾기' : 'Map & directions'}</h2>
     <p><a class="seo-cta" href="/?cafe=${esc(row.id)}">${ko ? '지도에서 열기' : 'Open in the map'} →</a></p>
     <p class="seo-links">${row.kakao_url ? `<a href="${esc(row.kakao_url)}" rel="noopener nofollow" target="_blank">${ko ? '카카오맵' : 'Kakao Map'}</a>` : ''}${row.naver_url ? `<a href="${esc(row.naver_url)}" rel="noopener nofollow" target="_blank">${ko ? '네이버지도' : 'Naver Map'}</a>` : ''}</p>
-    ${nearby.length ? `<h2>${ko ? '가까운 다른 카페' : 'Nearby cafes'}</h2><ul class="seo-dir">${nearby.map((c) => `<li><a href="${ko ? '' : '/en'}/cafes/${cafeSlug(c)}"><img src="${esc(imgPath(c.photo_url))}" alt="${esc(ko ? c.name : (c.name_en || c.name))}" loading="lazy" /><span><span class="n">${esc(ko ? c.name : (c.name_en || c.name))}</span><br><span class="m">${esc(guOf(c, ko) || 'Seoul')}</span></span></a></li>`).join('')}</ul>` : ''}
+    ${nearby.length ? `<h2>${ko ? '가까운 다른 카페' : 'Nearby cafes'}</h2><ul class="seo-dir">${nearby.map((c) => `<li><a href="${ko ? '' : '/en'}/cafes/${cafeSlug(c)}"><img src="${esc(imgPath(c.photo_url))}" alt="${esc(ko ? c.name : (c.name_en || c.name))}" loading="lazy" /><span><span class="n">${esc(ko ? c.name : (c.name_en || c.name))}</span><br><span class="m">${esc(guOf(c, ko) || regionCity(c, ko) || '')}</span></span></a></li>`).join('')}</ul>` : ''}
     ${seoFooter(ko)}`;
 
   return shell({ lang: ko ? 'ko' : 'en', title, desc, canonical, alternates, jsonLd: [ld, breadcrumb], body, ogImage: absImg(hero) });
@@ -306,13 +364,17 @@ function renderView(row, lang) {
   const comments = viewComments(row.id).map((c) => (ko ? c.body : (c.body_en || c.body))).filter(Boolean);
   const nearby = nearbyViews(row);
 
+  const cityKo = regionCity(row, true);   // from coordinates (view-spots have no address)
+  const cityEn = regionCity(row, false);
   const lead = ko
-    ? `${name}은(는) 서울에서 사진 찍기 좋은 장소입니다. 직접 방문해 촬영한 사진을 모았습니다.`
-    : `${name} is a scenic photo spot in Seoul. These are photos taken there in person.`;
-  const title = ko ? `${name} — 서울 사진 명소 | Cafe in Seoul` : `${name} — scenic photo spot in Seoul | Cafe in Seoul`;
+    ? `${name}${eunNeun(name)} ${cityKo ? `${cityKo}에서 ` : ''}사진 찍기 좋은 장소입니다. 직접 방문해 촬영한 사진을 모았습니다.`
+    : `${name} is a scenic photo spot${cityEn ? ` in ${cityEn}` : ''}. These are photos taken there in person.`;
+  const title = ko
+    ? `${name} — ${cityKo ? cityKo + ' ' : ''}사진 명소 | Cafe in Seoul`
+    : `${name} — scenic photo spot${cityEn ? ` in ${cityEn}` : ''} | Cafe in Seoul`;
   const desc = ko
-    ? `${name}에서 직접 촬영한 사진과 위치. 서울에서 사진 찍기 좋은 명소를 지도에서 찾아보세요.`
-    : `Photos and location of ${name}, a scenic spot in Seoul worth shooting.`;
+    ? `${name}에서 직접 촬영한 사진과 위치. ${cityKo || '한국'}에서 사진 찍기 좋은 명소를 지도에서 찾아보세요.`
+    : `Photos and location of ${name}, a scenic spot${cityEn ? ` in ${cityEn}` : ''} worth shooting.`;
   const canonical = `${BASE}${ko ? '' : '/en'}/views/${viewSlug(row)}`;
   const alternates = [
     { hreflang: 'ko', href: `${BASE}/views/${viewSlug(row)}` },
@@ -323,13 +385,13 @@ function renderView(row, lang) {
     '@context': 'https://schema.org', '@type': 'TouristAttraction', '@id': canonical,
     name, url: canonical, image: photos.slice(0, 6).map(absImg).filter(Boolean),
     geo: { '@type': 'GeoCoordinates', latitude: row.lat, longitude: row.lng },
-    address: { '@type': 'PostalAddress', addressRegion: ko ? '서울특별시' : 'Seoul', addressCountry: 'KR' },
+    address: { '@type': 'PostalAddress', addressRegion: (ko ? cityKo : cityEn) || undefined, addressCountry: 'KR' },
   };
   const dirHref = ko ? '/views' : '/en/views';
   const body = `
     <nav class="seo-top"><a href="${ko ? '/' : '/en/views'}">Cafe in Seoul</a> <span>›</span> <a href="${dirHref}">${ko ? '명소' : 'View spots'}</a> <span>›</span> <span>${esc(name)}</span></nav>
     <h1>${esc(name)}</h1>
-    <p class="sub">${ko ? '서울 사진 명소' : 'Scenic photo spot · Seoul'}</p>
+    <p class="sub">${ko ? `${cityKo ? cityKo + ' ' : ''}사진 명소` : `Scenic photo spot${cityEn ? ` · ${cityEn}` : ''}`}</p>
     ${hero ? `<img class="seo-hero" src="${esc(imgPath(hero))}" alt="${esc(name)} ${ko ? '사진 명소' : 'scenic spot'}" loading="eager" />` : ''}
     <p class="seo-lead">${esc(lead)}</p>
     ${photos.length > 1 ? `<h2>${ko ? '사진' : 'Photos'}</h2><div class="seo-gallery">${photos.slice(0, 9).map((u, i) => `<img src="${esc(imgPath(u))}" alt="${esc(name)} ${ko ? '사진' : 'photo'} ${i + 1}" loading="lazy" />`).join('')}</div>` : ''}
@@ -357,7 +419,7 @@ function renderCafeDirectory(lang) {
   const items = rows.map((c) => {
     const d = decorate(c);
     const nm = ko ? c.name : (c.name_en || c.name);
-    return `<li><a href="${ko ? '' : '/en'}/cafes/${cafeSlug(c)}"><img src="${esc(imgPath(c.photo_url))}" alt="${esc(nm)}" loading="lazy" /><span><span class="n">${esc(nm)}</span><br><span class="m">${esc(guOf(c, ko) || 'Seoul')} · ${d.score}${ko ? '점' : ''}</span></span></a></li>`;
+    return `<li><a href="${ko ? '' : '/en'}/cafes/${cafeSlug(c)}"><img src="${esc(imgPath(c.photo_url))}" alt="${esc(nm)}" loading="lazy" /><span><span class="n">${esc(nm)}</span><br><span class="m">${esc(guOf(c, ko) || regionCity(c, ko) || '')} · ${d.score}${ko ? '점' : ''}</span></span></a></li>`;
   }).join('');
   const title = ko ? `서울 카공 카페 전체 목록 (${rows.length}곳) | Cafe in Seoul` : `All study cafes in Seoul (${rows.length}) | Cafe in Seoul`;
   const desc = ko ? '직접 방문한 서울 카공 카페 전체 목록. 조용함·콘센트·좌석·가격 기준으로 정리했습니다.' : 'Every study-friendly cafe in Seoul we visited in person, ranked on quiet, outlets, seating and price.';
@@ -470,4 +532,4 @@ router.get('/en/cafes/:slug', serveCafe('en'));
 router.get('/views/:slug', serveView('ko'));
 router.get('/en/views/:slug', serveView('en'));
 
-module.exports = { router, cafeSlug, viewSlug, BASE };
+module.exports = { router, cafeSlug, viewSlug, BASE, regionOf, regionCity };
