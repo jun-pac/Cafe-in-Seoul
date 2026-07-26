@@ -14,6 +14,7 @@ const chatRouter = require('./routes/chat');
 const viewspotsRouter = require('./routes/viewspots');
 const imgRouter = require('./routes/img');
 const adminRouter = require('./routes/admin');
+const seo = require('./seo');
 
 const app = express();
 const PORT = process.env.PORT || 3000;
@@ -22,6 +23,16 @@ const PORT = process.env.PORT || 3000;
 process.on('unhandledRejection', (e) => console.error('unhandledRejection:', e));
 
 app.set('trust proxy', 1); // correct https cookies behind Cloudflare tunnel / proxy
+
+// Canonical host: 301 www → apex so search engines index ONE domain. Both
+// cafe-in-seoul.com and www.cafe-in-seoul.com are currently indexed separately.
+// Runs before the session so a bare redirect never mints a cookie. (https is
+// handled by Cloudflare; local dev hits localhost and is unaffected.)
+app.use((req, res, next) => {
+  const host = req.headers.host || '';
+  if (host.startsWith('www.')) return res.redirect(301, 'https://' + host.slice(4) + req.originalUrl);
+  next();
+});
 
 app.use(session({
   secret: process.env.SESSION_SECRET || 'dev-secret-change-me',
@@ -104,6 +115,10 @@ app.use(express.static(path.join(__dirname, '..', 'public'), {
     if (/\.(js|css|html)$/.test(filePath)) res.setHeader('Cache-Control', 'no-store');
   },
 }));
+
+// crawlable server-rendered pages (/cafes, /views, /sitemap.xml, /robots.txt, /en/...).
+// Mounted after static so real files always win; unknown paths fall through to these.
+app.use('/', seo.router);
 
 // api
 app.use('/api/auth', auth.router);

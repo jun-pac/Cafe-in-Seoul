@@ -38,8 +38,17 @@
   <link rel="stylesheet" href="https://cdn.jsdelivr.net/gh/orioncactus/pretendard@v1.3.9/dist/web/variable/pretendardvariable.min.css" />
   <link rel="stylesheet" href="/vendor/maplibre-gl.css" /><!-- self-hosted: no CDN dependency (works via tunnel/offline) -->
   <link rel="stylesheet" href="/css/style.css" />
+  <link rel="canonical" href="https://cafe-in-seoul.com/" />
+  <link rel="alternate" hreflang="ko" href="https://cafe-in-seoul.com/" />
+  <link rel="alternate" hreflang="en" href="https://cafe-in-seoul.com/en/cafes" />
+  <script type="application/ld+json">{"@context":"https://schema.org","@type":"WebSite","name":"Cafe in Seoul","alternateName":"카공 지도","url":"https://cafe-in-seoul.com/","inLanguage":"ko","description":"직접 방문한 서울 카공 카페와 사진 명소를 지도에서 찾아보세요."}</script>
 </head>
 <body>
+  <!-- Crawlable entry points: the map is client-rendered, so these give search
+       engines (and no-JS visitors) real links into every place. Sitemap: /sitemap.xml -->
+  <noscript>
+    <nav><a href="/cafes">서울 카공 카페 전체 목록</a> · <a href="/views">서울 사진 명소 전체 목록</a></nav>
+  </noscript>
   <div id="app">
     <!-- Header: brand + inline filter bar + actions (no floating panels) -->
     <header id="chrome">

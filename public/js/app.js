@@ -176,6 +176,7 @@ async function openDetail(id) {
   cafe.score = computeScore(cafe, getWeights()); // rescore with the user's weights so the big badge == map card == breakdown
   api.track('open_cafe', id, cafe.name);
   state.openCafeId = id;
+  setUrl('cafe=' + encodeURIComponent(id));
   renderDetail(detailEl, cafe, {
     user: state.me.user,
     onVote: (category, score) => handleVote(id, category, score),
@@ -203,6 +204,7 @@ function closeDetail() {
   state.chatCleanup = null;
   document.body.classList.remove('detail-open');
   map.setSelected(null);
+  setUrl(null);   // drop ?cafe=/?view= so the shared URL matches what's on screen
 }
 
 // ---- view-spots ----
@@ -211,6 +213,7 @@ async function openViewDetail(id) {
   api.track('open_view', id, spot.name);
   state.openViewId = id;
   state.openCafeId = null;
+  setUrl('view=' + encodeURIComponent(id));
   state.chatCleanup?.();
   state.chatCleanup = null;
   renderViewDetail(detailEl, spot, {
@@ -807,6 +810,25 @@ async function boot() {
   await refreshMe();
   await loadCafes();
   loadStats();
+  openFromUrl();      // deep link: /?cafe=<id> or /?view=<id> (e.g. from an SEO page)
+}
+
+// Open the place named in the query string, so a shared/crawlable link like
+// /?cafe=<id> lands on that detail. IDs (not slugs) keep this trivial and robust.
+function openFromUrl() {
+  try {
+    const p = new URLSearchParams(window.location.search);
+    const cafe = p.get('cafe'), view = p.get('view');
+    if (cafe) openDetail(cafe).catch(() => {});
+    else if (view) openViewDetail(view).catch(() => {});
+  } catch { /* no-op */ }
+}
+// Reflect the open place in the URL (without a reload) so the address bar is shareable.
+function setUrl(params) {
+  try {
+    const url = params ? `${window.location.pathname}?${params}` : window.location.pathname;
+    window.history.replaceState({}, '', url);
+  } catch { /* history unavailable */ }
 }
 
 async function loadStats() {

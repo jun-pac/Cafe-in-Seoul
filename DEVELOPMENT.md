@@ -33,6 +33,21 @@
   **내부/테스트 트래픽 제외** — 실 트래픽은 Cloudflare를 거쳐 항상 공인 IP(`cf-connecting-ip`)를 갖는다. 사설/루프백 IP(`127.*`, `10.*`, `192.168.*`, `172.16–31.*`, `::1`, `::ffff:` 매핑 포함)는 localhost 테스트(jsdom harness)이므로 `HUMAN` 집계 predicate에서 뺀다 — 과거 행에도 소급 적용(is_bot 백필 없이). harness의 비콘 UA(`node`)도 `BOT_UA`에 추가. **방문자 탭은 최근 활동순(last_seen desc), 원본 로그는 id desc** — 둘 다 최신이 위.
 - **English 콘텐츠 번역** — EN 토글 시 이름·주소·카공총평·리뷰요약·리뷰본문·댓글을 OpenAI로 번역해 `*_en` 컬럼에 저장·표시(한글 폴백).
 
+## SEO (검색엔진/AI 노출)
+
+지도는 클라이언트 렌더라 크롤러는 `/`에서 빈 껍데기만 본다. 그래서 **모든 장소를 서버 렌더 HTML 페이지로도 노출**한다(지도 UI는 그대로). `server/seo.js` 한 파일 + `index.js`에 라우터 마운트.
+
+- **개별 페이지** — `/cafes/<이름>-<id8>`, `/views/<이름>-<id8>`. 각 페이지에 `<title>`·meta description·`<h1>`·자연어 본문(필드+카공총평)·`<img alt>`·specs·후기·`CafeOrCoffeeShop`/`TouristAttraction` JSON-LD·breadcrumb·canonical·hreflang·가까운 장소 내부링크. **별점(aggregateRating)은 넣지 않음**(카공점수는 고객 별점이 아니라 자체 지표).
+- **영어 트윈** — `/en/cafes/...`, `/en/views/...` (기존 `*_en` 컬럼 사용). ko↔en `hreflang` 상호 연결.
+- **디렉터리** — `/cafes` `/views` (+ `/en/...`)에 전체 목록. 각 상세/디렉터리가 서로 링크 → 크롤 그래프.
+- **`/sitemap.xml`** — DB에서 동적 생성(홈+디렉터리+전 장소, `<image:image>`·ko/en `hreflang` 포함). **`/robots.txt`** — 전체 허용 + `OAI-SearchBot`(ChatGPT 검색) 명시 + sitemap.
+- **슬러그** = `slugify(name_en||name)` + `-` + `id`앞 8자. 이름 부분이 달라도 8자 id로 행을 찾고 **정식 슬러그로 301**. 미존재 → 404(정적으로 폴백).
+- **www→apex 301** (`index.js` 최상단 미들웨어, 세션 이전). https는 Cloudflare가 처리.
+- **딥링크** — `/?cafe=<id>` / `/?view=<id>`로 지도에서 해당 상세 자동 오픈(`app.js openFromUrl`); 카드 클릭 시 `history.replaceState`로 URL 공유 가능. SEO 페이지의 "지도에서 열기"가 여기로 연결.
+- 홈 `index.html`엔 canonical·hreflang·WebSite JSON-LD + `<noscript>` 디렉터리 링크.
+
+**수동(코드 밖):** Google Search Console 도메인 등록(DNS TXT) + `/sitemap.xml` 제출, Cloudflare Bot Fight Mode가 `OAI-SearchBot`을 막지 않는지 확인. **GPTBot(모델 학습)** 은 현재 허용(와일드카드) — 학습 사용을 막으려면 robots에 `User-agent: GPTBot\nDisallow: /` 추가.
+
 ## 스택
 
 Express 4 · better-sqlite3(WAL) · express-session/passport(scrypt) · multer · sharp(이미지 압축+썸네일) ·
