@@ -142,6 +142,12 @@ app.use((err, req, res, next) => {
 
 require('./backupUploads').startUploadsBackup(); // mirror every photo file (boot + every 10 min)
 
+// Repair English translations that were skipped while the OpenAI key had no credit —
+// once at boot (30s in, after warm-up) and every 6h, so a credit lapse self-heals.
+const { retranslateMissing } = require('./i18nContent');
+setTimeout(() => { retranslateMissing(); }, 30_000);
+setInterval(() => { retranslateMissing(); }, 6 * 60 * 60 * 1000).unref();
+
 app.listen(PORT, () => {
   console.log(`\n☕  seoul-cafe running at ${process.env.BASE_URL || `http://localhost:${PORT}`}`);
   console.log(`   Google SSO: ${auth.GIS_ENABLED ? 'enabled (GIS token flow)' : 'disabled (using dev login)'}\n`);
