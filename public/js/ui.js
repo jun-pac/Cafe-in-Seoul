@@ -144,33 +144,68 @@ function pickLocationFlow(back, { onPickLocation, onCancelPick, onPicked }) {
   onPickLocation((lng, lat) => { onPicked(lng, lat); onCancelPick?.(); done(); });
 }
 
-// ---- Lightbox (full-screen photo viewer) ----------------------------------
-export function openLightbox(photos, start = 0) {
+// ---- Lightbox / photo viewer (full-screen, original ratio) -----------------
+// Plain call `openLightbox(photos, start)` is a bare viewer (used by cafe photos).
+// Pass opts.spot to make it the view-spot "photo-first" viewer: a caption bar with
+// name, per-photo credit, ♥ like, and a "댓글·상세" button into the full panel.
+export function openLightbox(photos, start = 0, opts = {}) {
   if (!photos || !photos.length) return;
+  const { spot, user, onLike, onDetail, onClose, byUrl = {} } = opts;
   let i = start;
+  const multi = photos.length > 1;
   const back = document.createElement('div');
-  back.className = 'lightbox';
+  back.className = 'lightbox' + (spot ? ' lightbox--viewer' : '');
   back.innerHTML = `
     <button class="lightbox__close" aria-label="닫기">${icon('x', 20)}</button>
-    ${photos.length > 1 ? `<button class="lightbox__nav prev" aria-label="이전">${icon('chevronLeft', 30)}</button>
+    ${multi ? `<button class="lightbox__nav prev" aria-label="이전">${icon('chevronLeft', 30)}</button>
     <button class="lightbox__nav next" aria-label="다음">${icon('chevronRight', 30)}</button>` : ''}
     <img class="lightbox__img" alt="">
-    ${photos.length > 1 ? '<div class="lightbox__count"></div>' : ''}`;
+    ${multi ? '<div class="lightbox__count"></div>' : ''}
+    ${spot ? `<div class="lightbox__bar">
+      <div class="lightbox__meta"><b class="lightbox__title">${esc(L(spot, 'name'))}</b><span class="lightbox__by" id="lbBy"></span></div>
+      <div class="lightbox__acts">
+        <button type="button" class="like-btn ${spot.liked ? 'is-liked' : ''}" id="lbLike">${icon('thumbsUp', 15)} <span id="lbLikeN">${spot.likes || 0}</span></button>
+        ${onDetail ? `<button type="button" class="btn btn--ghost sm lightbox__detail" id="lbDetail">${icon('info', 14)} ${t('viewer.detail')}</button>` : ''}
+      </div>
+    </div>` : ''}`;
   const imgEl = back.querySelector('.lightbox__img');
   const countEl = back.querySelector('.lightbox__count');
-  const show = () => { imgEl.src = img(photos[i]); if (countEl) countEl.textContent = `${i + 1} / ${photos.length}`; };
+  const byEl = back.querySelector('#lbBy');
+  const show = () => {
+    imgEl.src = img(photos[i]);
+    if (countEl) countEl.textContent = `${i + 1} / ${photos.length}`;
+    if (byEl) { const by = byUrl[photos[i]]; byEl.textContent = by ? ` · ${t('viewer.by')} ${by}` : ''; }
+  };
   const onKey = (e) => {
     if (e.key === 'Escape') close();
     else if (e.key === 'ArrowLeft') go(-1);
     else if (e.key === 'ArrowRight') go(1);
   };
-  const close = () => { back.remove(); document.removeEventListener('keydown', onKey); };
+  const close = () => { back.remove(); document.removeEventListener('keydown', onKey); onClose?.(); };
   const go = (d) => { i = (i + d + photos.length) % photos.length; show(); };
   back.querySelector('.lightbox__close').onclick = close;
   back.querySelector('.lightbox__nav.prev')?.addEventListener('click', () => go(-1));
   back.querySelector('.lightbox__nav.next')?.addEventListener('click', () => go(1));
   back.addEventListener('click', (e) => { if (e.target === back) close(); });
   document.addEventListener('keydown', onKey);
+  // touch swipe (mobile) — horizontal drag past a threshold flips the photo
+  if (multi) {
+    let sx = 0, sy = 0, swiping = false;
+    back.addEventListener('touchstart', (e) => { const t0 = e.changedTouches[0]; sx = t0.clientX; sy = t0.clientY; swiping = true; }, { passive: true });
+    back.addEventListener('touchend', (e) => {
+      if (!swiping) return; swiping = false;
+      const t0 = e.changedTouches[0], dx = t0.clientX - sx, dy = t0.clientY - sy;
+      if (Math.abs(dx) > 45 && Math.abs(dx) > Math.abs(dy)) go(dx < 0 ? 1 : -1);
+    }, { passive: true });
+  }
+  // like / detail actions (view-spot viewer)
+  const likeBtn = back.querySelector('#lbLike');
+  if (likeBtn && onLike) likeBtn.onclick = async () => {
+    if (!user) return alert(t('vote.loginNeeded'));
+    try { const r = await onLike(); likeBtn.classList.toggle('is-liked', r.liked); back.querySelector('#lbLikeN').textContent = r.likes; }
+    catch (e) { alert(e.message); }
+  };
+  back.querySelector('#lbDetail')?.addEventListener('click', () => { close(); onDetail?.(); });
   document.body.appendChild(back);
   show();
 }

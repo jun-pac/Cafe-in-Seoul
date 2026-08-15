@@ -676,6 +676,22 @@ details.manual[open] summary { margin-bottom: 4px; }
 .lightbox__count { position: absolute; bottom: 22px; left: 50%; transform: translateX(-50%); color: #fff; font-size: 13px; letter-spacing: 1px; }
 .carousel__img[role="button"] { cursor: zoom-in; }
 
+/* view-spot "photo-first" viewer: caption bar with name / credit / like / detail */
+.lightbox--viewer .lightbox__img { max-height: 80vh; }
+.lightbox--viewer .lightbox__count { top: 20px; bottom: auto; }
+.lightbox__bar { position: absolute; left: 0; right: 0; bottom: 0; display: flex; align-items: flex-end; justify-content: space-between;
+  gap: 10px 16px; flex-wrap: wrap; padding: 44px 20px calc(16px + env(safe-area-inset-bottom));
+  background: linear-gradient(to top, rgba(0,0,0,.78), rgba(0,0,0,0)); color: #fff; pointer-events: none; }
+.lightbox__bar > * { pointer-events: auto; }
+.lightbox__meta { min-width: 0; flex: 1 1 180px; }
+.lightbox__title { display: block; font-family: var(--font-display); font-weight: 800; font-size: 17px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.lightbox__by { font-size: 12.5px; color: rgba(255,255,255,.72); }
+.lightbox__acts { display: flex; align-items: center; gap: 10px; flex: none; }
+.lightbox__bar .like-btn { background: rgba(255,255,255,.15); border-color: transparent; color: #fff; }
+.lightbox__bar .like-btn.is-liked { background: var(--view); color: #fff; }
+.lightbox__detail { color: #fff; border-color: rgba(255,255,255,.45); background: rgba(255,255,255,.12); }
+.lightbox__detail:hover { background: rgba(255,255,255,.24); }
+
 /* ---------- Icons ---------- */
 .ic { display: inline-block; vertical-align: -0.18em; flex: none; }
 .btn .ic, .linkbtn .ic { vertical-align: -0.2em; }

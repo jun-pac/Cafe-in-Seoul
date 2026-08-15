@@ -1,7 +1,7 @@
 import { api } from './api.js';
 import { initMap } from './map.js';
 import { renderAuth, renderDetail, openAddCafeModal, openEditCafeModal, renderPendingQueue, initChat,
-  renderViewDetail, openViewModal } from './ui.js';
+  renderViewDetail, openViewModal, openLightbox } from './ui.js';
 import { passesFilters, esc, img, thumb } from './util.js';
 import { getWeights, setWeights, resetWeights, computeScore, isCustomized, DEFAULT_WEIGHTS, WEIGHT_META, setSiteDefault, siteDefault, hasSiteDefault } from './score.js';
 import { icon } from './icons.js';
@@ -21,6 +21,7 @@ const state = {
   viewspots: [],
   openCafeId: null,
   openViewId: null,
+  viewMode: null, // 'photos' (centered viewer) | 'detail' (side panel) — how the open view-spot is shown
 };
 
 const detailEl = $('#detail');
@@ -28,7 +29,7 @@ let map;
 try {
   if (typeof maplibregl === 'undefined') throw new Error('maplibre-gl not loaded');
   map = initMap('map', {
-    onCardClick: (item, kind) => (kind === 'view' ? openViewDetail(item.id) : openDetail(item.id)),
+    onCardClick: (item, kind) => (kind === 'view' ? openViewPhotos(item.id) : openDetail(item.id)),
   });
 } catch (e) {
   // Fail loud, not blank: if the map library can't load, say so instead of a white screen.
@@ -200,6 +201,7 @@ async function openDetail(id) {
 function closeDetail() {
   state.openCafeId = null;
   state.openViewId = null;
+  state.viewMode = null;
   state.chatCleanup?.();
   state.chatCleanup = null;
   document.body.classList.remove('detail-open');
@@ -208,11 +210,35 @@ function closeDetail() {
 }
 
 // ---- view-spots ----
+// Photo-first: clicking a view-spot opens a centered original-ratio photo viewer
+// straight away (the site is a photo showcase). Comments/details are one tap deeper.
+async function openViewPhotos(id) {
+  const spot = await api.getViewspot(id);
+  api.track('open_view', id, spot.name);
+  state.openViewId = id;
+  state.openCafeId = null;
+  state.viewMode = 'photos';
+  setUrl('view=' + encodeURIComponent(id));
+  map.setSelected(id);
+  const gallery = (spot.photos && spot.photos.length) ? spot.photos : [spot.photo_url].filter(Boolean);
+  const byUrl = {};
+  (spot.photoMeta || []).forEach((m) => { if (m.uploader) byUrl[m.url] = m.uploader; });
+  openLightbox(gallery, 0, {
+    spot,
+    user: state.me.user,
+    byUrl,
+    onLike: async () => { const r = await api.likeViewspot(id); api.track('like', id, spot.name); loadCafes(); return r; },
+    onDetail: () => openViewDetail(id),          // "댓글·상세 →" opens the full side panel
+    onClose: () => { if (state.viewMode === 'photos') { state.openViewId = null; state.viewMode = null; map.setSelected(null); setUrl(null); } },
+  });
+}
+
 async function openViewDetail(id) {
   const spot = await api.getViewspot(id);
   api.track('open_view', id, spot.name);
   state.openViewId = id;
   state.openCafeId = null;
+  state.viewMode = 'detail';
   setUrl('view=' + encodeURIComponent(id));
   state.chatCleanup?.();
   state.chatCleanup = null;
@@ -386,7 +412,7 @@ async function rerenderI18n() {
   if (state.viewspots) map.setViewspots(state.viewspots);
   await refreshPendingQueue();
   if (state.openCafeId) await openDetail(state.openCafeId);
-  else if (state.openViewId) await openViewDetail(state.openViewId);
+  else if (state.openViewId && state.viewMode === 'detail') await openViewDetail(state.openViewId);
 }
 
 // ---------- header chrome: login modal, chrome height, detail resize/swipe ----------
@@ -401,7 +427,7 @@ function openAuthModal() {
   const done = async () => {
     close(); await refreshMe();
     if (state.openCafeId) await openDetail(state.openCafeId);
-    else if (state.openViewId) await openViewDetail(state.openViewId);
+    else if (state.openViewId && state.viewMode === 'detail') await openViewDetail(state.openViewId);
   };
   renderAuth(back.querySelector('#authBody'), state.me, {
     onGoogleCredential: async (c) => { try { await api.googleVerify(c); await done(); } catch (e) { alert('Google 로그인 실패: ' + e.message); } },
@@ -841,7 +867,7 @@ function openFromUrl() {
     const p = new URLSearchParams(window.location.search);
     const cafe = p.get('cafe'), view = p.get('view');
     if (cafe) openDetail(cafe).catch(() => {});
-    else if (view) openViewDetail(view).catch(() => {});
+    else if (view) openViewPhotos(view).catch(() => {});
   } catch { /* no-op */ }
 }
 // Reflect the open place in the URL (without a reload) so the address bar is shareable.
