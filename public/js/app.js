@@ -853,14 +853,19 @@ function wireChrome() {
   $('#authBtn').addEventListener('click', openAuthModal);
   measureChrome();
 
-  // "상세" toggle → show/hide the advanced filter row
+  // "상세" toggle → show/hide the advanced filter row. Collapsed by default (people didn't
+  // realise it could be collapsed); a user's choice is remembered for next time.
   const moreBtn = $('#filterMore');
   const adv = $('#filteradv');
+  const setAdv = (open, persist) => {
+    adv.hidden = !open;
+    moreBtn.setAttribute('aria-expanded', open ? 'true' : 'false');
+    if (persist) { try { localStorage.setItem('filtersAdvOpen', open ? '1' : '0'); } catch { /* */ } }
+  };
+  try { if (localStorage.getItem('filtersAdvOpen') === '1') setAdv(true, false); } catch { /* default collapsed */ }
   moreBtn.addEventListener('click', () => {
-    const show = adv.hidden;
-    adv.hidden = !show;
-    moreBtn.setAttribute('aria-expanded', show ? 'true' : 'false');
-    setTimeout(() => { try { map.map.resize(); } catch { /* */ } }, 60); // header grew → re-fit map
+    setAdv(adv.hidden, true);
+    setTimeout(() => { try { map.map.resize(); } catch { /* */ } }, 60); // header grew/shrank → re-fit map
   });
 
   // desktop: drag the detail panel's left edge to resize width (persisted)

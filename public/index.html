@@ -79,15 +79,15 @@
         <label class="fbar__field fbar__field--price"><span data-i18n="f.price">아아</span>
           <input type="range" id="f-price" class="fbar__range" min="3000" max="7500" step="500" value="7500">
           <b id="f-price-val" class="fbar__num"></b></label>
-        <button id="filterMore" class="fbar__more" aria-expanded="true">
+        <button id="filterMore" class="fbar__more" aria-expanded="false">
           <span data-i18n="filters.more">상세</span>
           <svg class="ic" width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="m6 9 6 6 6-6"/></svg>
         </button>
         <span class="fbar__result"><span data-i18n="result.shown">표시중</span> <b id="result-count">-</b></span>
       </div>
 
-      <!-- Advanced filters (open by default so people find them) -->
-      <div id="filteradv">
+      <!-- Advanced filters (collapsed by default; the "상세" button toggles, choice persisted) -->
+      <div id="filteradv" hidden>
         <!-- the 6 essentials, forced onto ONE row -->
         <div class="adv-primary">
           <label class="pilltog tip"><input type="checkbox" id="f-multifloor"><span data-i18n="f.multiFloor.short" data-tip-i18n="def.floors">다층</span></label>
