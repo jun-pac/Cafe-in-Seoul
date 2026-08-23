@@ -186,7 +186,13 @@ export function initMap(containerId, { onCardClick }) {
     const members = [ent, ...ent.absorbedIds.map((aid) => entries.get(aid)).filter(Boolean)];
     const pop = document.createElement('div');
     pop.className = 'cluster-pop';
-    pop.addEventListener('click', (e) => e.stopPropagation());
+    // The popup lives inside the marker element, which sits on the map canvas. Without this,
+    // a touch/drag/wheel on the popup reaches MapLibre and starts a pan/zoom → 'movestart' →
+    // closeCluster(), so the popup vanishes the instant you touch it (and row clicks never
+    // land). Swallow the pointer/touch/wheel gestures here so the popup stays open and scrolls
+    // on its own (we only stopPropagation, never preventDefault, so its overflow scroll works).
+    ['click', 'dblclick', 'mousedown', 'pointerdown', 'touchstart', 'touchmove', 'wheel', 'contextmenu']
+      .forEach((ev) => pop.addEventListener(ev, (e) => e.stopPropagation(), { passive: true }));
     pop.innerHTML = `<div class="cluster-pop__head">이 위치에 ${members.length}곳</div>`
       + members.map((m) => `
         <button type="button" class="cluster-pop__row" data-id="${esc(m.item.id)}">
