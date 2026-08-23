@@ -229,8 +229,15 @@ function setupHero(el, gallery, { onIndex } = {}) {
   // build the sliding track of full-width slides in place of the single image div
   const track = document.createElement('div');
   track.className = 'carousel__track';
-  track.innerHTML = gallery.map((u) => `<div class="carousel__slide" style="background-image:url('${esc(img(u))}')"></div>`).join('');
+  // lazy: keep the full-res URL in data-src and only paint the current slide + its
+  // neighbours, so opening a place with N photos doesn't fetch all N full images at once.
+  track.innerHTML = gallery.map((u) => `<div class="carousel__slide" data-src="${esc(img(u))}"></div>`).join('');
   carImg.replaceWith(track);
+  const slides = track.querySelectorAll('.carousel__slide');
+  const loadSlide = (i) => {
+    const s = slides[(i + gallery.length) % gallery.length];
+    if (s && s.dataset.src) { s.style.backgroundImage = `url('${s.dataset.src}')`; delete s.dataset.src; }
+  };
 
   let idx = 0, startX = 0, startY = 0, dragging = false, dragged = false;
   const to = (i, animate = true) => {
@@ -238,6 +245,7 @@ function setupHero(el, gallery, { onIndex } = {}) {
     track.style.transition = animate ? 'transform .32s ease' : 'none';
     track.style.transform = `translateX(-${idx * 100}%)`;
     hero.querySelectorAll('.carousel__dot').forEach((d, k) => d.classList.toggle('is-on', k === idx));
+    loadSlide(idx); loadSlide(idx + 1); loadSlide(idx - 1); // current + neighbours only
     onIndex?.(idx);
   };
 

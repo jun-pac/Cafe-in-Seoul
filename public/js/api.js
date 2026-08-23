@@ -60,6 +60,12 @@ export const api = {
       body: JSON.stringify(payload),
     }).then(json),
   adminInsights: () => fetch('/api/admin/insights').then(json),
+  adminPerf: () => fetch('/api/admin/perf').then(json),
+  adminI18n: (table) => fetch(`/api/admin/i18n?table=${encodeURIComponent(table)}`).then(json),
+  adminI18nSet: (table, id, field, value) =>
+    fetch('/api/admin/i18n', { method: 'PATCH', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ table, id, field, value }) }).then(json),
+  adminI18nClear: (table, id, field) =>
+    fetch('/api/admin/i18n', { method: 'DELETE', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ table, id, field }) }).then(json),
   adminSetScoreWeights: (weights) =>
     fetch('/api/admin/score-weights', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ weights }) }).then(json),
   adminResetScoreWeights: () => fetch('/api/admin/score-weights', { method: 'DELETE' }).then(json),

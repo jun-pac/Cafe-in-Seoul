@@ -159,6 +159,29 @@ router.get('/analytics', requireAdmin, (req, res) => {
   res.json(analytics(day));
 });
 
+// ---- latency dashboard: server timings + real-user metrics + photo-library audit ----
+const perf = require('../perf');
+router.get('/perf', requireAdmin, (req, res) => {
+  res.json({ server: perf.serverStats(), client: perf.clientStats(), assets: perf.assetAudit() });
+});
+
+// ---- translation editor: review + hand-correct AI translations ----------------
+const i18n = require('../i18nContent');
+router.get('/i18n', requireAdmin, (req, res) => {
+  const table = req.query.table === 'viewspots' ? 'viewspots' : 'cafes';
+  res.json({ table, ...i18n.reviewList(table) });
+});
+router.patch('/i18n', requireAdmin, express.json(), (req, res) => {
+  const { table, id, field, value } = req.body || {};
+  try { res.json(i18n.setManual(table, id, field, value)); }
+  catch (e) { res.status(400).json({ error: e.message }); }
+});
+router.delete('/i18n', requireAdmin, express.json(), async (req, res) => {
+  const { table, id, field } = req.body || {};
+  try { res.json(await i18n.clearManual(table, id, field)); }
+  catch (e) { res.status(400).json({ error: e.message }); }
+});
+
 // Admin sets the GLOBAL default score weights everyone sees (personal weights still override locally).
 const settings = require('../settings');
 router.post('/score-weights', requireAdmin, express.json(), (req, res) => {

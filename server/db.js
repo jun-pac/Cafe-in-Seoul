@@ -207,6 +207,17 @@ db.exec(`CREATE TABLE IF NOT EXISTS daily_visits (day TEXT PRIMARY KEY, n INTEGE
 // small key/value store for admin-set site settings (e.g. the global default score weights)
 db.exec(`CREATE TABLE IF NOT EXISTS app_settings (key TEXT PRIMARY KEY, value TEXT)`);
 
+// Manually corrected English translations. The AI romanizes some names wrong (콩카페 →
+// "Kong" not "Cong"); an admin fix is written to the *_en column AND locked here so the
+// self-heal/re-translate passes never overwrite it. One row per (table,row,field) locked.
+db.exec(`CREATE TABLE IF NOT EXISTS i18n_locks (
+  tbl        TEXT NOT NULL,
+  row_id     TEXT NOT NULL,
+  field      TEXT NOT NULL,
+  updated_at TEXT NOT NULL DEFAULT (datetime('now')),
+  PRIMARY KEY (tbl, row_id, field)
+)`);
+
 // Per-action analytics: one row per tracked event (page view, opening a cafe/view-spot,
 // applying a filter, searching, liking, ...). session_id (the express-session id) tells
 // apart distinct visitors; user_id links logged-in users. Query this to analyze traffic.

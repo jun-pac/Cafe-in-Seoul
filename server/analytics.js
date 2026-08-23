@@ -1,6 +1,10 @@
 'use strict';
 
 const db = require('./db');
+// "admin" for exclusion means the SAME thing everywhere else: DB is_admin=1 OR an
+// ADMIN_EMAILS-allowlisted email. Reading req.user.is_admin alone missed Google-login
+// admins (column 0), so their own visits leaked into every "real people" KPI.
+const { isAdmin } = require('./auth');
 
 // crawlers/monitors/link-preview fetchers hit the site without keeping cookies, so each
 // hit looks like a new visitor. Flag them (and empty UAs) so real-people stats exclude them.
@@ -86,7 +90,7 @@ function recordEvent(req, { type, target = null, label = null }) {
       country: req.headers['cf-ipcountry'] || null,
       ua: ua.slice(0, 200),
       is_bot: isBotUA(ua) ? 1 : 0,
-      is_admin: req.user?.is_admin ? 1 : 0,
+      is_admin: isAdmin(req.user) ? 1 : 0, // email-allowlist admins included, not just DB flag
       referer: referer ? String(referer).slice(0, 300) : null,
       source: classifySource(referer, utm),
     });

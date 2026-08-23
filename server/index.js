@@ -24,6 +24,10 @@ process.on('unhandledRejection', (e) => console.error('unhandledRejection:', e))
 
 app.set('trust proxy', 1); // correct https cookies behind Cloudflare tunnel / proxy
 
+// latency instrumentation — times every request into an in-memory ring (see server/perf.js)
+const perf = require('./perf');
+app.use(perf.timing);
+
 // Canonical host: 301 www → apex so search engines index ONE domain. Both
 // cafe-in-seoul.com and www.cafe-in-seoul.com are currently indexed separately.
 // Runs before the session so a bare redirect never mints a cookie. (https is
@@ -68,7 +72,7 @@ app.use((req, res, next) => {
       const ua = req.get('user-agent') || '';
       const isBot = isBotUA(ua);
       const today = kstToday();
-      const reason = req.user?.is_admin ? 'admin'
+      const reason = auth.isAdmin(req.user) ? 'admin'
         : isBot ? 'bot'
         : (req.session && req.session.visitDay === today) ? 'dupe'
         : 'counted';
@@ -93,6 +97,13 @@ const TRACK_TYPES = new Set(['open_cafe', 'open_view', 'filter', 'search', 'like
 app.post('/api/track', express.json({ limit: '4kb' }), (req, res) => {
   const { type, target, label } = req.body || {};
   if (TRACK_TYPES.has(type)) recordEvent(req, { type, target, label });
+  res.json({ ok: true });
+});
+
+// real-user performance beacon: the browser posts its own load timings (TTFB, LCP,
+// time-to-map-render, marker count) once per session so we can see the lag people feel.
+app.post('/api/perf', express.json({ limit: '2kb' }), (req, res) => {
+  try { perf.recordClient(req.body || {}); } catch { /* ignore */ }
   res.json({ ok: true });
 });
 // "오늘" comes from the events table via visitorsOn() — the same query the admin panel uses, so

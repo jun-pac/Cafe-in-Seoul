@@ -6,6 +6,7 @@ import { passesFilters, esc, img, thumb } from './util.js';
 import { getWeights, setWeights, resetWeights, computeScore, isCustomized, DEFAULT_WEIGHTS, WEIGHT_META, setSiteDefault, siteDefault, hasSiteDefault } from './score.js';
 import { icon } from './icons.js';
 import { t, getLang, setLang, onLangChange, applyStaticI18n } from './i18n.js';
+import { reportPerf } from './perf.js';
 
 const $ = (sel) => document.querySelector(sel);
 
@@ -146,6 +147,7 @@ async function loadCafes() {
   map.setCafes(cafes);
   map.setViewspots(views);
   applyFilters();
+  reportPerf(cafes.length + views.length); // real-user timing beacon (once, first load)
   await refreshPendingQueue();
 }
 
@@ -449,6 +451,13 @@ function openAuthModal() {
     b.innerHTML = `${icon('shield', 14)} ${getLang() === 'ko' ? '관리자 통계' : 'Admin insights'}`;
     b.onclick = () => { close(); openInsightsModal(); };
     back.querySelector('#authBody').appendChild(b);
+
+    const bt = document.createElement('button');
+    bt.className = 'btn btn--ghost sm';
+    bt.style.cssText = 'margin-top:8px;width:100%';
+    bt.innerHTML = `${icon('edit', 14)} ${getLang() === 'ko' ? '번역 관리' : 'Translations'}`;
+    bt.onclick = () => { close(); openI18nModal(); };
+    back.querySelector('#authBody').appendChild(bt);
   }
 }
 
@@ -473,6 +482,7 @@ async function openInsightsModal() {
       <button class="in-tab" data-tab="who">${L('방문자', 'Visitors')}</button>
       <button class="in-tab" data-tab="src">${L('유입·AI', 'Traffic & AI')}</button>
       <button class="in-tab" data-tab="con">${L('콘텐츠', 'Content')}</button>
+      <button class="in-tab" data-tab="perf">${L('성능', 'Performance')}</button>
       <button class="in-tab" data-tab="log">${L('원본 로그', 'Raw log')}</button>
     </div>
     <div id="inBody"><p class="muted">${L('불러오는 중…', 'Loading…')}</p></div>
@@ -498,6 +508,7 @@ async function openInsightsModal() {
 
   let day = null;          // currently viewed KST day
   let d = null, a = null;  // insights payload (day-independent) + analytics payload (per day)
+  let p = null;            // performance payload (loaded lazily when the 성능 tab opens)
   let tab = 'sum';
   let showBots = false;
 
@@ -606,8 +617,53 @@ async function openInsightsModal() {
       ${list((d.users.recent || []).map((u) => `<div class="in-row"><b>${esc(u.name || u.provider_id)}</b>${u.is_admin ? ` <span class="admin-badge">ADMIN</span>` : ''} <span class="muted">${esc(u.provider)}</span><span class="in-when">${mmddhhmm(u.created_at)}</span></div>`))}`;
   }
 
+  // Latency dashboard. Client metrics = what real browsers reported (the lag people feel);
+  // server metrics = our own per-route response time; assets = the photo library on disk.
+  async function loadPerf() {
+    try { p = await api.adminPerf(); if (tab === 'perf') paint(); }
+    catch (e) { if (tab === 'perf') body.innerHTML = `<p class="err">${esc(e.message)}</p>`; }
+  }
+  function perfTab() {
+    if (!p) { loadPerf(); return `<p class="muted">${L('성능 데이터 불러오는 중…', 'Loading performance…')}</p>`; }
+    const c = p.client || {}, sv = p.server || {}, as = p.assets || {};
+    const pair = (s) => (s ? `${s.p50} / ${s.p95}` : '—');           // p50 / p95
+    const good = (s, ok, warn) => (!s ? '' : s.p95 <= ok ? 'in-ok' : s.p95 <= warn ? 'in-warn' : 'in-bad');
+    const msTiles = `
+      <div class="in-stats">
+        <div class="in-stat ${good(c.lcp, 2500, 4000)}" title="${L('가장 큰 요소가 그려질 때까지. 2.5초 이하가 좋음.', 'Largest Contentful Paint. Under 2.5s is good.')}"><b>${c.lcp ? pair(c.lcp) : '—'}</b><span>LCP ms (p50/p95)</span></div>
+        <div class="in-stat ${good(c.mapReady, 2500, 5000)}" title="${L('지도 마커가 화면에 뜰 때까지 (탐색 시작 기준).', 'Time until map markers are on screen.')}"><b>${c.mapReady ? pair(c.mapReady) : '—'}</b><span>${L('지도 표시', 'Map ready')} ms</span></div>
+        <div class="in-stat" title="${L('첫 바이트까지 (서버·네트워크 지연).', 'Time to first byte.')}"><b>${c.ttfb ? pair(c.ttfb) : '—'}</b><span>TTFB ms</span></div>
+        <div class="in-stat" title="${L('onload까지', 'Until onload')}"><b>${c.load ? pair(c.load) : '—'}</b><span>${L('완전 로드', 'Load')} ms</span></div>
+        ${stat(c.markers ? c.markers.p50 : '—', L('마커 수', 'Markers'))}
+        ${stat(c.sampleCount || 0, L('표본(방문)', 'Samples'))}
+      </div>
+      <p class="in-note muted">${L('실제 방문자 브라우저가 보고한 값입니다. 서버 재시작 시 초기화되며, 방문이 쌓일수록 정확해집니다.', 'Reported by real visitors’ browsers. Resets on server restart; sharpens as visits accumulate.')}</p>`;
+
+    const routes = (sv.routes || []).filter((r) => r.ms).slice(0, 12);
+    const serverBlock = `
+      <h4 class="in-h4">${L('서버 응답시간 (경로별)', 'Server response time')} <small class="muted">${L('p95 느린 순', 'slowest p95')} · ${sv.sampleCount || 0}${L('건', '')}${sv.windowMinutes ? ` · ${sv.windowMinutes}${L('분', 'min')}` : ''}</small></h4>
+      ${routes.length ? `<div class="in-list">${routes.map((r) => `<div class="in-row"><span class="ev-type" style="max-width:60%;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">${esc(r.route)}</span><span class="in-when">p50 ${r.ms.p50} · <b>p95 ${r.ms.p95}</b> · max ${r.ms.max}ms · ${r.count}×${r.avgBytes ? ` · ${Math.round(r.avgBytes / 1024)}KB` : ''}${r.errors ? ` · <span class="err">${r.errors} err</span>` : ''}</span></div>`).join('')}</div>` : `<p class="muted">${L('아직 없음', 'none yet')}</p>`}`;
+
+    const assetBlock = as.error ? '' : `
+      <h4 class="in-h4">${L('사진 라이브러리 (디스크)', 'Photo library (disk)')}</h4>
+      <div class="in-stats">
+        ${stat(as.originals || 0, L('원본 사진', 'Originals'))}
+        ${stat((as.totalThumbMB || 0) + 'MB', L('썸네일 총량', 'Thumbs total'), L('지도 카드가 모두 뜰 때의 대략적 전송량', 'Rough payload if every map card thumb loads'))}
+        ${stat((as.avgThumbKB || 0) + 'KB', L('평균 썸네일', 'Avg thumb'))}
+        ${stat((as.totalOriginalMB || 0) + 'MB', L('원본 총량', 'Originals total'))}
+        <div class="in-stat ${(as.missingThumbs || []).length ? 'in-warn' : 'in-ok'}"><b>${(as.missingThumbs || []).length}</b><span>${L('썸네일 없음', 'Missing thumbs')}</span></div>
+        <div class="in-stat ${(as.oversizedThumbs || []).length ? 'in-bad' : 'in-ok'}"><b>${(as.oversizedThumbs || []).length}</b><span>${L('깨진 썸네일', 'Broken thumbs')}</span></div>
+        <div class="in-stat ${(as.oversizedOriginals || []).length ? 'in-warn' : 'in-ok'}"><b>${(as.oversizedOriginals || []).length}</b><span>${L('과대 원본', 'Oversized')}</span></div>
+      </div>
+      ${(as.oversizedThumbs || []).length ? `<p class="in-note muted">${L('깨진/과대 썸네일이 있어요. 서버에서 복구:', 'Broken/oversized thumbnails found. Repair on the server:')} <code>node scripts/fix-thumbnails.js --apply</code></p>${bars(as.oversizedThumbs.slice(0, 6).map((x) => ({ label: x.file, n: x.kb, suffix: 'KB' })))}` : ''}
+      ${(as.oversizedOriginals || []).length ? `<h4 class="in-h4">${L('과대 원본 (>1MB)', 'Oversized originals (>1MB)')}</h4>${bars(as.oversizedOriginals.slice(0, 6).map((x) => ({ label: x.file, n: x.kb, suffix: 'KB' })))}` : ''}
+      <p class="in-note muted">${L('심층 감사: 서버에서', 'Deep audit: run')} <code>node scripts/perf-report.js</code></p>`;
+
+    return `<h4 class="in-h4">${L('실제 사용자 체감', 'What real visitors experience')}</h4>${msTiles}${serverBlock}${assetBlock}`;
+  }
+
   function logTab() {
-    const rows = a.recent.filter((e) => showBots || !e.is_bot);
+    const rows = a.recent.filter((e) => showBots || (!e.is_bot && !e.is_admin));
     return `<label class="in-note in-check"><input type="checkbox" id="inBots"${showBots ? ' checked' : ''}> ${L('봇·관리자 트래픽도 보기', 'Include bot / admin traffic')}</label>
       <p class="in-note muted">${L(`이 날(00:00–24:00 KST)의 이벤트 ${rows.length}건, 최신순.`, `${rows.length} events on this day (00:00–24:00 KST), newest first.`)}</p>
       ${list(rows.map((e) => `<div class="in-row ${e.is_bot ? 'is-bot' : ''}"><span class="ev-type">${esc(A[e.type] || e.type)}</span> <span class="muted">${esc(e.label || e.target || '')}</span><span class="in-when">${hhmm(e.ts)} ${esc(e.country || '')}${e.is_bot ? L(' ·봇', ' ·bot') : ''}${e.is_admin ? L(' ·관리자', ' ·admin') : ''}</span></div>`))}`;
@@ -617,7 +673,7 @@ async function openInsightsModal() {
     back.querySelector('#inDay').textContent = dayLabel();
     back.querySelector('#inNext').disabled = day >= a.today;
     back.querySelectorAll('.in-tab').forEach((b) => b.classList.toggle('is-on', b.dataset.tab === tab));
-    body.innerHTML = tab === 'sum' ? summaryTab() : tab === 'who' ? visitorsTab() : tab === 'src' ? sourcesTab() : tab === 'con' ? contentTab() : logTab();
+    body.innerHTML = tab === 'sum' ? summaryTab() : tab === 'who' ? visitorsTab() : tab === 'src' ? sourcesTab() : tab === 'con' ? contentTab() : tab === 'perf' ? perfTab() : logTab();
     body.scrollTop = 0;
     body.querySelectorAll('.in-col[data-day]').forEach((b) => { b.onclick = () => load(b.dataset.day); });
     const bots = body.querySelector('#inBots');
@@ -642,6 +698,83 @@ async function openInsightsModal() {
     day = a.day;
     paint();
   } catch (e) { body.innerHTML = `<p class="err">${esc(e.message)}</p>`; }
+}
+
+// Translation editor: review the AI's English and hand-correct wrong ones (콩카페 → "Cong",
+// not "Kong"). A saved value is locked so the self-heal/re-translate passes never overwrite it.
+async function openI18nModal() {
+  const ko = getLang() === 'ko';
+  const L = (k, e) => (ko ? k : e);
+  const back = document.createElement('div');
+  back.className = 'modal-back';
+  back.innerHTML = `<div class="modal modal--insights">
+    <div class="modal__head"><h2>${L('번역 관리', 'Translations')}</h2><button class="detail__close" id="i18nClose">${icon('x', 16)}</button></div>
+    <div class="in-tabs">
+      <button class="in-tab is-on" data-t="cafes">${L('카페', 'Cafes')}</button>
+      <button class="in-tab" data-t="viewspots">${L('명소', 'Views')}</button>
+    </div>
+    <input type="search" id="i18nQ" class="i18n-search" placeholder="${L('이름으로 검색…', 'Search by name…')}" autocomplete="off">
+    <p class="in-note muted">${L('영어 번역을 고치고 저장하면 그 값이 고정되어 AI가 다시 덮어쓰지 않습니다. "AI 자동"은 고정을 풀고 다시 번역합니다.', 'Fix an English value and save — it locks so AI never overwrites it. "Auto" unlocks and re-translates.')}</p>
+    <div id="i18nBody"><p class="muted">${L('불러오는 중…', 'Loading…')}</p></div>
+  </div>`;
+  document.body.appendChild(back);
+  const close = () => back.remove();
+  back.querySelector('#i18nClose').onclick = close;
+  back.addEventListener('mousedown', (e) => { if (e.target === back) close(); });
+  const body = back.querySelector('#i18nBody');
+  let table = 'cafes', data = null, q = '';
+  const fieldLabel = (f) => ({ name: L('이름', 'Name'), address: L('주소', 'Address'), region: L('지역', 'Region') }[f] || f);
+
+  function render() {
+    if (!data) { body.innerHTML = `<p class="muted">${L('불러오는 중…', 'Loading…')}</p>`; return; }
+    const ql = q.trim().toLowerCase();
+    const rows = data.rows.filter((r) => !ql || (r.name || '').toLowerCase().includes(ql) || (r.name_en || '').toLowerCase().includes(ql));
+    body.innerHTML = (rows.map((r) => `
+      <div class="i18n-row" data-id="${esc(r.id)}">
+        ${data.fields.map((f) => `
+          <div class="i18n-f">
+            <label class="i18n-l">${fieldLabel(f)}${r.locked[f] ? ` <span class="i18n-lock" title="${L('수동 고정됨', 'manually locked')}">${icon('lock', 11)}</span>` : ''}</label>
+            <div class="i18n-ko" title="${esc(r[f] || '')}">${esc(r[f] || '—')}</div>
+            <input class="i18n-en" data-f="${f}" value="${esc(r[f + '_en'] || '')}" placeholder="English">
+          </div>`).join('')}
+        <div class="i18n-acts">
+          <button class="btn sm i18n-save">${L('저장·고정', 'Save & lock')}</button>
+          <button class="btn btn--ghost sm i18n-auto">${L('AI 자동', 'Auto')}</button>
+          <span class="i18n-msg muted"></span>
+        </div>
+      </div>`).join('')) || `<p class="muted">${L('없음', 'none')}</p>`;
+    body.querySelectorAll('.i18n-row').forEach((rowEl) => {
+      const id = rowEl.dataset.id;
+      const msg = rowEl.querySelector('.i18n-msg');
+      rowEl.querySelector('.i18n-save').onclick = async () => {
+        msg.textContent = L('저장 중…', 'Saving…');
+        try {
+          const rr = data.rows.find((x) => x.id === id);
+          for (const inp of rowEl.querySelectorAll('.i18n-en')) {
+            const v = inp.value.trim();
+            await api.adminI18nSet(table, id, inp.dataset.f, v);
+            rr[inp.dataset.f + '_en'] = v; rr.locked[inp.dataset.f] = true;
+          }
+          render();
+        } catch (e) { msg.textContent = e.message; }
+      };
+      rowEl.querySelector('.i18n-auto').onclick = async () => {
+        msg.textContent = L('AI 재번역 중…', 'Retranslating…');
+        try { for (const f of data.fields) await api.adminI18nClear(table, id, f); await load(table); }
+        catch (e) { msg.textContent = e.message; }
+      };
+    });
+  }
+
+  async function load(t) {
+    table = t; data = null; render();
+    try { data = await api.adminI18n(t); render(); }
+    catch (e) { body.innerHTML = `<p class="err">${esc(e.message)}</p>`; }
+  }
+
+  back.querySelectorAll('.in-tab').forEach((b) => { b.onclick = () => { back.querySelectorAll('.in-tab').forEach((x) => x.classList.toggle('is-on', x === b)); load(b.dataset.t); }; });
+  back.querySelector('#i18nQ').oninput = (e) => { q = e.target.value; render(); };
+  load('cafes');
 }
 
 // score-weight editor. Personal weights (localStorage) override the site default for you only.

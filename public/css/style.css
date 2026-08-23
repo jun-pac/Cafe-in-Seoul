@@ -194,6 +194,24 @@ b { font-weight: 700; }
 .in-h4 { margin: 16px 0 2px; font-size: 12px; font-weight: 800; letter-spacing: .3px; color: var(--ink-2); text-transform: uppercase; }
 .modal--insights .ev-type { font-weight: 700; font-size: 11px; padding: 1px 6px; border-radius: var(--pill); background: var(--cool); color: var(--ink); }
 .in-row.is-bot { opacity: .5; }
+/* performance tab: colour the stat tile by how healthy the p95 is */
+.in-stat.in-ok b { color: var(--view); }
+.in-stat.in-warn b { color: #c08a00; }
+.in-stat.in-bad b { color: var(--danger, #b00020); }
+.in-stat.in-ok, .in-stat.in-warn, .in-stat.in-bad { border-color: currentColor; }
+.in-stat.in-ok { border-color: color-mix(in srgb, var(--view) 40%, var(--hair)); }
+.in-note code { background: var(--surface-2); border: 1px solid var(--hair); border-radius: 4px; padding: 1px 5px; font-size: 11px; }
+/* translation editor */
+.i18n-search { width: 100%; box-sizing: border-box; margin: 8px 0 4px; padding: 8px 10px; border: 1px solid var(--hair-strong); border-radius: var(--r-sm); font-size: 13px; }
+.i18n-row { padding: 10px 0; border-top: 1px solid var(--hair); }
+.i18n-row:first-child { border-top: 0; }
+.i18n-f { display: grid; grid-template-columns: 64px 1fr 1fr; align-items: center; gap: 8px; margin-bottom: 5px; }
+.i18n-l { font-size: 11px; font-weight: 700; color: var(--ink-2); display: flex; align-items: center; gap: 3px; }
+.i18n-lock svg { color: var(--view); vertical-align: middle; }
+.i18n-ko { font-size: 12.5px; color: var(--ink); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.i18n-en { width: 100%; box-sizing: border-box; padding: 5px 8px; border: 1px solid var(--hair-strong); border-radius: 6px; font-size: 12.5px; }
+.i18n-acts { display: flex; align-items: center; gap: 8px; margin-top: 4px; }
+.i18n-msg { font-size: 11px; }
 /* per-visitor journey (session + its action trail) */
 .in-session { padding: 7px 0; border-top: 1px solid var(--hair); }
 .in-session:first-child { border-top: 0; }

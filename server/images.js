@@ -24,9 +24,11 @@ async function processUploadFile(filename) {
   let buf;
   try { buf = fs.readFileSync(mainPath); } catch { return; }
   try {
-    const main = await sharp(buf).rotate() // .rotate() honours EXIF orientation (phone photos)
+    // failOn:'none' tolerates slightly-malformed phone JPEGs (e.g. an invalid SOS marker)
+    // so they still get compressed instead of being served raw at full size.
+    const main = await sharp(buf, { failOn: 'none' }).rotate() // .rotate() honours EXIF orientation
       .resize(MAIN).jpeg({ quality: 82, mozjpeg: true }).toBuffer();
-    const thumb = await sharp(buf).rotate()
+    const thumb = await sharp(buf, { failOn: 'none' }).rotate()
       .resize(THUMB).jpeg({ quality: 72, mozjpeg: true }).toBuffer();
     fs.writeFileSync(mainPath, main); // overwrite original bytes; URL unchanged
     fs.writeFileSync(path.join(UPLOADS, thumbPathFor(filename)), thumb);
