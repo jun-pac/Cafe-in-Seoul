@@ -153,51 +153,98 @@ export function openLightbox(photos, start = 0, opts = {}) {
   const { spot, user, onLike, onDetail, onClose, byUrl = {} } = opts;
   let i = start;
   const multi = photos.length > 1;
+  const N = photos.length;
+  const at = (k) => img(photos[((k % N) + N) % N]); // wrap-around source url
   const back = document.createElement('div');
   back.className = 'lightbox' + (spot ? ' lightbox--viewer' : '');
   back.innerHTML = `
+    ${multi
+      ? `<div class="lightbox__stage"><div class="lightbox__track">
+           <div class="lightbox__slide"><img alt=""></div>
+           <div class="lightbox__slide"><img alt=""></div>
+           <div class="lightbox__slide"><img alt=""></div>
+         </div></div>`
+      : '<img class="lightbox__img" alt="">'}
     <button class="lightbox__close" aria-label="닫기">${icon('x', 20)}</button>
     ${multi ? `<button class="lightbox__nav prev" aria-label="이전">${icon('chevronLeft', 30)}</button>
     <button class="lightbox__nav next" aria-label="다음">${icon('chevronRight', 30)}</button>` : ''}
-    <img class="lightbox__img" alt="">
     ${multi ? '<div class="lightbox__count"></div>' : ''}
     ${spot ? `<div class="lightbox__bar">
+
       <div class="lightbox__meta"><b class="lightbox__title">${esc(L(spot, 'name'))}</b><span class="lightbox__by" id="lbBy"></span></div>
       <div class="lightbox__acts">
         <button type="button" class="like-btn ${spot.liked ? 'is-liked' : ''}" id="lbLike">${icon('thumbsUp', 15)} <span id="lbLikeN">${spot.likes || 0}</span></button>
         ${onDetail ? `<button type="button" class="btn btn--ghost sm lightbox__detail" id="lbDetail">${icon('info', 14)} ${t('viewer.detail')}</button>` : ''}
       </div>
     </div>` : ''}`;
-  const imgEl = back.querySelector('.lightbox__img');
   const countEl = back.querySelector('.lightbox__count');
   const byEl = back.querySelector('#lbBy');
-  const show = () => {
-    imgEl.src = img(photos[i]);
-    if (countEl) countEl.textContent = `${i + 1} / ${photos.length}`;
+  const updMeta = () => {
+    if (countEl) countEl.textContent = `${i + 1} / ${N}`;
     if (byEl) { const by = byUrl[photos[i]]; byEl.textContent = by ? ` · ${t('viewer.by')} ${by}` : ''; }
   };
+
   const onKey = (e) => {
     if (e.key === 'Escape') close();
     else if (e.key === 'ArrowLeft') go(-1);
     else if (e.key === 'ArrowRight') go(1);
   };
   const close = () => { back.remove(); document.removeEventListener('keydown', onKey); onClose?.(); };
-  const go = (d) => { i = (i + d + photos.length) % photos.length; show(); };
+
+  let go = () => {};
+  if (!multi) {
+    const imgEl = back.querySelector('.lightbox__img');
+    imgEl.src = at(0);
+    updMeta();
+  } else {
+    // Three slides (prev / current / next) in a track that translateX-es — so the next
+    // photo slides in (following the finger, then snapping) instead of cutting abruptly.
+    const stage = back.querySelector('.lightbox__stage');
+    const track = back.querySelector('.lightbox__track');
+    const imgs = [...track.querySelectorAll('img')];
+    const paint = () => { imgs[0].src = at(i - 1); imgs[1].src = at(i); imgs[2].src = at(i + 1); updMeta(); };
+    const width = () => stage.clientWidth || window.innerWidth;
+    const setX = (px, anim) => {
+      track.style.transition = anim ? 'transform .32s cubic-bezier(.22,.61,.36,1)' : 'none';
+      track.style.transform = `translateX(${px}px)`;
+    };
+    const rest = () => setX(-width(), false); // center the current slide (middle of three)
+    let animating = false;
+    const settle = (dir) => {
+      const w = width();
+      if (!dir) { setX(-w, true); return; }        // snap back
+      animating = true;
+      setX(dir > 0 ? -2 * w : 0, true);            // slide to next / prev
+      setTimeout(() => { i = (i + dir + N) % N; paint(); rest(); animating = false; }, 330);
+    };
+    go = (d) => { if (!animating && d) settle(d); };
+    paint(); rest();
+
+    // finger-follow drag with vertical-scroll direction lock
+    let sx = 0, sy = 0, drag = false, moved = false;
+    stage.addEventListener('touchstart', (e) => { if (animating) return; const p = e.touches[0]; sx = p.clientX; sy = p.clientY; drag = true; moved = false; }, { passive: true });
+    stage.addEventListener('touchmove', (e) => {
+      if (!drag) return;
+      const p = e.touches[0], dx = p.clientX - sx, dy = p.clientY - sy;
+      if (!moved && Math.abs(dx) < Math.abs(dy)) { drag = false; return; } // vertical → ignore
+      if (Math.abs(dx) > 6) moved = true;
+      if (moved) { e.preventDefault(); setX(-width() + dx, false); }
+    }, { passive: false });
+    stage.addEventListener('touchend', (e) => {
+      if (!drag) return; drag = false;
+      const dx = e.changedTouches[0].clientX - sx;
+      if (Math.abs(dx) > 45) settle(dx < 0 ? 1 : -1); else settle(0);
+    }, { passive: true });
+    // tap on the empty backdrop (not a moved swipe, not the photo) closes
+    stage.addEventListener('click', (e) => { if (!moved && e.target !== imgs[1] && e.target !== imgs[0] && e.target !== imgs[2]) close(); });
+    window.addEventListener('resize', rest);
+  }
+
   back.querySelector('.lightbox__close').onclick = close;
   back.querySelector('.lightbox__nav.prev')?.addEventListener('click', () => go(-1));
   back.querySelector('.lightbox__nav.next')?.addEventListener('click', () => go(1));
   back.addEventListener('click', (e) => { if (e.target === back) close(); });
   document.addEventListener('keydown', onKey);
-  // touch swipe (mobile) — horizontal drag past a threshold flips the photo
-  if (multi) {
-    let sx = 0, sy = 0, swiping = false;
-    back.addEventListener('touchstart', (e) => { const t0 = e.changedTouches[0]; sx = t0.clientX; sy = t0.clientY; swiping = true; }, { passive: true });
-    back.addEventListener('touchend', (e) => {
-      if (!swiping) return; swiping = false;
-      const t0 = e.changedTouches[0], dx = t0.clientX - sx, dy = t0.clientY - sy;
-      if (Math.abs(dx) > 45 && Math.abs(dx) > Math.abs(dy)) go(dx < 0 ? 1 : -1);
-    }, { passive: true });
-  }
   // like / detail actions (view-spot viewer)
   const likeBtn = back.querySelector('#lbLike');
   if (likeBtn && onLike) likeBtn.onclick = async () => {
@@ -207,7 +254,6 @@ export function openLightbox(photos, start = 0, opts = {}) {
   };
   back.querySelector('#lbDetail')?.addEventListener('click', () => { close(); onDetail?.(); });
   document.body.appendChild(back);
-  show();
 }
 
 // Turn the detail hero into a real sliding carousel: the photos sit in a flex track that
