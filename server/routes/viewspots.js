@@ -91,6 +91,12 @@ router.get('/', (req, res) => {
   const likes = {};
   allLikeCounts.all().forEach((r) => { likes[r.viewspot_id] = r.n; });
   const likedSet = uid ? new Set(likedByUser.all(uid).map((r) => r.viewspot_id)) : null;
+  // Anonymous list is identical for everyone → edge-cacheable (~60s). Logged-in
+  // response is personalized (own pending + per-user `liked`) → private/no-store.
+  // See the matching note in routes/cafes.js.
+  res.set('Cache-Control', req.user
+    ? 'private, no-store'
+    : 'public, max-age=30, s-maxage=60, stale-while-revalidate=600');
   res.json(listStmt.all().filter((v) =>
     v.status !== 'rejected' && (v.status === 'approved' || admin || (uid && v.created_by === uid))
   ).map((v) => ({ ...v, likes: likes[v.id] || 0, liked: !!(likedSet && likedSet.has(v.id)) })));

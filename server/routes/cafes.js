@@ -76,6 +76,14 @@ router.get('/', (req, res) => {
     .filter((c) => c.status === 'approved' || admin || (uid && c.created_by === uid))
     .map((c) => { const d = decorate(c); d.likes = likes[c.id] || 0; d.liked = !!(likedSet && likedSet.has(c.id)); return d; });
   cafes.sort((a, b) => b.score - a.score);
+  // The anonymous map list is byte-identical for every visitor, so let Cloudflare
+  // edge-cache it (~60s) instead of round-tripping to origin on every page load.
+  // A logged-in response is personalized (own pending drafts + per-user `liked`),
+  // so it stays private/no-store — never poolable. Anonymous visitors carry no
+  // session cookie (saveUninitialized:false), which is also the CF bypass key.
+  res.set('Cache-Control', req.user
+    ? 'private, no-store'
+    : 'public, max-age=30, s-maxage=60, stale-while-revalidate=600');
   res.json(cafes);
 });
 
