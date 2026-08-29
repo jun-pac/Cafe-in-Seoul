@@ -3,25 +3,13 @@ import { esc, img, thumb } from './util.js';
 import { icon } from './icons.js';
 import { L, t } from './i18n.js';
 
-// Minimal light OSM basemap: CARTO Positron (light_all) raster tiles - clean,
-// airy grayscale. No API key required.
-const STYLE = {
-  version: 8,
-  sources: {
-    carto: {
-      type: 'raster',
-      tiles: [
-        'https://a.basemaps.cartocdn.com/light_all/{z}/{x}/{y}@2x.png',
-        'https://b.basemaps.cartocdn.com/light_all/{z}/{x}/{y}@2x.png',
-        'https://c.basemaps.cartocdn.com/light_all/{z}/{x}/{y}@2x.png',
-        'https://d.basemaps.cartocdn.com/light_all/{z}/{x}/{y}@2x.png',
-      ],
-      tileSize: 256,
-      attribution: '© OpenStreetMap contributors © CARTO',
-    },
-  },
-  layers: [{ id: 'carto', type: 'raster', source: 'carto' }],
-};
+// Minimal light basemap — the clean, airy grayscale "Positron" look.
+// We used CARTO's keyless raster tiles until 2026-08, when CARTO started requiring an
+// API key and stamped "API KEY REQUIRED" across every tile. Switched to OpenFreeMap's
+// hosted Positron vector style: same look, free, no key, no signup. The style URL is a
+// stable endpoint that pulls its own glyphs/sprite/tiles + attribution (OSM/OpenMapTiles).
+// (Vector, not raster — our HTML photo-card markers are unaffected.)
+const STYLE = 'https://tiles.openfreemap.org/styles/positron';
 
 export function initMap(containerId, { onCardClick }) {
   const map = new maplibregl.Map({
