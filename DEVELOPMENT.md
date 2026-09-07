@@ -105,7 +105,9 @@ BASE_URL=https://cafe-in-seoul.com  SESSION_SECRET=<랜덤>
 ## 데이터 안전 (중요)
 
 - **DB 데이터 절대 삭제 금지가 원칙.** `server/db.js`에 하드 가드: WHERE 없는 DELETE/UPDATE, DROP/TRUNCATE 차단(예외: `ALLOW_DESTRUCTIVE=1`). 삭제는 **soft-delete**(`status='rejected'`, 행 보존·지도에서 숨김).
-- **자동 백업**: DB는 부팅 시 + 5분마다 `data/backups/` (60개 유지). **업로드 사진**은 `data/backups/uploads-mirror/` 로 미러(부팅+10분, 불변 파일만 복사). `npm run backups` / `npm run restore [latest|<file>]`.
+- **자동 백업(로컬)**: DB는 부팅 시 + 5분마다 `data/backups/` 로 스냅샷 — **5분치 60개(~5시간)** + **일일 스냅샷 `app-daily-<날짜>.db` 60개(~2개월)**, 각각 독립 정리. **업로드 사진**은 `data/backups/uploads-mirror/` 로 미러(부팅+10분, 불변 파일만 복사). `npm run backups` / `npm run restore [latest|<file>]`.
+- **오프-호스트 백업(Cloudflare R2)**: `scripts/backup-r2.sh` 가 호스트 크론(매일 KST 04:00)으로 `uploads/`(사진, 증분) + 일일 DB 스냅샷을 R2 버킷 `cafe-in-seoul-backup` 으로 rclone 복사(90일 초과 DB는 R2에서 자동 삭제 → 10GB 무료 티어 유지). 자격증명은 `~/.config/rclone/rclone.conf`(chmod 600, git 제외), R2 토큰은 서버 IP 한정 + `no_check_bucket=true` 필요. 로그: `data/logs/backup-r2.log`.
+- **손상 방지(중요)**: DB가 bind-mount 위 WAL이라 재시작 시 미체크포인트 WAL이 `app.db`를 손상시킨 적 있음(2026-09-07). `server/index.js` 가 SIGTERM/SIGINT에 `wal_checkpoint(TRUNCATE)`+`close()` 하는 graceful shutdown으로 방지. 복구: `docker compose stop` → 백업 `PRAGMA integrity_check` 로 검증 → `cp` 로 `app.db` 교체(+ stale `-wal`/`-shm` 삭제) → `up -d`.
 - **사진 파일은 코드가 삭제하지 않음** — 행이 지워져도 파일은 "고아"로 남아 복구 가능.
 - **UI 원칙:** 컬러 이모지 금지. 단색 SVG 아이콘(`icons.js`, `currentColor`) 또는 CSS-컬러 유니코드 기호만 사용.
 
