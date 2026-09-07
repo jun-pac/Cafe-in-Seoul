@@ -273,18 +273,28 @@ db.exec(`CREATE TABLE IF NOT EXISTS cafe_likes (
 // --- safety net: timestamped DB backups (keep last 60) ---
 // So no operation is ever irreversible: if data is lost, restore from data/backups/.
 const backupsDir = path.join(DATA_DIR, 'backups');
-const KEEP_BACKUPS = 60;
+const KEEP_BACKUPS = 60;   // fine-grained 5-min rolling snapshots (~5 hours back)
+const KEEP_DAILY = 60;     // one snapshot per day, kept ~2 months (catches slow-onset problems)
 function backupNow() {
   try {
     if (!fs.existsSync(backupsDir)) fs.mkdirSync(backupsDir, { recursive: true });
     const rows = db.prepare('SELECT (SELECT COUNT(*) FROM cafes) + (SELECT COUNT(*) FROM users) + (SELECT COUNT(*) FROM viewspots) AS n').get().n;
     if (rows <= 0) return; // never overwrite history with an empty snapshot
     db.pragma('wal_checkpoint(TRUNCATE)'); // flush WAL into the main file first
-    const stamp = new Date().toISOString().replace(/[:.]/g, '-').slice(0, 19);
-    const dest = path.join(backupsDir, `app-${stamp}.db`);
-    if (!fs.existsSync(dest)) fs.copyFileSync(path.join(DATA_DIR, 'app.db'), dest);
-    const files = fs.readdirSync(backupsDir).filter((f) => /^app-.*\.db$/.test(f)).sort();
-    for (const f of files.slice(0, -KEEP_BACKUPS)) fs.unlinkSync(path.join(backupsDir, f));
+    const src = path.join(DATA_DIR, 'app.db');
+    const iso = new Date().toISOString();
+    // fine-grained rolling snapshot (app-<ISO>.db)
+    const dest = path.join(backupsDir, `app-${iso.replace(/[:.]/g, '-').slice(0, 19)}.db`);
+    if (!fs.existsSync(dest)) fs.copyFileSync(src, dest);
+    // long-term daily snapshot (app-daily-<YYYY-MM-DD>.db) — one per day, pruned separately
+    const daily = path.join(backupsDir, `app-daily-${iso.slice(0, 10)}.db`);
+    if (!fs.existsSync(daily)) fs.copyFileSync(src, daily);
+    // prune each set independently so daily long-term backups aren't rotated out by the 5-min churn
+    const all = fs.readdirSync(backupsDir);
+    const rolling = all.filter((f) => /^app-\d{4}-\d\d-\d\dT.*\.db$/.test(f)).sort();
+    for (const f of rolling.slice(0, -KEEP_BACKUPS)) fs.unlinkSync(path.join(backupsDir, f));
+    const daylies = all.filter((f) => /^app-daily-\d{4}-\d\d-\d\d\.db$/.test(f)).sort();
+    for (const f of daylies.slice(0, -KEEP_DAILY)) fs.unlinkSync(path.join(backupsDir, f));
   } catch (e) {
     console.error('DB backup skipped:', e.message);
   }
