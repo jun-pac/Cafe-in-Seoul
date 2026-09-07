@@ -18,6 +18,22 @@ ts() { date -u +%FT%TZ; }
 
 if ! command -v rclone >/dev/null 2>&1; then echo "$(ts) ERROR rclone not found" >&2; exit 1; fi
 
+# Hard cap (R2 has no native per-bucket quota). Since this script is the ONLY writer
+# to the bucket (IP-restricted token), refusing to upload past a size ceiling is an
+# effective hard limit. Our real footprint is ~0.5GB and bounded (immutable photos +
+# 90-day DB prune), so this should never trip — if it does, something is wrong and
+# stopping + shouting beats silently accruing charges. Override with R2_MAX_GB.
+MAX_GB="${R2_MAX_GB:-2}"
+USED=$(rclone size "$REMOTE" --s3-no-check-bucket 2>/dev/null | grep -oE '\(([0-9]+) Byte' | grep -oE '[0-9]+' | head -1)
+if [ -n "${USED:-}" ]; then
+  CAP=$(( MAX_GB * 1073741824 ))
+  if [ "$USED" -ge "$CAP" ]; then
+    echo "$(ts) ALERT R2 usage $((USED/1048576))MiB >= cap ${MAX_GB}GB — skipping upload to avoid billing. Investigate!" >&2
+    exit 2
+  fi
+  echo "$(ts) R2 usage $((USED/1048576))MiB / cap ${MAX_GB}GB"
+fi
+
 # 1) photos — incremental copy
 rclone copy "$APP/uploads" "$REMOTE/uploads" --transfers 8 --checkers 16 --fast-list --stats-one-line --s3-no-check-bucket
 
