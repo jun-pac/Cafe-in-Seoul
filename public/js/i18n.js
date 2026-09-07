@@ -4,7 +4,7 @@ const DICT = {
   ko: {
     'brand.sub': '카공하기 좋은 서울 카페 지도',
     'nav.addCafe': '카페 등록', 'nav.addView': '명소 등록',
-    'nav.collections': '조건별·지역별 카페 모음',
+    'nav.collections': '카페 모음',
     'detail.aiSummary': '요약',
     'filters': '필터', 'filters.reset': '초기화', 'filters.show': '표시', 'filters.more': '상세',
     'show.cafes': '주인장 추천 카페', 'show.views': '주인장 추천 명소',
@@ -106,7 +106,7 @@ const DICT = {
   en: {
     'brand.sub': 'Study-friendly cafes in Seoul',
     'nav.addCafe': 'Add Cafe', 'nav.addView': 'Add View',
-    'nav.collections': 'Browse cafe guides',
+    'nav.collections': 'Cafe guides',
     'detail.aiSummary': 'Summary',
     'filters': 'Filters', 'filters.reset': 'Reset', 'filters.show': 'Show', 'filters.more': 'More',
     'show.cafes': 'Cafe picks', 'show.views': 'View picks',

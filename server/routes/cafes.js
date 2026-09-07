@@ -304,7 +304,7 @@ router.patch('/:id', requireAdmin, upload.array('photos', 30), async (req, res) 
   })();
   if (sets.length) {
     i18nContent.translateCafe(req.params.id).catch(() => {}); // refresh *_en after an edit
-    seoSummary.generateCafe(req.params.id).catch(() => {});   // refresh the AI summary too
+    seoSummary.regenerateOnEdit(req.params.id).catch(() => {}); // refresh AI summary (throttled to once/day)
   }
   res.json(decorate(getStmt.get(req.params.id)));
 });

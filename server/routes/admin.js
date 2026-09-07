@@ -13,6 +13,15 @@ router.get('/capabilities', requireAuth, (req, res) => {
   res.json({ kakao: kakao.HAS_KAKAO, ai: ai.HAS_AI });
 });
 
+// Force-regenerate every cafe's AI search summary (ignores the once/day throttle).
+// Use after the summary prompt changes. Runs in the background, in-process.
+router.post('/regen-summaries', requireAdmin, (req, res) => {
+  if (!ai.HAS_AI) return res.status(400).json({ error: 'AI가 설정되어 있지 않습니다 (OPENAI_API_KEY).' });
+  const count = db.prepare("SELECT COUNT(*) AS n FROM cafes WHERE status != 'rejected'").get().n;
+  require('../seoSummary').regenerateAll().catch(() => {});
+  res.json({ ok: true, started: count });
+});
+
 // pending review queue
 const pendingStmt = db.prepare(`SELECT * FROM cafes WHERE status = 'pending' ORDER BY created_at DESC`);
 const setApproved = db.prepare(`UPDATE cafes SET status = 'approved', moderation_reason = NULL WHERE id = ?`);

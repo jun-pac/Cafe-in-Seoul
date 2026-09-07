@@ -275,6 +275,15 @@ async function handleViewDelete(id) {
   try { await api.deleteViewspot(id); closeDetail(); await loadCafes(); }
   catch (e) { alert(e.message); }
 }
+// Header entry point to the curated collection/guide pages (attribute + neighborhood).
+// Always visible (unlike add-cafe/view which need login); navigates to the /cafes hub.
+function wireCollections() {
+  const btn = $('#collectionsBtn');
+  if (!btn) return;
+  btn.innerHTML = `${icon('grip', 15)}<span class="tb__label">${t('nav.collections')}</span>`;
+  btn.title = t('nav.collections');
+  btn.addEventListener('click', () => { window.location.href = getLang() === 'en' ? '/en/cafes' : '/cafes'; });
+}
 function wireAddView() {
   $('#addViewBtn').innerHTML = `${icon('view', 15)}<span class="tb__label">${t('nav.addView')}</span>`;
   $('#addViewBtn').addEventListener('click', () => {
@@ -407,6 +416,8 @@ async function rerenderI18n() {
   $('#langToggle').textContent = getLang() === 'ko' ? 'EN' : 'KO';
   $('#addCafeBtn').innerHTML = `${icon('plus', 15)}<span class="tb__label">${t('nav.addCafe')}</span>`;
   $('#addViewBtn').innerHTML = `${icon('view', 15)}<span class="tb__label">${t('nav.addView')}</span>`;
+  $('#collectionsBtn').innerHTML = `${icon('grip', 15)}<span class="tb__label">${t('nav.collections')}</span>`;
+  $('#collectionsBtn').title = t('nav.collections');
   ['f-price', 'f-quiet', 'f-coffee', 'f-restroom'].forEach((id) => $(`#${id}`).dispatchEvent(new Event('input')));
   await refreshMe();               // re-render auth bar in the new language
   applyFilters();                  // result text
@@ -992,6 +1003,7 @@ async function boot() {
   wireCardZoom();
   wireAddCafe();
   wireAddView();
+  wireCollections();
   await refreshMe();
   await loadCafes();
   loadStats();

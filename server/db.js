@@ -177,6 +177,8 @@ for (const col of ['name_en', 'address_en', 'study_review_en', 'view_note_en', '
 for (const col of ['ai_summary', 'ai_summary_en']) {
   if (!cafeCols.has(col)) db.exec(`ALTER TABLE cafes ADD COLUMN ${col} TEXT`);
 }
+// when the summary was last generated — used to throttle regeneration to once/day
+if (!cafeCols.has('ai_summary_at')) db.exec(`ALTER TABLE cafes ADD COLUMN ai_summary_at TEXT`);
 
 const userCols = new Set(db.prepare(`PRAGMA table_info(users)`).all().map((c) => c.name));
 if (!userCols.has('password_hash')) {

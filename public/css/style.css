@@ -64,6 +64,9 @@ b { font-weight: 700; }
 .tb__btn--accent:hover { background: #222; color: #fff; }
 .tb__btn--viewaccent { border-color: var(--view); color: var(--view); }
 .tb__btn--viewaccent:hover { background: rgba(31,158,115,.09); border-color: var(--view); }
+/* collection/guide entry: a prominent, always-visible nav pill (soft-filled + bold) */
+.tb__btn--nav { background: var(--cool); border-color: var(--hair-strong); font-weight: 700; font-size: 13.5px; }
+.tb__btn--nav:hover { background: var(--cool); border-color: var(--ink); }
 #authBtn.is-in { border-color: var(--ink); color: var(--ink); }
 .tb__avatar { display: inline-flex; align-items: center; justify-content: center; width: 22px; height: 22px; border-radius: 50%; background: var(--ink); color: #fff; font-family: var(--font-display); font-weight: 800; font-size: 11px; }
 
@@ -257,8 +260,9 @@ b { font-weight: 700; }
 .modal--insights .admin-badge { font-size: 8px; padding: 0 4px; }
 
 .authbar { display: flex; align-items: center; justify-content: space-between; gap: 8px; }
-.authbar__link { display: flex; align-items: center; gap: 6px; width: 100%; margin-top: 12px; padding: 0; font-size: 12.5px; font-weight: 600; color: var(--ink-2); background: none; border: none; cursor: pointer; text-align: left; }
-.authbar__link:hover { color: var(--ink); }
+/* score-weight adjust: an important action, shown as a clear pill button */
+.authbar__link { display: flex; align-items: center; gap: 7px; width: 100%; margin-top: 12px; padding: 9px 11px; font-size: 13.5px; font-weight: 700; color: var(--ink); background: var(--cool); border: 1px solid var(--hair-strong); border-radius: var(--pill); cursor: pointer; text-align: left; }
+.authbar__link:hover { border-color: var(--ink); }
 .authbar__contact { display: flex; align-items: center; gap: 6px; margin-top: 12px; padding-top: 12px; border-top: 1px solid var(--hair); font-size: 12.5px; font-weight: 600; color: var(--ink-2); text-decoration: none; }
 .authbar__contact:hover { color: var(--ink); }
 .authbar__contact .muted { font-weight: 500; }
