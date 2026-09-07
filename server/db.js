@@ -172,6 +172,11 @@ if (!cafeCols.has('rain_ok')) {
 for (const col of ['name_en', 'address_en', 'study_review_en', 'view_note_en', 'review_summary_en']) {
   if (!cafeCols.has(col)) db.exec(`ALTER TABLE cafes ADD COLUMN ${col} TEXT`);
 }
+// AI search-engine summary: one dense paragraph synthesizing every field + votes +
+// the owner's verdict, for crawlers/LLMs (rendered on the SEO page, not the map UI).
+for (const col of ['ai_summary', 'ai_summary_en']) {
+  if (!cafeCols.has(col)) db.exec(`ALTER TABLE cafes ADD COLUMN ${col} TEXT`);
+}
 
 const userCols = new Set(db.prepare(`PRAGMA table_info(users)`).all().map((c) => c.name));
 if (!userCols.has('password_hash')) {
@@ -195,6 +200,9 @@ if (!vsCols.has('name_en')) db.exec(`ALTER TABLE viewspots ADD COLUMN name_en TE
 // real location, reverse-geocoded from lat/lng at registration ("인천 제물포구") + its EN
 if (!vsCols.has('region')) db.exec(`ALTER TABLE viewspots ADD COLUMN region TEXT`);
 if (!vsCols.has('region_en')) db.exec(`ALTER TABLE viewspots ADD COLUMN region_en TEXT`);
+// AI search-engine summary (see cafes above)
+if (!vsCols.has('ai_summary')) db.exec(`ALTER TABLE viewspots ADD COLUMN ai_summary TEXT`);
+if (!vsCols.has('ai_summary_en')) db.exec(`ALTER TABLE viewspots ADD COLUMN ai_summary_en TEXT`);
 // English translations of user text: story bodies + view-spot comments
 const reviewCols2 = new Set(db.prepare(`PRAGMA table_info(reviews)`).all().map((c) => c.name));
 if (!reviewCols2.has('body_en')) db.exec(`ALTER TABLE reviews ADD COLUMN body_en TEXT`);

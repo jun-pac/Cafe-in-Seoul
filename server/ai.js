@@ -149,6 +149,55 @@ async function draftStudyReview(cafe) {
   catch { return null; }
 }
 
+// Search-engine summary: one dense, natural Korean paragraph that synthesizes EVERY
+// field (location, size, floors, hours, price, outlets, view) + crowd votes + the
+// owner's own verdict — the crawlable prose the structured data alone doesn't give.
+const SEO_SYSTEM = `너는 "카공(카페에서 공부/작업)" 지도 사이트의 카페 소개 문단을 쓰는 도우미다.
+주어진 정보(위치, 규모, 층수, 영업시간, 가격, 콘센트, 뷰, 방문자 평점, 직접 쓴 총평)를 종합해,
+검색엔진과 AI가 읽고 인용하기 좋은 자연스러운 한국어 소개 문단을 써라.
+규칙:
+- 3~4문장. 정보 밀도 높게, 구체적 사실 위주(어디에 있고, 얼마고, 몇 시까지 하고, 콘센트/좌석/조용함이 어떤지, 카공에 왜 좋은지/아쉬운지).
+- 주어진 정보만 사용(지어내기 금지). 수치는 자연스럽게 문장에 녹여라(단순 나열 금지).
+- "직접 방문해 확인했다"는 1차 경험의 톤을 유지하되 과장/광고 문구 금지.
+- 반드시 아래 JSON만: { "summary": "소개 문단(한국어)" }`;
+
+async function seoSummary(cafe, votes) {
+  if (!HAS_AI) return null;
+  const v = votes || {};
+  const rate = (x) => (x == null ? '평가없음' : `${x}/5`);
+  const info = `이름: ${cafe.name}
+주소/지역: ${cafe.address || cafe.region || ''}
+규모: ${cafe.size} / 층수: ${cafe.floors} / 콘센트: ${cafe.outlets} / 뷰: ${cafe.has_view ? '있음' : '없음'}${cafe.view_note ? `(${cafe.view_note})` : ''}
+영업시간: ${cafe.open_time} ~ ${cafe.close_time}
+아이스아메리카노: ${cafe.iced_americano_price}원
+우천시 작업하기 좋음: ${cafe.rain_ok ? '예' : '아니오'}
+방문자 평점 — 조용함:${rate(v.quiet)} 커피맛:${rate(v.coffee)} 화장실:${rate(v.restroom)}
+직접 쓴 카공 총평: ${cafe.study_review || '없음'}
+외부 리뷰 요약: ${cafe.review_summary || '없음'}`;
+
+  const payload = JSON.stringify({
+    model: MODEL, temperature: 0.4, response_format: { type: 'json_object' },
+    messages: [{ role: 'system', content: SEO_SYSTEM }, { role: 'user', content: info }],
+  });
+  const sleep = (ms) => new Promise((res) => setTimeout(res, ms));
+  let r, lastErr;
+  for (let attempt = 0; attempt < 3; attempt++) {
+    if (attempt) await sleep(500 * attempt);
+    r = await fetch('https://api.openai.com/v1/chat/completions', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${OPENAI_API_KEY}` },
+      body: payload,
+    });
+    if (r.ok) break;
+    lastErr = `HTTP ${r.status}`;
+    if (r.status !== 429 && r.status < 500) break;
+  }
+  if (!r.ok) throw new Error(`OpenAI 오류 (${lastErr})`);
+  const data = await r.json();
+  try { return (JSON.parse(data.choices?.[0]?.message?.content || '{}').summary || '').trim() || null; }
+  catch { return null; }
+}
+
 // Translate an array of Korean strings to natural English in one call. Names → common English
 // or clean romanization; sentences → fluent English. Returns a same-length array (null on fail).
 async function translateBatch(texts) {
@@ -191,4 +240,4 @@ async function translateBatch(texts) {
   return texts.map(() => null);
 }
 
-module.exports = { summarize, moderate, draftStudyReview, translateBatch, HAS_AI };
+module.exports = { summarize, moderate, draftStudyReview, seoSummary, translateBatch, HAS_AI };

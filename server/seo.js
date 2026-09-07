@@ -232,6 +232,9 @@ function renderCafe(row, lang) {
   const price = won(row.iced_americano_price);
   const review = ko ? (row.study_review || '') : (row.study_review_en || row.study_review || '');
   const viewNote = ko ? (row.view_note || '') : (row.view_note_en || row.view_note || '');
+  // AI search-engine summary (synthesizes every field + votes + verdict). Primary
+  // crawlable prose when present; the templated `lead` is the fallback.
+  const aiSum = ko ? (row.ai_summary || '') : (row.ai_summary_en || row.ai_summary || '');
   const photos = cafePhotos(row.id);
   const hero = photos[0] || row.photo_url;
 
@@ -316,7 +319,7 @@ function renderCafe(row, lang) {
     <h1>${esc(name)}</h1>
     <p class="sub">${esc(addr)}${gu ? '' : ''} · <span class="seo-badge">${d.score}<small>${ko ? '카공점수' : 'STUDY'}</small></span></p>
     ${hero ? `<img class="seo-hero" src="${esc(imgPath(hero))}" alt="${esc(name)} ${ko ? '카공 카페 대표 사진' : 'study cafe'}" loading="eager" />` : ''}
-    <p class="seo-lead">${esc(lead)}</p>
+    <p class="seo-lead">${esc(aiSum || lead)}</p>
     ${review ? `<h2>${ko ? '카공 총평' : 'Study verdict'}</h2><p class="seo-lead" style="margin-top:0">${esc(review)}</p>` : ''}
     ${viewNote ? `<h2>${ko ? '뷰' : 'View'}</h2><p>${esc(viewNote)}</p>` : ''}
     <h2>${ko ? '카공 정보' : 'The details'}</h2>
@@ -329,7 +332,8 @@ function renderCafe(row, lang) {
     ${nearby.length ? `<h2>${ko ? '가까운 다른 카페' : 'Nearby cafes'}</h2><ul class="seo-dir">${nearby.map((c) => `<li><a href="${ko ? '' : '/en'}/cafes/${cafeSlug(c)}"><img src="${esc(imgPath(c.photo_url))}" alt="${esc(ko ? c.name : (c.name_en || c.name))}" loading="lazy" /><span><span class="n">${esc(ko ? c.name : (c.name_en || c.name))}</span><br><span class="m">${esc(guOf(c, ko) || regionCity(c, ko) || '')}</span></span></a></li>`).join('')}</ul>` : ''}
     ${seoFooter(ko)}`;
 
-  return shell({ lang: ko ? 'ko' : 'en', title, desc, canonical, alternates, jsonLd: [ld, breadcrumb], body, ogImage: absImg(hero) });
+  const metaDesc = (aiSum ? aiSum.replace(/\s+/g, ' ') : desc).slice(0, 160);
+  return shell({ lang: ko ? 'ko' : 'en', title, desc: metaDesc, canonical, alternates, jsonLd: [ld, breadcrumb], body, ogImage: absImg(hero) });
 }
 
 // ---- view-spot page --------------------------------------------------------
@@ -569,8 +573,8 @@ function cmpRow(c, ko) {
 function rankCard(c, i, def, ko) {
   const nm = ko ? c.name : (c.name_en || c.name);
   const href = `${ko ? '' : '/en'}/cafes/${cafeSlug(c)}`;
-  const review = ko ? (c.study_review || '') : (c.study_review_en || c.study_review || '');
-  const why = [def.blurb ? def.blurb(c, ko) : '', clip(review, 2, 170)].filter(Boolean).join(' ');
+  const prose = ko ? (c.ai_summary || c.study_review || '') : (c.ai_summary_en || c.ai_summary || c.study_review_en || c.study_review || '');
+  const why = [def.blurb ? def.blurb(c, ko) : '', clip(prose, 2, 170)].filter(Boolean).join(' ');
   const gu = guOf(c, ko) || regionCity(c, ko) || '';
   return `<li>
       <a class="thumb" href="${href}"><img src="${esc(thumbPath(c.photo_url))}" alt="${esc(nm)}" loading="lazy" /></a>

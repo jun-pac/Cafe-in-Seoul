@@ -13,6 +13,7 @@ const { setCafeCover } = require('../cafePhotos');
 const { processUploads } = require('../images');
 const { sendAdminAlert } = require('../mailer');
 const i18nContent = require('../i18nContent');
+const seoSummary = require('../seoSummary');
 
 const router = express.Router();
 
@@ -221,6 +222,7 @@ router.post('/', requireAuth, upload.array('photos', 30), async (req, res, next)
       ).catch(() => {});
     }
     i18nContent.translateCafe(cafe.id).catch(() => {}); // fill *_en in the background
+    seoSummary.generateCafe(cafe.id).catch(() => {}); // AI search-engine summary (background)
     res.status(201).json({ ...decorate(getStmt.get(cafe.id)), pending: !admin });
   } catch (e) {
     cleanup();
@@ -300,7 +302,10 @@ router.patch('/:id', requireAdmin, upload.array('photos', 30), async (req, res) 
       ordered.forEach((url, i) => insertCafePhoto.run(crypto.randomUUID(), req.params.id, url, i));
     }
   })();
-  if (sets.length) i18nContent.translateCafe(req.params.id).catch(() => {}); // refresh *_en after an edit
+  if (sets.length) {
+    i18nContent.translateCafe(req.params.id).catch(() => {}); // refresh *_en after an edit
+    seoSummary.generateCafe(req.params.id).catch(() => {});   // refresh the AI summary too
+  }
   res.json(decorate(getStmt.get(req.params.id)));
 });
 

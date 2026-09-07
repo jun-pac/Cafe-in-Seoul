@@ -159,6 +159,13 @@ const { retranslateMissing } = require('./i18nContent');
 setTimeout(() => { retranslateMissing(); }, 30_000);
 setInterval(() => { retranslateMissing(); }, 6 * 60 * 60 * 1000).unref();
 
+// AI search-engine summaries: backfill any cafe missing one (one-time fill on first
+// boot after deploy, and self-heals after an OpenAI credit lapse). Runs inside the
+// server process so the writes are immediately visible to the SEO pages it serves.
+const { backfillMissing: backfillSeoSummaries } = require('./seoSummary');
+setTimeout(() => { backfillSeoSummaries(); }, 45_000);
+setInterval(() => { backfillSeoSummaries(); }, 6 * 60 * 60 * 1000).unref();
+
 app.listen(PORT, () => {
   console.log(`\n☕  seoul-cafe running at ${process.env.BASE_URL || `http://localhost:${PORT}`}`);
   console.log(`   Google SSO: ${auth.GIS_ENABLED ? 'enabled (GIS token flow)' : 'disabled (using dev login)'}\n`);
