@@ -442,6 +442,10 @@ function allCafesDecorated() {
 }
 const byScore = (a, b) => b.score - a.score || String(a.name || '').localeCompare(b.name || '');
 const quietOf = (c) => (c.votes && c.votes.averages && c.votes.averages.quiet != null ? c.votes.averages.quiet : -1);
+// Every collection page targets a "서울 …" query, so it must be Seoul-only. Non-Seoul
+// cafes (경주·부산·횡성 등) still get individual pages — just not these city lists. Also
+// keeps a shared district name (부산 중구 vs 서울 중구) from leaking across neighborhoods.
+const isSeoul = (c) => /^\s*서울/.test(c.address || '');
 
 // attribute collections (array order = hub display order)
 const ATTR_COLLECTIONS = [
@@ -506,6 +510,7 @@ const ATTR_COLLECTIONS = [
 function hoodCounts() {
   const m = {};
   for (const c of db.prepare(`SELECT address FROM cafes WHERE status='approved'`).all()) {
+    if (!isSeoul(c)) continue;               // Seoul 구 only (no 부산/인천 중구 …)
     const g = district(c.address);
     if (g && SEOUL_GU[g]) m[g] = (m[g] || 0) + 1;
   }
@@ -513,11 +518,10 @@ function hoodCounts() {
 }
 function hoodDef(gu) {
   const info = SEOUL_GU[gu];
-  const koCity = gu.replace(/구$/, ''); // 강남구 → 강남 (reads naturally in a query)
   return {
-    key: info.slug, kind: 'hood', filter: (c) => district(c.address) === gu, sort: byScore,
-    query: { ko: `${koCity} 카공 카페`, en: `Best cafes to work in ${info.en}` },
-    h1: { ko: `${koCity} 카공하기 좋은 카페`, en: `Best cafes to work in ${info.en}` },
+    key: info.slug, kind: 'hood', filter: (c) => isSeoul(c) && district(c.address) === gu, sort: byScore,
+    query: { ko: `${gu} 카공 카페`, en: `Best cafes to work in ${info.en}` },
+    h1: { ko: `${gu} 카공하기 좋은 카페`, en: `Best cafes to work in ${info.en}` },
     lead: {
       ko: `${gu}에서 직접 방문한 카공 카페입니다. 콘센트, 조용함, 좌석, 아메리카노 가격, 영업시간을 같은 기준으로 비교했습니다.`,
       en: `Study-friendly cafes in ${info.en}, Seoul that I visited in person — compared on outlets, quiet, seating, americano price and hours.`,
@@ -541,6 +545,52 @@ function listCollections() {
   const hoods = Object.entries(hoodCounts()).filter(([, n]) => n >= HOOD_MIN)
     .sort((a, b) => b[1] - a[1]).map(([gu]) => hoodDef(gu));
   return { attrs: ATTR_COLLECTIONS, hoods };
+}
+
+// ---- neighborhood × attribute combos (e.g. 영등포구 뷰 좋은 카페) ----
+// Only generated when at least COMBO_MIN cafes match (no thin pages); reachable via
+// cross-links + sitemap, not the top-level hub. URL: /cafes/<hood-slug>/<attr-key>.
+const COMBO_MIN = 3;
+// 'best-study-cafes-seoul' is excluded — crossed with a hood it just == the hood page.
+const COMBO_ATTR_KEYS = ['late-night', '24-hour', 'great-view', 'power-outlets', 'quiet', 'affordable', 'spacious'];
+
+function comboDef(gu, attr) {
+  const info = SEOUL_GU[gu];
+  const subKo = (s) => String(s).replace('서울', gu);
+  const subEn = (s) => String(s).replace('Seoul', info.en);
+  return {
+    key: `${info.slug}/${attr.key}`, kind: 'combo', hoodSlug: info.slug, attrKey: attr.key,
+    filter: (c) => isSeoul(c) && district(c.address) === gu && attr.filter(c),
+    sort: attr.sort, blurb: attr.blurb,
+    query: { ko: subKo(attr.query.ko), en: subEn(attr.query.en) },
+    h1: { ko: subKo(attr.h1.ko), en: subEn(attr.h1.en) },
+    lead: { ko: `${gu}에서 ${attr.lead.ko}`, en: `${info.en} — ${attr.lead.en}` },
+    criteria: { ko: [`${gu} 소재`, ...attr.criteria.ko], en: [`Located in ${info.en}`, ...attr.criteria.en] },
+  };
+}
+// resolve <hood-slug>/<attr-key> to a live combo def (>= COMBO_MIN cafes), else null
+function getCombo(hoodSlug, attrKey) {
+  const g = GU_BY_SLUG[hoodSlug];
+  const attr = ATTR_COLLECTIONS.find((d) => d.key === attrKey);
+  if (!g || !attr || !COMBO_ATTR_KEYS.includes(attrKey)) return null;
+  if ((hoodCounts()[g.ko] || 0) < HOOD_MIN) return null;   // hood must itself qualify
+  const def = comboDef(g.ko, attr);
+  if (allCafesDecorated().filter(def.filter).length < COMBO_MIN) return null;
+  return def;
+}
+// all qualifying combos (for sitemap + cross-links)
+function listCombos() {
+  const base = allCafesDecorated().filter(isSeoul);
+  const hoods = Object.entries(hoodCounts()).filter(([, n]) => n >= HOOD_MIN).map(([gu]) => gu);
+  const out = [];
+  for (const gu of hoods) {
+    for (const key of COMBO_ATTR_KEYS) {
+      const attr = ATTR_COLLECTIONS.find((d) => d.key === key);
+      const def = comboDef(gu, attr);
+      if (base.filter(def.filter).length >= COMBO_MIN) out.push(def);
+    }
+  }
+  return out;
 }
 
 const COLLECTION_CSS = `
@@ -589,9 +639,9 @@ function rankCard(c, i, def, ko) {
 
 function renderCollection(def, lang) {
   const ko = lang !== 'en';
-  const all = allCafesDecorated();
-  const total = all.length;
-  const rows = all.filter(def.filter).sort(def.sort);
+  const base = allCafesDecorated().filter(isSeoul);   // Seoul-only universe for every list
+  const total = base.length;
+  const rows = base.filter(def.filter).sort(def.sort);
   const n = rows.length;
   const shown = rows.slice(0, DISPLAY);
   const hero = shown[0] ? shown[0].photo_url : null;
@@ -610,6 +660,14 @@ function renderCollection(def, lang) {
 
   const { attrs, hoods } = listCollections();
   const relLinks = [...attrs, ...hoods].filter((d) => d.key !== def.key).slice(0, 12)
+    .map((d) => `<a href="${ko ? '' : '/en'}/cafes/${d.key}">${esc(d.query[ko ? 'ko' : 'en'])}</a>`).join('');
+  // neighborhood × attribute combos relevant to THIS page (discoverable, not in the hub)
+  const allCombos = listCombos();
+  let comboRel;
+  if (def.kind === 'hood') comboRel = allCombos.filter((d) => d.hoodSlug === def.key);
+  else if (def.kind === 'combo') comboRel = allCombos.filter((d) => d.key !== def.key && (d.hoodSlug === def.hoodSlug || d.attrKey === def.attrKey));
+  else comboRel = allCombos.filter((d) => d.attrKey === def.key); // attribute page → its neighborhood variants
+  const comboLinks = comboRel.slice(0, 16)
     .map((d) => `<a href="${ko ? '' : '/en'}/cafes/${d.key}">${esc(d.query[ko ? 'ko' : 'en'])}</a>`).join('');
 
   const ld = [
@@ -640,6 +698,7 @@ function renderCollection(def, lang) {
     <ul class="seo-crit">${crit.map((x) => `<li>${esc(x)}</li>`).join('')}</ul>
     <h2>${ko ? '다른 조건·지역으로 보기' : 'Browse by intent or area'}</h2>
     <div class="seo-links">${relLinks}</div>
+    ${comboLinks ? `<h2>${ko ? '지역 × 조건' : 'Area × filter'}</h2><div class="seo-links">${comboLinks}</div>` : ''}
     ${seoFooter(ko)}`;
 
   return shell({ lang: ko ? 'ko' : 'en', title, desc, canonical, alternates, jsonLd: ld, body, ogImage: absImg(hero), extraCss: COLLECTION_CSS });
@@ -733,7 +792,8 @@ function sitemap() {
   // search-intent collection pages (attribute + qualifying neighborhoods), ko/en
   const { attrs, hoods } = listCollections();
   const collUrls = [...attrs, ...hoods].map((d) => urlEntry(`${BASE}/cafes/${d.key}`, `${BASE}/en/cafes/${d.key}`, null, null)).join('\n');
-  return `<?xml version="1.0" encoding="UTF-8"?>\n<urlset ${NS}>\n${staticUrls}\n${collUrls}\n${cafeUrls}\n${viewUrls}\n</urlset>\n`;
+  const comboUrls = listCombos().map((d) => urlEntry(`${BASE}/cafes/${d.key}`, `${BASE}/en/cafes/${d.key}`, null, null)).join('\n');
+  return `<?xml version="1.0" encoding="UTF-8"?>\n<urlset ${NS}>\n${staticUrls}\n${collUrls}\n${comboUrls}\n${cafeUrls}\n${viewUrls}\n</urlset>\n`;
 }
 
 const ROBOTS = `User-agent: *
@@ -795,5 +855,16 @@ router.get('/cafes/:slug', serveCafe('ko'));
 router.get('/en/cafes/:slug', serveCafe('en'));
 router.get('/views/:slug', serveView('ko'));
 router.get('/en/views/:slug', serveView('en'));
+
+// neighborhood × attribute combo pages: /cafes/<hood>/<attr> (404 when < COMBO_MIN)
+function serveCombo(lang) {
+  return (req, res, next) => {
+    const def = getCombo(req.params.hood, req.params.attr);
+    if (!def) return next();
+    html(res, renderCollection(def, lang));
+  };
+}
+router.get('/cafes/:hood/:attr', serveCombo('ko'));
+router.get('/en/cafes/:hood/:attr', serveCombo('en'));
 
 module.exports = { router, cafeSlug, viewSlug, BASE, regionOf, regionCity, listCollections, getCollection };
