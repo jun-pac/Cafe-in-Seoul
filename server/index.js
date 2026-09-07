@@ -166,6 +166,22 @@ const { backfillMissing: backfillSeoSummaries } = require('./seoSummary');
 setTimeout(() => { backfillSeoSummaries(); }, 45_000);
 setInterval(() => { backfillSeoSummaries(); }, 6 * 60 * 60 * 1000).unref();
 
+// Graceful shutdown: flush the WAL into app.db and close cleanly before exit. A
+// container restart that kills the process with an un-checkpointed WAL has corrupted
+// app.db over the bind-mounted volume; checkpointing on SIGTERM/SIGINT prevents that.
+const dbForShutdown = require('./db');
+let shuttingDown = false;
+function gracefulShutdown(sig) {
+  if (shuttingDown) return;
+  shuttingDown = true;
+  try { dbForShutdown.pragma('wal_checkpoint(TRUNCATE)'); } catch (e) { console.error('shutdown checkpoint failed:', e.message); }
+  try { dbForShutdown.close(); } catch { /* already closed */ }
+  console.log(`\n☕  shut down cleanly on ${sig} (WAL checkpointed)`);
+  process.exit(0);
+}
+process.on('SIGTERM', () => gracefulShutdown('SIGTERM'));
+process.on('SIGINT', () => gracefulShutdown('SIGINT'));
+
 app.listen(PORT, () => {
   console.log(`\n☕  seoul-cafe running at ${process.env.BASE_URL || `http://localhost:${PORT}`}`);
   console.log(`   Google SSO: ${auth.GIS_ENABLED ? 'enabled (GIS token flow)' : 'disabled (using dev login)'}\n`);
