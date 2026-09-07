@@ -44,13 +44,15 @@
 
 - **개별 페이지** — `/cafes/<이름>-<id8>`, `/views/<이름>-<id8>`. 각 페이지에 `<title>`·meta description·`<h1>`·자연어 본문(필드+카공총평)·`<img alt>`·specs·후기·`CafeOrCoffeeShop`/`TouristAttraction` JSON-LD·breadcrumb·canonical·hreflang·가까운 장소 내부링크. **별점(aggregateRating)은 넣지 않음**(카공점수는 고객 별점이 아니라 자체 지표).
 - **영어 트윈** — `/en/cafes/...`, `/en/views/...` (기존 `*_en` 컬럼 사용). ko↔en `hreflang` 상호 연결.
-- **디렉터리** — `/cafes` `/views` (+ `/en/...`)에 전체 목록. 각 상세/디렉터리가 서로 링크 → 크롤 그래프.
-- **`/sitemap.xml`** — DB에서 동적 생성(홈+디렉터리+전 장소, `<image:image>`·ko/en `hreflang` 포함). **`/robots.txt`** — 전체 허용 + `OAI-SearchBot`(ChatGPT 검색) 명시 + sitemap.
+- **디렉터리** — `/cafes` `/views` (+ `/en/...`)에 전체 목록. 각 상세/디렉터리가 서로 링크 → 크롤 그래프. `/cafes`엔 조건별·지역별 collection 허브 링크.
+- **검색 의도별 collection 페이지** — broad 쿼리("서울 늦게까지 하는 카페", "best cafes to work in Seoul")를 먹는 대표 문서. `/cafes/<key>` + `/en/cafes/<key>`. **속성 8종**(`best-study-cafes-seoul`·`late-night`·`24-hour`·`great-view`·`power-outlets`·`quiet`·`affordable`·`spacious`) + **지역 자동**(카페 4곳 이상인 서울 구 = `gangnam`·`mapo`·`yeongdeungpo`·`용산`… — `SEOUL_GU` 로마자 slug). 각 페이지 = 리드 + 비교표 + 랭킹 카드(사진+요약) + 선정기준 + 상호링크 + `CollectionPage`/`ItemList`/`BreadcrumbList` JSON-LD. 라우트는 `/cafes/:slug`를 공유하되 collection이 아니면 상세 핸들러로 폴백(상세 slug는 `-8hex`로 끝나 충돌 없음). 4곳 미만 구는 404(얇은 페이지 방지). faceted-nav URL 폭발 없이 실제 검색 의도만 승격.
+- **AI 검색봇 요약** — 카페마다 모든 필드+투표+카공총평을 종합한 한 문단(`cafes.ai_summary`/`ai_summary_en`). `ai.seoSummary`(사실 위주·1차경험 톤·과장금지) 생성 → `translateBatch`로 영문. `seoSummary.js`: `generateCafe(id)`+`backfillMissing()`. 등록/수정 시 + 부팅 45초 후 + 6h 타이머로 서버 프로세스 안에서 백필(SEO 페이지가 즉시 봄, 크레딧 lapse 자가복구). 상세 페이지의 메인 리드 + meta description + collection 카드 blurb에 사용(지도 UI엔 노출 안 함). **명소 요약은 컬럼만 준비, 배선은 후속.**
+- **`/sitemap.xml`** — DB에서 동적 생성(홈+디렉터리+**collection 전체**+전 장소, `<image:image>`·ko/en `hreflang` 포함). **`/robots.txt`** — 전체 허용 + `OAI-SearchBot`(ChatGPT 검색) 명시 + sitemap.
 - **지역명은 등록 시 저장** — 카페는 `address`(예: "부산 해운대구…")를 그대로 쓰고, **명소는 등록 시 좌표를 Kakao 역지오코딩(`kakao.reverseRegion`)해 `viewspots.region`("인천 제물포구")에 저장**한다. 영문은 기존 번역 파이프라인(`translateViewspot`이 `name`+`region` 번역 → `region_en`). 좌표 박스 추측은 폐기. `region`이 없으면 SEO 카피는 지역명을 생략(틀리게 "서울" 안 씀). 명소 문장 은/는은 `eunNeun`으로 받침 판정. **AI가 신설 행정구(예 인천 제물포구, 2026 신설)를 오번역**하므로 `i18nContent.REGION_EN`에 결정적 override를 둔다. 기존 데이터는 1회 백필 완료.
 - **슬러그** = `slugify(name_en||name)` + `-` + `id`앞 8자. 이름 부분이 달라도 8자 id로 행을 찾고 **정식 슬러그로 301**. 미존재 → 404(정적으로 폴백).
 - **www→apex 301** (`index.js` 최상단 미들웨어, 세션 이전). https는 Cloudflare가 처리.
 - **딥링크** — `/?cafe=<id>` / `/?view=<id>`로 지도에서 해당 상세 자동 오픈(`app.js openFromUrl`); 카드 클릭 시 `history.replaceState`로 URL 공유 가능. SEO 페이지의 "지도에서 열기"가 여기로 연결.
-- 홈 `index.html`엔 canonical·hreflang·WebSite JSON-LD + `<noscript>` 디렉터리 링크.
+- 홈 `index.html`엔 canonical·hreflang·WebSite JSON-LD + 보강된 `<noscript>`(제목·소개문 + 조건별·지역별 collection 링크; JS 실행 시 안 보여 지도 UI 불변, 무-JS 크롤러/AI봇용).
 
 **수동(코드 밖):** Google Search Console 도메인 등록(DNS TXT) + `/sitemap.xml` 제출, Cloudflare Bot Fight Mode가 `OAI-SearchBot`을 막지 않는지 확인. **GPTBot(모델 학습)** 은 현재 허용(와일드카드) — 학습 사용을 막으려면 robots에 `User-agent: GPTBot\nDisallow: /` 추가.
 
@@ -127,7 +129,7 @@ server/
   score.js          카공 종합점수         cafeModel.js  투표집계+점수 데코
   settings.js       admin 전역 기본 점수 가중치(app_settings)
   auth.js           Google GIS + 로컬(scrypt, 대소문자 구분) + 관리자 판별
-  kakao.js          카카오 검색/상세 추출   ai.js  리뷰요약·카공총평초안·translateBatch(영어번역)
+  kakao.js          카카오 검색/상세 추출   ai.js  리뷰요약·카공총평초안·SEO요약·translateBatch(영어번역)
   i18nContent.js    콘텐츠 영어번역(_en) 헬퍼   mailer.js  제안 알림 SMTP
   cafePhotos.js     대표사진(cover) 설정   images.js  sharp 압축+썸네일
   analytics.js      이벤트 기록 + 관리자 통계 집계(봇필터, KST)
