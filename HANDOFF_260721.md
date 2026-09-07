@@ -44,5 +44,5 @@ docker compose up -d --force-recreate   # .env 변경 반영 시 (env_file은 �
 
 ## 7. 계정/도메인
 - 도메인 `cafe-in-seoul.com` (Cloudflare). Google OAuth 클라이언트: **웹앱** 타입, "승인된 자바스크립트 원본"에 도메인 등록 필요(리디렉션 URI 불필요).
-- 관리자: `sejun`(owner), `damhiya`, `YGH`(=`ygh`). 사용자 문의: **skg4078@snu.ac.kr** (계정 팝업 하단 링크).
+- 관리자: `sejun`(owner), `damhiya`, `YGH`(=`ygh`). 사용자 문의: **sejun3@illinois.edu** (계정 팝업 하단 링크).
 - 세션 기록: 자세한 진행/결정은 대화 메모리(`~/.claude/.../memory/`)의 `never-delete-db-data`, `no-color-emoji-use-icons`, `seoul-cafe-project` 참고.

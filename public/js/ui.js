@@ -23,8 +23,8 @@ export function renderAuth(el, me, { onLogout, onGoogleCredential, onLocalLogin,
   const contactEl = () => {
     const a = document.createElement('a');
     a.className = 'authbar__contact';
-    a.href = 'mailto:skg4078@snu.ac.kr?subject=' + encodeURIComponent('[Cafe in Seoul] 문의');
-    a.innerHTML = `${icon('mail', 13)} ${t('auth.contact')} <span class="muted">skg4078@snu.ac.kr</span>`;
+    a.href = 'mailto:sejun3@illinois.edu?subject=' + encodeURIComponent('[Cafe in Seoul] 문의');
+    a.innerHTML = `${icon('mail', 13)} ${t('auth.contact')} <span class="muted">sejun3@illinois.edu</span>`;
     return a;
   };
   if (me.user) {
