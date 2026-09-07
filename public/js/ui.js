@@ -2,7 +2,7 @@ import {
   sizeLabel, outletLabel, def, won, hoursText, isOpenNow, weeklyHours, esc, img, thumb, haversineKm,
 } from './util.js';
 import { icon } from './icons.js';
-import { t, L } from './i18n.js';
+import { t, L, getLang } from './i18n.js';
 import { scoreBreakdown, isCustomized } from './score.js';
 
 const VOTE_CATS = [
@@ -27,6 +27,14 @@ export function renderAuth(el, me, { onLogout, onGoogleCredential, onLocalLogin,
     a.innerHTML = `${icon('mail', 13)} ${t('auth.contact')} <span class="muted">sejun3@illinois.edu</span>`;
     return a;
   };
+  // quiet entry point to the curated collection/directory pages (by attribute & area)
+  const collectionsEl = () => {
+    const a = document.createElement('a');
+    a.className = 'authbar__link';
+    a.href = getLang() === 'en' ? '/en/cafes' : '/cafes';
+    a.innerHTML = `${icon('grip', 13)} ${t('nav.collections')}`;
+    return a;
+  };
   if (me.user) {
     const wrap = document.createElement('div');
     wrap.className = 'authbar';
@@ -44,6 +52,7 @@ export function renderAuth(el, me, { onLogout, onGoogleCredential, onLocalLogin,
       sw.onclick = onScoreWeights;
       el.appendChild(sw);
     }
+    el.appendChild(collectionsEl());
     el.appendChild(contactEl());
     return;
   }
@@ -101,6 +110,7 @@ export function renderAuth(el, me, { onLogout, onGoogleCredential, onLocalLogin,
   };
   box.appendChild(form);
   el.appendChild(box);
+  el.appendChild(collectionsEl());
   el.appendChild(contactEl());
 }
 
@@ -389,6 +399,8 @@ export function renderDetail(el, cafe, { user, onVote, onAddReview, onClose, onE
           ${cafe.naver_url ? `<a class="btn btn--map naver" href="${esc(cafe.naver_url)}" target="_blank" rel="noopener">${t('detail.naver')}</a>` : ''}
           ${cafe.kakao_url ? `<a class="btn btn--map kakao" href="${esc(cafe.kakao_url)}" target="_blank" rel="noopener">${t('detail.kakao')}</a>` : ''}
         </div>
+
+        ${cafe.ai_summary ? `<div class="detail__study detail__aisum"><div class="detail__study-h">${icon('ai', 15)} <b>${t('detail.aiSummary')}</b></div><p>${esc(L(cafe, 'ai_summary'))}</p></div>` : ''}
 
         ${cafe.study_review ? `<div class="detail__study"><div class="detail__study-h">${icon('coffee', 15)} <b>${t('detail.studyReview')}</b></div><p>${esc(L(cafe, 'study_review'))}</p></div>` : ''}
 

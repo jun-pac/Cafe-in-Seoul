@@ -543,6 +543,11 @@ details.manual[open] summary { margin-bottom: 4px; }
 .detail__study-h { display: flex; align-items: center; gap: 7px; letter-spacing: .3px; }
 .detail__study-h .ic { color: #fff; }
 .detail__study p { margin: 8px 0 0; line-height: 1.7; color: rgba(255,255,255,.9); white-space: pre-wrap; }
+/* AI summary: a lighter, secondary card above the human verdict (which stays the hero) */
+.detail__aisum { background: var(--surface-2); color: var(--ink-2); border: 1px solid var(--hair); }
+.detail__aisum .detail__study-h .ic { color: var(--mute); }
+.detail__aisum .detail__study-h b { color: var(--ink-2); font-size: 12px; text-transform: uppercase; letter-spacing: .4px; }
+.detail__aisum p { color: var(--ink-2); }
 
 .detail__h3 {
   font-family: var(--font-display); text-transform: uppercase; letter-spacing: 1.4px;
