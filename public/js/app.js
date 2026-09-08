@@ -504,7 +504,7 @@ async function openInsightsModal() {
   back.addEventListener('mousedown', (e) => { if (e.target === back) close(); });
 
   const body = back.querySelector('#inBody');
-  const A = { pageview: L('페이지뷰', 'Pageview'), open_cafe: L('카페 열람', 'Open cafe'), open_view: L('명소 열람', 'Open view'), filter: L('필터', 'Filter'), search: L('검색', 'Search'), like: L('따봉', 'Like'), add_cafe: L('카페 제안', 'Add cafe'), add_view: L('명소 제안', 'Add view'), lang: L('언어변경', 'Lang'), locate: L('내 위치', 'Locate'), install: L('앱설치', 'Install') };
+  const A = { pageview: L('페이지뷰', 'Pageview'), open_cafe: L('카페 열람', 'Open cafe'), open_view: L('명소 열람', 'Open view'), filter: L('필터', 'Filter'), search: L('검색', 'Search'), like: L('따봉', 'Like'), add_cafe: L('카페 제안', 'Add cafe'), add_view: L('명소 제안', 'Add view'), lang: L('언어변경', 'Lang'), locate: L('내 위치', 'Locate'), install: L('앱설치', 'Install'), collection: L('카페 모음', 'Collection') };
   const DOW = ko ? ['일', '월', '화', '수', '목', '금', '토'] : ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'];
   const stat = (n, label, hint) => `<div class="in-stat"${hint ? ` title="${esc(hint)}"` : ''}><b>${n}</b><span>${esc(label)}</span></div>`;
   const row = (label, n, sub) => `<div class="in-row">${esc(label)}${sub ? ` <span class="muted">${esc(sub)}</span>` : ''}<span class="in-when">${n}</span></div>`;
@@ -570,6 +570,7 @@ async function openInsightsModal() {
 
       ${a.week.topViews.length ? `<h4 class="in-h4">${L('많이 본 명소', 'Top views')} <small class="muted">${L('최근 7일', 'last 7 days')}</small></h4>${bars(a.week.topViews.map((x) => ({ label: x.label || '?', n: x.n })))}` : ''}
       ${a.week.topSearches.length ? `<h4 class="in-h4">${L('검색어', 'Searches')} <small class="muted">${L('최근 7일', 'last 7 days')}</small></h4>${bars(a.week.topSearches.map((x) => ({ label: x.label || '?', n: x.n })))}` : ''}
+      ${a.week.topCollections && a.week.topCollections.length ? `<h4 class="in-h4">${L('많이 본 카페 모음', 'Top collections')} <small class="muted">${L('최근 7일 · 사람만', 'last 7 days · people')}</small></h4>${bars(a.week.topCollections.map((x) => ({ label: x.label || '?', n: x.n })))}<p class="in-note muted">${L('조건·지역별 SEO 모음 페이지와 헤더의 "카페 모음"에 실제로 들어온 사람 수입니다(봇 제외).', 'People (not bots) who landed on a collection/combo SEO page or the header "Cafe guides" hub.')}</p>` : ''}
       ${a.countries.length ? `<h4 class="in-h4">${L('국가별 방문자', 'Visitors by country')}</h4>${bars(a.countries.map((c) => ({ label: c.country || '?', n: c.n })))}` : ''}
 
       <h4 class="in-h4">${L('전체 규모', 'Totals')}</h4>

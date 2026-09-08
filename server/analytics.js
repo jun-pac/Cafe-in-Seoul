@@ -249,6 +249,7 @@ function analytics(day = kstToday()) {
     topCafes: topDay('open_cafe'),
     topViews: topDay('open_view'),
     topSearches: topDay('search'),
+    topCollections: topDay('collection'),
     week: {
       from: one(`SELECT date(?, '-6 days') AS d`, day).d,
       to: day,
@@ -257,6 +258,8 @@ function analytics(day = kstToday()) {
       topCafes: topWeek('open_cafe'),
       topViews: topWeek('open_view'),
       topSearches: topWeek('search'),
+      // SEO collection/combo pages people (not bots) landed on — the header "카페 모음" hub too
+      topCollections: topWeek('collection'),
     },
     // recent raw feed (all, incl. bots, so nothing is hidden)
     recent: many(`SELECT ${KTS} AS ts, type, label, target, ip, country, is_bot, is_admin, session_id, user_id

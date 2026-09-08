@@ -3,13 +3,13 @@ import { esc, img, thumb } from './util.js';
 import { icon } from './icons.js';
 import { L, t } from './i18n.js';
 
-// Minimal light basemap — the clean, airy grayscale "Positron" look.
-// We used CARTO's keyless raster tiles until 2026-08, when CARTO started requiring an
-// API key and stamped "API KEY REQUIRED" across every tile. Switched to OpenFreeMap's
-// hosted Positron vector style: same look, free, no key, no signup. The style URL is a
-// stable endpoint that pulls its own glyphs/sprite/tiles + attribution (OSM/OpenMapTiles).
-// (Vector, not raster — our HTML photo-card markers are unaffected.)
-const STYLE = 'https://tiles.openfreemap.org/styles/positron';
+// Clean OSM basemap. History: used CARTO's keyless raster tiles until 2026-08, when CARTO
+// started requiring an API key ("API KEY REQUIRED" stamped on every tile); moved to
+// OpenFreeMap's Positron; then to OpenFreeMap's "Liberty" style (a keyless OSM-Liberty) —
+// crisper, a touch more color than the flat Positron grayscale, still light and airy.
+// All keyless/free/no-signup; the URL pulls its own glyphs/sprite/tiles + attribution
+// (OSM/OpenMapTiles). Vector, not raster — our HTML photo-card markers are unaffected.
+const STYLE = 'https://tiles.openfreemap.org/styles/liberty';
 
 export function initMap(containerId, { onCardClick }) {
   const map = new maplibregl.Map({
