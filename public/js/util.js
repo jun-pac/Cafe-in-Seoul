@@ -1,6 +1,6 @@
 // Formatting + filter helpers shared by the map cards and the detail panel.
 
-import { t } from './i18n.js';
+import { t, getLang } from './i18n.js';
 
 export const OUTLET_RANK = { none: 0, few: 1, some: 2, many: 3 };
 export const SIZE_RANK = { small: 1, medium: 2, large: 3 }; // bigger = better for studying
@@ -8,7 +8,11 @@ export const sizeLabel = (s) => t(`size.${s}`);
 export const outletLabel = (o) => t(`outlet.${o}`);
 export const def = (k) => t(`def.${k}`); // field definition tooltip (localized)
 
-export const won = (n) => `${Number(n).toLocaleString('ko-KR')}원`;
+// Korean: "5,500원". English: "₩5,500". Keeps prices readable in both UIs
+// (the detail chip previously always said "원", which read wrong in English).
+export const won = (n) => (getLang() === 'en'
+  ? `₩${Number(n).toLocaleString('en-US')}`
+  : `${Number(n).toLocaleString('ko-KR')}원`);
 
 export function toMinutes(hhmm) {
   const m = /^(\d{1,2}):(\d{2})$/.exec(hhmm || '');

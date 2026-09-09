@@ -4,6 +4,7 @@ import {
 import { icon } from './icons.js';
 import { t, L } from './i18n.js';
 import { scoreBreakdown, isCustomized } from './score.js';
+import { pushLayer, closeTop } from './nav.js';
 
 const VOTE_CATS = [
   { key: 'coffee', icon: 'coffee' },
@@ -150,7 +151,7 @@ function pickLocationFlow(back, { onPickLocation, onCancelPick, onPicked }) {
 // name, per-photo credit, ♥ like, and a "댓글·상세" button into the full panel.
 export function openLightbox(photos, start = 0, opts = {}) {
   if (!photos || !photos.length) return;
-  const { spot, user, onLike, onDetail, onClose, byUrl = {} } = opts;
+  const { spot, user, onLike, onDetail, onClose, onRequestClose, byUrl = {} } = opts;
   let i = start;
   const multi = photos.length > 1;
   const N = photos.length;
@@ -184,12 +185,21 @@ export function openLightbox(photos, start = 0, opts = {}) {
     if (byEl) { const by = byUrl[photos[i]]; byEl.textContent = by ? ` · ${t('viewer.by')} ${by}` : ''; }
   };
 
+  let onResize = null;   // set in the multi-photo branch; removed on teardown
   const onKey = (e) => {
     if (e.key === 'Escape') close();
     else if (e.key === 'ArrowLeft') go(-1);
     else if (e.key === 'ArrowRight') go(1);
   };
-  const close = () => { back.remove(); document.removeEventListener('keydown', onKey); onClose?.(); };
+  // Back-button aware. `close` is the user-close action (X / ESC / backdrop tap). When the
+  // app owns the Back stack (onRequestClose given — the view-spot viewer), it routes there so
+  // the whole hierarchy stays in sync; otherwise this lightbox self-registers a Back layer
+  // (cafe photos opened from inside the detail panel) and closing goes through it.
+  const controlled = typeof onRequestClose === 'function';
+  const teardown = () => { back.remove(); document.removeEventListener('keydown', onKey); if (onResize) window.removeEventListener('resize', onResize); };
+  const fullClose = () => { teardown(); onClose?.(); };
+  const close = controlled ? onRequestClose : () => closeTop();
+  if (!controlled) pushLayer(fullClose);
 
   let go = () => {};
   if (!multi) {
@@ -237,7 +247,7 @@ export function openLightbox(photos, start = 0, opts = {}) {
     }, { passive: true });
     // tap on the empty backdrop (not a moved swipe, not the photo) closes
     stage.addEventListener('click', (e) => { if (!moved && e.target !== imgs[1] && e.target !== imgs[0] && e.target !== imgs[2]) close(); });
-    window.addEventListener('resize', rest);
+    onResize = rest; window.addEventListener('resize', rest);
   }
 
   back.querySelector('.lightbox__close').onclick = close;
@@ -252,8 +262,11 @@ export function openLightbox(photos, start = 0, opts = {}) {
     try { const r = await onLike(); likeBtn.classList.toggle('is-liked', r.liked); back.querySelector('#lbLikeN').textContent = r.likes; }
     catch (e) { alert(e.message); }
   };
-  back.querySelector('#lbDetail')?.addEventListener('click', () => { close(); onDetail?.(); });
+  // "댓글·상세 →": the app's onDetail tears down this viewer and opens the panel as a swap
+  // (same Back level) — so we do NOT close() here (that would double-handle the Back stack).
+  back.querySelector('#lbDetail')?.addEventListener('click', () => { onDetail?.(); });
   document.body.appendChild(back);
+  return { close: fullClose };
 }
 
 // Turn the detail hero into a real sliding carousel: the photos sit in a flex track that
@@ -332,7 +345,8 @@ const SCORE_LABELS = { price: 'f.price', outlets: 'f.outlet', floors: 'f.multiFl
 export function renderDetail(el, cafe, { user, onVote, onAddReview, onClose, onEdit, onSetCover, onDeleteStory, onEditStory, onLike, onScoreWeights }) {
   const openNow = isOpenNow(cafe);
   const floorTxt = cafe.multi_floor ? `${cafe.floors}${t('unit.floor')} · ${t('detail.multiFloor')}` : t('detail.singleFloor');
-  const viewTxt = cafe.has_view ? (cafe.view_note ? `${t('detail.viewGood')} · ${esc(cafe.view_note)}` : t('detail.viewGood')) : t('detail.viewMeh');
+  const viewNote = L(cafe, 'view_note'); // localized (falls back to KO when no _en yet)
+  const viewTxt = cafe.has_view ? (viewNote ? `${t('detail.viewGood')} · ${esc(viewNote)}` : t('detail.viewGood')) : t('detail.viewMeh');
 
   const gallery = (cafe.gallery && cafe.gallery.length) ? cafe.gallery : [cafe.photo_url].filter(Boolean);
 

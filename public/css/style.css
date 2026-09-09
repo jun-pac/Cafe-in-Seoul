@@ -103,6 +103,18 @@ b { font-weight: 700; }
 .fbar__more[aria-expanded="true"] .ic { transform: rotate(180deg); }
 .fbar__result { margin-left: auto; font-size: 11px; letter-spacing: .3px; text-transform: uppercase; color: var(--mute); white-space: nowrap; }
 .fbar__result b { color: var(--ink); }
+/* Desktop: the primary filter row stays on ONE line in every language. The price
+   slider is the elastic element (it grows to fill, shrinks first when tight), so the
+   label-width gap between KO "아아" and EN "Iced Am" never bumps "상세/More" to a new
+   line — the row is tuned by flex, not by hoping the labels happen to fit. */
+@media (min-width: 761px) {
+  #filterbar { flex-wrap: nowrap; }
+  .fbar__field--price { flex: 1 1 auto; min-width: 0; }
+  .fbar__field--price .fbar__range { flex: 1 1 0; width: auto; min-width: 52px; max-width: 132px; }
+  .fbar__more, .fbar__result, .fbar__sep { flex: none; }
+}
+/* EN price value ("≤ ₩4,200") is narrower than KO ("4,200원 이하") — reclaim that width */
+html[lang="en"] .fbar__field--price .fbar__num { min-width: 56px; }
 
 /* admin pending queue → floating card over the map */
 .pending-queue { position: absolute; top: 14px; right: 14px; z-index: 12; width: 300px; max-width: calc(100vw - 28px);
@@ -121,6 +133,13 @@ b { font-weight: 700; }
 .install-banner .btn--primary { background: #fff; color: var(--ink); border-color: #fff; flex: none; }
 .install-x { border: 0; background: none; color: rgba(255,255,255,.65); cursor: pointer; display: grid; place-items: center; padding: 4px; flex: none; }
 .install-x:hover { color: #fff; }
+
+/* "press Back again to exit" hint at the map base — brief, self-dismissing pill */
+.exit-toast { position: fixed; left: 50%; bottom: 74px; transform: translate(-50%, 8px); z-index: 2200;
+  background: rgba(20,20,30,.92); color: #fff; font-size: 13px; font-weight: 600; letter-spacing: .2px;
+  padding: 9px 16px; border-radius: var(--pill); box-shadow: 0 8px 24px rgba(0,0,0,.3);
+  opacity: 0; pointer-events: none; transition: opacity .22s ease, transform .22s ease; max-width: calc(100vw - 32px); }
+.exit-toast.is-on { opacity: 1; transform: translate(-50%, 0); }
 
 /* daily visitor tally — tucked in the corner */
 .visit-stat { position: absolute; left: 12px; bottom: 10px; z-index: 8; font-size: 10.5px; letter-spacing: .2px; color: var(--mute);
@@ -148,7 +167,10 @@ b { font-weight: 700; }
 /* admin insights modal */
 .modal--insights { width: 500px; max-width: calc(100vw - 32px); }
 /* body scrolls on its own so the day navigator + tabs stay put while you read */
-.modal--insights #inBody { padding: 12px 2px 0 0; max-height: min(64vh, 620px); overflow-y: auto; }
+/* overflow-x hidden: long unbreakable tokens (URLs, UAs, session ids) in the feed used
+   to widen a row and make the whole panel scroll sideways — they wrap now instead. */
+.modal--insights #inBody { padding: 12px 2px 0 0; max-height: min(64vh, 620px); overflow-y: auto; overflow-x: hidden; }
+.in-row, .in-srow, .in-trail, .in-body { overflow-wrap: anywhere; word-break: break-word; }
 /* which KST day you are looking at */
 .in-daybar { display: flex; align-items: center; gap: 8px; margin-top: 14px; }
 .in-daybar b { font-family: var(--font-display); font-size: 14px; font-weight: 800; letter-spacing: .3px; }
@@ -785,8 +807,24 @@ details.manual[open] summary { margin-bottom: 4px; }
   body.detail-open .detail { transform: none; }
   .detail-resize { display: none !important; }
   .detail__grip { display: block; }             /* swipe grip only on mobile */
-  .detail__hero { height: 230px; }
+  /* compact the block ABOVE the AI summary so the summary is visible without scrolling —
+     on phones the hero + name + hours + chips were eating ~70% of the sheet. */
+  .detail__hero { height: 168px; }
+  .detail__body { padding: 15px 16px 20px; }
+  .detail__name { font-size: 21px; }
+  .detail__addr { margin-top: 5px; }
+  .detail__hours { margin-top: 12px; padding: 6px 12px; }
+  .detail__adminrow { margin-top: 9px; }
+  .chips { margin-top: 12px; gap: 6px; }
+  .chip { padding: 4px 9px; font-size: 11px; gap: 5px; }
+  .chip svg { width: 13px; height: 13px; }
+  .detail__links { margin-top: 13px; }
+  .detail__aisum { margin-top: 13px; padding: 12px 13px; }
   .grid2, .loc-row { grid-template-columns: 1fr; }
+
+  /* insights: fewer, wider stat tiles so labels sit on one line (not big+wrapping) */
+  .in-stats { grid-template-columns: repeat(auto-fit, minmax(96px, 1fr)); }
+  .in-stat b { font-size: 18px; }
 }
 
 /* swipe grip (mobile only) */

@@ -230,6 +230,9 @@ function syncLangUrl() {
   } catch { /* no location/history (e.g. tests) */ }
 }
 syncLangUrl(); // reflect the initial language in the URL on load
+// reflect the initial language on <html> too (static markup ships lang="ko"), so a11y and
+// [lang="…"]-scoped CSS (e.g. per-language filter widths) are correct on the first paint.
+if (typeof document !== 'undefined') document.documentElement.lang = lang;
 
 export function getLang() { return lang; }
 export function t(key) { return (DICT[lang] && DICT[lang][key]) ?? DICT.ko[key] ?? key; }

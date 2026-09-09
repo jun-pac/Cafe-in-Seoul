@@ -7,6 +7,7 @@ import { getWeights, setWeights, resetWeights, computeScore, isCustomized, DEFAU
 import { icon } from './icons.js';
 import { t, getLang, setLang, onLangChange, applyStaticI18n } from './i18n.js';
 import { reportPerf } from './perf.js';
+import { initNav, pushLayer, swapLayer, closeTop, isPopping, overlayDepth } from './nav.js';
 
 const $ = (sel) => document.querySelector(sel);
 
@@ -179,6 +180,9 @@ async function openDetail(id) {
   cafe.score = computeScore(cafe, getWeights()); // rescore with the user's weights so the big badge == map card == breakdown
   api.track('open_cafe', id, cafe.name);
   state.openCafeId = id;
+  state.openViewId = null;
+  state.viewMode = null;
+  enterL1(teardownDetail);                 // Back button: register/refresh this overlay
   setUrl('cafe=' + encodeURIComponent(id));
   renderDetail(detailEl, cafe, {
     user: state.me.user,
@@ -200,7 +204,20 @@ async function openDetail(id) {
   map.flyTo(cafe);
 }
 
-function closeDetail() {
+// ---- Back-button overlay hierarchy ----------------------------------------
+// The detail panel and the view-spot photo viewer are "level-1" overlays (mutually
+// exclusive — only one is ever open). A full-screen lightbox opened from inside the detail
+// (cafe photos) is a level-2 overlay on top (self-managed in ui.js). enterL1() registers
+// the overlay with the Back coordinator: a fresh open adds a history entry; switching
+// between level-1 overlays (viewer → detail, or re-rendering) reuses the same entry.
+let l1open = false;
+function enterL1(teardown) {
+  const close = () => { l1open = false; teardown(); };   // runs when Back (or closeTop) tears it down
+  if (l1open) swapLayer(close); else { l1open = true; pushLayer(close); }
+}
+
+// The actual teardown (DOM + state). Runs when the overlay is closed by Back or by X.
+function teardownDetail() {
   state.openCafeId = null;
   state.openViewId = null;
   state.viewMode = null;
@@ -209,6 +226,13 @@ function closeDetail() {
   document.body.classList.remove('detail-open');
   map.setSelected(null);
   setUrl(null);   // drop ?cafe=/?view= so the shared URL matches what's on screen
+}
+
+// User/programmatic close (X, swipe, after reject/delete): go Back one step so the history
+// stack stays in sync — the popstate handler then runs the registered teardown.
+function closeDetail() {
+  if (overlayDepth() && !isPopping()) closeTop();
+  else teardownDetail();
 }
 
 // ---- view-spots ----
@@ -225,14 +249,16 @@ async function openViewPhotos(id) {
   const gallery = (spot.photos && spot.photos.length) ? spot.photos : [spot.photo_url].filter(Boolean);
   const byUrl = {};
   (spot.photoMeta || []).forEach((m) => { if (m.uploader) byUrl[m.url] = m.uploader; });
-  openLightbox(gallery, 0, {
+  const lb = openLightbox(gallery, 0, {
     spot,
     user: state.me.user,
     byUrl,
     onLike: async () => { const r = await api.likeViewspot(id); api.track('like', id, spot.name); loadCafes(); return r; },
-    onDetail: () => openViewDetail(id),          // "댓글·상세 →" opens the full side panel
+    onRequestClose: closeTop,                    // X / backdrop / ESC → close this overlay via Back
+    onDetail: () => { lb.close(); openViewDetail(id); }, // "댓글·상세 →": swap viewer for the panel (same Back level)
     onClose: () => { if (state.viewMode === 'photos') { state.openViewId = null; state.viewMode = null; map.setSelected(null); setUrl(null); } },
   });
+  enterL1(() => lb.close());                      // Back button: this viewer is a level-1 overlay
 }
 
 async function openViewDetail(id) {
@@ -241,6 +267,7 @@ async function openViewDetail(id) {
   state.openViewId = id;
   state.openCafeId = null;
   state.viewMode = 'detail';
+  enterL1(teardownDetail);                        // Back button: register/refresh this overlay
   setUrl('view=' + encodeURIComponent(id));
   state.chatCleanup?.();
   state.chatCleanup = null;
@@ -1008,7 +1035,23 @@ async function boot() {
   await refreshMe();
   await loadCafes();
   loadStats();
+  // Back-button hierarchy: Back closes open overlays one-by-one, then guards leaving the map.
+  initNav(showExitHint);
   openFromUrl();      // deep link: /?cafe=<id> or /?view=<id> (e.g. from an SEO page)
+}
+
+// "press Back again to exit" toast at the map base (a blocking Back-confirm isn't allowed by
+// browsers). Brief, self-dismissing, one at a time.
+let exitToastEl = null;
+function showExitHint() {
+  if (exitToastEl) return;
+  const el = document.createElement('div');
+  el.className = 'exit-toast';
+  el.textContent = getLang() === 'ko' ? '한 번 더 뒤로 가면 나갑니다' : 'Press back again to exit';
+  document.body.appendChild(el);
+  exitToastEl = el;
+  requestAnimationFrame(() => el.classList.add('is-on'));
+  setTimeout(() => { el.classList.remove('is-on'); setTimeout(() => { el.remove(); if (exitToastEl === el) exitToastEl = null; }, 250); }, 1900);
 }
 
 // Open the place named in the query string, so a shared/crawlable link like
