@@ -3,13 +3,37 @@ import { esc, img, thumb } from './util.js';
 import { icon } from './icons.js';
 import { L, t } from './i18n.js';
 
-// Clean OSM basemap. History: used CARTO's keyless raster tiles until 2026-08, when CARTO
-// started requiring an API key ("API KEY REQUIRED" stamped on every tile); moved to
-// OpenFreeMap's Positron; then to OpenFreeMap's "Liberty" style (a keyless OSM-Liberty) —
-// crisper, a touch more color than the flat Positron grayscale, still light and airy.
-// All keyless/free/no-signup; the URL pulls its own glyphs/sprite/tiles + attribution
-// (OSM/OpenMapTiles). Vector, not raster — our HTML photo-card markers are unaffected.
-const STYLE = 'https://tiles.openfreemap.org/styles/liberty';
+// ---- Basemap style (switch in ONE place: MAP_STYLE below) -------------------
+// History: CARTO's keyless raster until 2026-08 → OpenFreeMap Positron → OpenFreeMap
+// Liberty. Now back to CARTO Positron (the original clean grayscale look). CARTO raster now
+// needs an API key: it lives in .env and is injected into the page before boot via
+// /api/mapconfig.js → window.__MAP__.cartoKey (never committed to git; basemap keys are
+// public-by-design — they ride in tile URLs — and domain-restrictable in the CARTO dashboard).
+// If no key is present we auto-fall back to OpenFreeMap (keyless) so the map always works.
+const CARTO_KEY = (typeof window !== 'undefined' && window.__MAP__ && window.__MAP__.cartoKey) || '';
+const HD = (typeof window !== 'undefined' && window.devicePixelRatio > 1) ? '@2x' : ''; // retina tiles
+const CARTO_ATTRIB = '© <a href="https://www.openstreetmap.org/copyright" target="_blank" rel="noopener">OpenStreetMap</a> © <a href="https://carto.com/attributions" target="_blank" rel="noopener">CARTO</a>';
+// CARTO raster style as a MapLibre style object (raster, so our HTML photo-card markers are
+// unaffected). light_all = Positron (grayscale), voyager = more color.
+const cartoRaster = (variant) => ({
+  version: 8,
+  sources: { carto: {
+    type: 'raster', tileSize: 256, attribution: CARTO_ATTRIB,
+    tiles: [`https://basemaps.cartocdn.com/rastertiles/${variant}/{z}/{x}/{y}${HD}.png?key=${encodeURIComponent(CARTO_KEY)}`],
+  } },
+  layers: [{ id: 'carto', type: 'raster', source: 'carto' }],
+});
+const STYLES = {
+  'carto-positron': () => cartoRaster('light_all'),                              // ← original look (needs .env key)
+  'carto-voyager': () => cartoRaster('voyager'),                                 // more color (needs .env key)
+  'openfreemap-liberty': () => 'https://tiles.openfreemap.org/styles/liberty',   // keyless fallback
+  'openfreemap-positron': () => 'https://tiles.openfreemap.org/styles/positron', // keyless fallback
+};
+// ↓↓↓ Change this ONE line to switch the basemap. ↓↓↓
+const MAP_STYLE = 'carto-positron';
+const wanted = STYLES[MAP_STYLE] ? MAP_STYLE : 'openfreemap-liberty';
+// CARTO styles need the key; without it, quietly use the keyless OpenFreeMap Liberty instead.
+const STYLE = (wanted.startsWith('carto') && !CARTO_KEY) ? STYLES['openfreemap-liberty']() : STYLES[wanted]();
 
 export function initMap(containerId, { onCardClick }) {
   const map = new maplibregl.Map({

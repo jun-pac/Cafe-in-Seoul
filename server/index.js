@@ -143,6 +143,15 @@ app.use('/api/admin', adminRouter);   // kakao search + AI prefill
 
 app.get('/api/health', (req, res) => res.json({ ok: true }));
 
+// Map config exposed to the browser before boot (a classic <script> in index.html runs this
+// before the app module). The CARTO Basemaps key lives ONLY in .env (never in git); this is
+// how map.js gets it to build the keyed tile URL with no watermark flash. Basemap keys are
+// public by design (they ride in tile URLs) and are domain-restrictable in CARTO's dashboard.
+app.get('/api/mapconfig.js', (req, res) => {
+  res.type('application/javascript').set('Cache-Control', 'no-store')
+    .send(`window.__MAP__=${JSON.stringify({ cartoKey: process.env.CARTO_API_KEY || '' })};`);
+});
+
 // multer / generic error handler -> JSON
 app.use((err, req, res, next) => {
   if (res.headersSent) return next(err);
