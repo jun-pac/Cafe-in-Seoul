@@ -714,6 +714,10 @@ details.manual[open] summary { margin-bottom: 4px; }
   border: 1px solid var(--hair-strong); border-radius: 5px; background: var(--surface); color: var(--ink); }
 .pp-cam::placeholder { color: var(--mute); }
 .pp-cam:focus { outline: none; border-color: var(--ink); }
+/* keep the "make cover" hover hint on the IMAGE (not over the camera input below it) */
+.pp-item--cam .pp-hovercover { top: 0; bottom: auto; height: 84px; padding: 0 0 4px; display: flex;
+  align-items: flex-end; justify-content: center; border-radius: var(--r-sm) var(--r-sm) 0 0;
+  background: linear-gradient(transparent 55%, rgba(10,10,10,.72)); }
 .pp-hint { flex-basis: 100%; font-size: 11px; color: var(--mute); margin-top: 2px; letter-spacing: 0.2px; }
 
 /* photo grid + lightbox */
