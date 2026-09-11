@@ -748,8 +748,8 @@ details.manual[open] summary { margin-bottom: 4px; }
 .lightbox--viewer .lightbox__img { max-height: 80vh; }
 .lightbox--viewer .lightbox__count { top: 20px; bottom: auto; }
 .lightbox__bar { position: absolute; left: 0; right: 0; bottom: 0; display: flex; align-items: flex-end; justify-content: space-between;
-  gap: 10px 16px; flex-wrap: wrap; padding: 44px 20px calc(16px + env(safe-area-inset-bottom));
-  background: linear-gradient(to top, rgba(0,0,0,.78), rgba(0,0,0,0)); color: #fff; pointer-events: none; }
+  gap: 10px 14px; flex-wrap: nowrap; padding: 40px 18px calc(15px + env(safe-area-inset-bottom));
+  background: linear-gradient(to top, rgba(0,0,0,.85) 0%, rgba(0,0,0,.58) 42%, rgba(0,0,0,0) 100%); color: #fff; pointer-events: none; }
 .lightbox__bar > * { pointer-events: auto; }
 .lightbox__meta { min-width: 0; flex: 1 1 180px; }
 .lightbox__title { display: block; font-family: var(--font-display); font-weight: 800; font-size: 17px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
@@ -762,6 +762,21 @@ details.manual[open] summary { margin-bottom: 4px; }
 .lightbox__bar .like-btn.is-liked { background: var(--view); color: #fff; }
 .lightbox__detail { color: #fff; border-color: rgba(255,255,255,.45); background: rgba(255,255,255,.12); }
 .lightbox__detail:hover { background: rgba(255,255,255,.24); }
+/* like + 댓글·상세 unified so they sit level and same-size (the like-btn's detail-panel
+   margin-top must NOT apply here — that was pushing it down out of line) */
+.lightbox__acts .like-btn, .lightbox__acts .lightbox__detail {
+  margin: 0; height: 34px; padding: 0 13px; font-size: 12.5px; font-weight: 700;
+  border-radius: var(--pill); display: inline-flex; align-items: center; gap: 6px; white-space: nowrap; box-sizing: border-box; }
+/* desktop: slightly larger caption text */
+@media (min-width: 761px) {
+  .lightbox__title { font-size: 18px; }
+  .lightbox__desc { font-size: 14px; }
+}
+/* mobile: keep the viewer photo a touch shorter so the caption bar clears it (no overlap
+   with the place name on tall/portrait shots) */
+@media (max-width: 760px) {
+  .lightbox--viewer .lightbox__slide img, .lightbox--viewer .lightbox__img { max-height: 72vh; }
+}
 
 /* ---------- Icons ---------- */
 .ic { display: inline-block; vertical-align: -0.18em; flex: none; }
