@@ -341,6 +341,28 @@ function renderCafe(row, lang) {
 function viewPhotos(id) {
   return db.prepare('SELECT url FROM viewspot_photos WHERE viewspot_id=? ORDER BY ord, rowid').all(id).map((r) => r.url);
 }
+// per-photo credit meta (photographer + camera), ordered like the gallery
+function viewPhotoMeta(id) {
+  return db.prepare(`SELECT vp.url, u.name AS uploader, vp.camera
+    FROM viewspot_photos vp LEFT JOIN users u ON u.id = vp.created_by
+    WHERE vp.viewspot_id=? ORDER BY vp.ord, vp.rowid`).all(id);
+}
+// distinct "photographer (camera)" credits for a spot, in first-seen order
+function photoCredits(meta) {
+  const seen = new Map();
+  for (const m of (meta || [])) {
+    if (!m.uploader) continue;
+    const key = `${m.uploader}|${m.camera || ''}`;
+    if (!seen.has(key)) seen.set(key, { who: m.uploader, cam: m.camera || '' });
+  }
+  return [...seen.values()];
+}
+// "촬영: sejun (Olympus OM10 24mm f2.8)" / "Photos by sejun (Olympus OM10 24mm f2.8)"
+function creditLine(credits, ko) {
+  if (!credits.length) return '';
+  const parts = credits.map((c) => (c.cam ? `${c.who} (${c.cam})` : c.who));
+  return (ko ? '촬영: ' : 'Photos by ') + parts.join(', ');
+}
 function viewComments(id) {
   return db.prepare(`SELECT body, body_en FROM viewspot_comments WHERE viewspot_id=? ORDER BY created_at DESC LIMIT 6`).all(id);
 }
@@ -360,15 +382,21 @@ function renderView(row, lang) {
 
   const cityKo = regionCity(row, true);   // from coordinates (view-spots have no address)
   const cityEn = regionCity(row, false);
-  const lead = ko
+  // the new one-line description (설명) + who shot it with what (사람, 카메라)
+  const description = ko ? (row.description || '') : (row.description_en || row.description || '');
+  const meta = viewPhotoMeta(row.id);
+  const credit = creditLine(photoCredits(meta), ko);
+  const genericLead = ko
     ? `${name}${eunNeun(name)} ${cityKo ? `${cityKo}에 위치한 ` : ''}사진 찍기 좋은 장소입니다. 직접 방문해 촬영한 사진을 모았습니다.`
     : `${name} is a scenic photo spot${cityEn ? ` in ${cityEn}` : ''}. These are photos taken there in person.`;
+  const lead = description || genericLead;    // [설명] first; fall back to the generic line
   const title = ko
     ? `${name} — ${cityKo ? cityKo + ' ' : ''}사진 명소 | Cafe in Seoul`
     : `${name} — scenic photo spot${cityEn ? ` in ${cityEn}` : ''} | Cafe in Seoul`;
-  const desc = ko
-    ? `${name}에서 직접 촬영한 사진과 위치. ${cityKo || '한국'}에서 사진 찍기 좋은 명소를 지도에서 찾아보세요.`
-    : `Photos and location of ${name}, a scenic spot${cityEn ? ` in ${cityEn}` : ''} worth shooting.`;
+  // search-bot text = [설명] [장소] [사람, 카메라], concatenated (no LLM needed)
+  const place = ko ? (cityKo ? `${cityKo}에 위치한 사진 명소.` : '사진 찍기 좋은 명소.')
+                   : (cityEn ? `A scenic photo spot in ${cityEn}.` : 'A scenic photo spot.');
+  const desc = [description, place, credit].filter(Boolean).join(' ').slice(0, 200);
   const canonical = `${BASE}${ko ? '' : '/en'}/views/${viewSlug(row)}`;
   const alternates = [
     { hreflang: 'ko', href: `${BASE}/views/${viewSlug(row)}` },
@@ -377,7 +405,8 @@ function renderView(row, lang) {
   ];
   const ld = {
     '@context': 'https://schema.org', '@type': 'TouristAttraction', '@id': canonical,
-    name, url: canonical, image: photos.slice(0, 6).map(absImg).filter(Boolean),
+    name, url: canonical, description: [lead, credit].filter(Boolean).join(' '),
+    image: photos.slice(0, 6).map(absImg).filter(Boolean),
     geo: { '@type': 'GeoCoordinates', latitude: row.lat, longitude: row.lng },
     address: { '@type': 'PostalAddress', addressRegion: (ko ? cityKo : cityEn) || undefined, addressCountry: 'KR' },
   };
@@ -388,6 +417,7 @@ function renderView(row, lang) {
     <p class="sub">${ko ? `${cityKo ? cityKo + ' ' : ''}사진 명소` : `Scenic photo spot${cityEn ? ` · ${cityEn}` : ''}`}</p>
     ${hero ? `<img class="seo-hero" src="${esc(imgPath(hero))}" alt="${esc(name)} ${ko ? '사진 명소' : 'scenic spot'}" loading="eager" />` : ''}
     <p class="seo-lead">${esc(lead)}</p>
+    ${credit ? `<p class="sub">${esc(credit)}</p>` : ''}
     ${photos.length > 1 ? `<h2>${ko ? '사진' : 'Photos'}</h2><div class="seo-gallery">${photos.slice(0, 9).map((u, i) => `<img src="${esc(imgPath(u))}" alt="${esc(name)} ${ko ? '사진' : 'photo'} ${i + 1}" loading="lazy" />`).join('')}</div>` : ''}
     ${comments.length ? `<h2>${ko ? '방문 코멘트' : 'Comments'}</h2>${comments.map((c) => `<blockquote class="seo-story">${esc(c)}</blockquote>`).join('')}` : ''}
     <h2>${ko ? '지도' : 'Map'}</h2>
@@ -747,6 +777,7 @@ function renderCafeDirectory(lang) {
     <h1>${ko ? '서울 카공 카페' : 'Study cafes in Seoul'}</h1>
     <p class="seo-lead">${ko ? `직접 방문한 카공 카페 ${rows.length}곳입니다. 각 카페의 조용함, 콘센트, 좌석, 아메리카노 가격, 영업시간을 확인했습니다.` : `${rows.length} study-friendly cafes we visited in person — checking quiet, outlets, seating, americano price and hours at each one.`}</p>
     <p><a class="seo-cta" href="${mapHome(ko)}">${ko ? '지도에서 둘러보기' : 'Explore on the map'} →</a></p>
+    <p class="seo-links"><a href="${ko ? '/views' : '/en/views'}">${ko ? '사진 명소 모음 보기' : 'Browse scenic photo spots'} →</a></p>
     <h2>${ko ? '조건별 카페' : 'By what you need'}</h2>
     <div class="seo-links">${attrLinks}</div>
     ${hoodLinks ? `<h2>${ko ? '지역별 카페' : 'By neighborhood'}</h2><div class="seo-links">${hoodLinks}</div>` : ''}
@@ -766,7 +797,8 @@ function renderViewDirectory(lang) {
   const rows = db.prepare(`SELECT * FROM viewspots WHERE status='approved' ORDER BY name`).all();
   const items = rows.map((v) => {
     const nm = ko ? v.name : (v.name_en || v.name);
-    return `<li><a href="${ko ? '' : '/en'}/views/${viewSlug(v)}"><img src="${esc(imgPath(v.photo_url))}" alt="${esc(nm)}" loading="lazy" /><span class="n">${esc(nm)}</span></a></li>`;
+    const sub = (ko ? v.description : (v.description_en || v.description)) || regionCity(v, ko) || '';
+    return `<li><a href="${ko ? '' : '/en'}/views/${viewSlug(v)}"><img src="${esc(imgPath(v.photo_url))}" alt="${esc(nm)}" loading="lazy" /><span><span class="n">${esc(nm)}</span>${sub ? `<br><span class="m">${esc(clip(sub, 1, 60))}</span>` : ''}</span></a></li>`;
   }).join('');
   const title = ko ? `서울 사진 명소 전체 목록 (${rows.length}곳) | Cafe in Seoul` : `All scenic photo spots in Seoul (${rows.length}) | Cafe in Seoul`;
   const desc = ko ? '서울에서 사진 찍기 좋은 명소 전체 목록. 직접 방문해 촬영했습니다.' : 'Every scenic photo spot in Seoul on Cafe in Seoul, shot in person.';
@@ -776,6 +808,7 @@ function renderViewDirectory(lang) {
     <h1>${ko ? '서울 사진 명소' : 'Scenic photo spots in Seoul'}</h1>
     <p class="seo-lead">${ko ? `직접 방문해 촬영한 서울 사진 명소 ${rows.length}곳입니다.` : `${rows.length} scenic spots in Seoul, each shot in person.`}</p>
     <p><a class="seo-cta" href="${mapHome(ko)}">${ko ? '지도에서 둘러보기' : 'Explore on the map'} →</a></p>
+    <p class="seo-links"><a href="${ko ? '/cafes' : '/en/cafes'}">${ko ? '카공 카페 모음 보기' : 'Browse study cafes'} →</a></p>
     <ul class="seo-dir">${items}</ul>
     ${seoFooter(ko)}`;
   return shell({

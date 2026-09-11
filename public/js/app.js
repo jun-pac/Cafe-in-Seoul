@@ -247,12 +247,13 @@ async function openViewPhotos(id) {
   setUrl('view=' + encodeURIComponent(id));
   map.setSelected(id);
   const gallery = (spot.photos && spot.photos.length) ? spot.photos : [spot.photo_url].filter(Boolean);
-  const byUrl = {};
-  (spot.photoMeta || []).forEach((m) => { if (m.uploader) byUrl[m.url] = m.uploader; });
+  const byUrl = {}; const camByUrl = {};
+  (spot.photoMeta || []).forEach((m) => { if (m.uploader) byUrl[m.url] = m.uploader; if (m.camera) camByUrl[m.url] = m.camera; });
   const lb = openLightbox(gallery, 0, {
     spot,
     user: state.me.user,
     byUrl,
+    camByUrl,
     onLike: async () => { const r = await api.likeViewspot(id); api.track('like', id, spot.name); loadCafes(); return r; },
     onRequestClose: closeTop,                    // X / backdrop / ESC → close this overlay via Back
     onDetail: () => { lb.close(); openViewDetail(id); }, // "댓글·상세 →": swap viewer for the panel (same Back level)

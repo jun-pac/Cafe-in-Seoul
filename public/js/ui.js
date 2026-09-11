@@ -151,7 +151,8 @@ function pickLocationFlow(back, { onPickLocation, onCancelPick, onPicked }) {
 // name, per-photo credit, ♥ like, and a "댓글·상세" button into the full panel.
 export function openLightbox(photos, start = 0, opts = {}) {
   if (!photos || !photos.length) return;
-  const { spot, user, onLike, onDetail, onClose, onRequestClose, byUrl = {} } = opts;
+  const { spot, user, onLike, onDetail, onClose, onRequestClose, byUrl = {}, camByUrl = {} } = opts;
+  const spotDesc = spot ? (L(spot, 'description') || '') : ''; // one-line 설명 shown under the title
   let i = start;
   const multi = photos.length > 1;
   const N = photos.length;
@@ -172,7 +173,7 @@ export function openLightbox(photos, start = 0, opts = {}) {
     ${multi ? '<div class="lightbox__count"></div>' : ''}
     ${spot ? `<div class="lightbox__bar">
 
-      <div class="lightbox__meta"><b class="lightbox__title">${esc(L(spot, 'name'))}</b><span class="lightbox__by" id="lbBy"></span></div>
+      <div class="lightbox__meta"><b class="lightbox__title">${esc(L(spot, 'name'))}</b>${spotDesc ? `<span class="lightbox__desc">${esc(spotDesc)}</span>` : ''}<span class="lightbox__by" id="lbBy"></span></div>
       <div class="lightbox__acts">
         <button type="button" class="like-btn ${spot.liked ? 'is-liked' : ''}" id="lbLike">${icon('thumbsUp', 15)} <span id="lbLikeN">${spot.likes || 0}</span></button>
         ${onDetail ? `<button type="button" class="btn btn--ghost sm lightbox__detail" id="lbDetail">${icon('info', 14)} ${t('viewer.detail')}</button>` : ''}
@@ -182,7 +183,13 @@ export function openLightbox(photos, start = 0, opts = {}) {
   const byEl = back.querySelector('#lbBy');
   const updMeta = () => {
     if (countEl) countEl.textContent = `${i + 1} / ${N}`;
-    if (byEl) { const by = byUrl[photos[i]]; byEl.textContent = by ? ` · ${t('viewer.by')} ${by}` : ''; }
+    if (byEl) {
+      const by = byUrl[photos[i]]; const cam = camByUrl[photos[i]];
+      const bits = [];
+      if (by) bits.push(`${t('viewer.by')} ${by}`);
+      if (cam) bits.push(cam);
+      byEl.textContent = bits.join(' · ');
+    }
   };
 
   let onResize = null;   // set in the multi-photo branch; removed on teardown
@@ -914,6 +921,8 @@ export function openViewModal({ mode = 'create', spot, onSearch, onPickLocation,
           <small class="muted" id="vHint"></small>
           <input type="hidden" name="lat" value="${spot ? esc(spot.lat) : ''}">
           <input type="hidden" name="lng" value="${spot ? esc(spot.lng) : ''}"></div>
+        <div class="field"><span>${t('modal.viewDesc')} <small class="muted">${t('view.descHint')}</small></span>
+          <input class="input" name="description" maxlength="120" placeholder="${esc(t('view.descPlaceholder'))}" value="${esc(spot?.description || '')}"></div>
         <div class="field"><span>${t('modal.photo')} * <small class="muted">${t('modal.photoHint')}</small></span>
           <div class="filmnote">${icon('camera', 14)} ${t('view.filmNote')}</div>
           <div class="photo-picker" id="vPicker"></div></div>
@@ -927,8 +936,12 @@ export function openViewModal({ mode = 'create', spot, onSearch, onPickLocation,
   const errEl = back.querySelector('#vErr');
   const resultsEl = back.querySelector('#vResults');
   const locStatus = back.querySelector('#vLocStatus');
-  const picker = createPhotoPicker(back.querySelector('#vPicker'), {});
-  if (spot?.photos?.length) picker.addUrls(spot.photos);
+  const picker = createPhotoPicker(back.querySelector('#vPicker'), { cameras: true });
+  if (spot?.photos?.length) {
+    const camByUrl = {};
+    (spot.photoMeta || []).forEach((m) => { if (m.camera) camByUrl[m.url] = m.camera; });
+    picker.addUrls(spot.photos, camByUrl);
+  }
   const close = () => { onCancelPick?.(); back.remove(); };
   back.querySelector('#vClose').onclick = close;
   back.addEventListener('mousedown', (e) => { if (e.target === back) close(); });
@@ -972,7 +985,7 @@ export function openViewModal({ mode = 'create', spot, onSearch, onPickLocation,
     errEl.textContent = '';
     if (!form.elements.name.value.trim()) { errEl.textContent = t('view.needName'); return; }
     if (!form.elements.lat.value || !form.elements.lng.value) { errEl.textContent = t('view.needLoc'); return; }
-    const { manifest, files, count } = picker.getManifest();
+    const { manifest, files, count, cameras } = picker.getManifest();
     if (!count) { errEl.textContent = t('view.needPhoto'); return; }
     const btn = form.querySelector('button[type="submit"]');
     if (btn.disabled) return; // already submitting → ignore repeat clicks (kills double-submit)
@@ -981,7 +994,9 @@ export function openViewModal({ mode = 'create', spot, onSearch, onPickLocation,
     fd.set('name', form.elements.name.value);
     fd.set('lat', form.elements.lat.value);
     fd.set('lng', form.elements.lng.value);
+    if (form.elements.description) fd.set('description', form.elements.description.value);
     fd.set('photo_manifest', JSON.stringify(manifest));
+    fd.set('camera_manifest', JSON.stringify(cameras));   // per-photo camera, parallel to photo_manifest
     files.forEach((f) => fd.append('photos', f));
     try { await onSubmit(fd); close(); }
     catch (err) { errEl.textContent = err.message || '실패'; btn.disabled = false; btn.textContent = orig; }
@@ -1069,8 +1084,9 @@ export function createHoursEditor(container, initial = {}) {
 }
 
 // ---- Reusable photo picker (reorderable; first = cover/representative) -----
-export function createPhotoPicker(container, { onChange } = {}) {
-  let items = []; // { kind:'file'|'url', file?, url?, obj? }
+// `cameras: true` adds a small per-photo camera input (used by the view-spot editor).
+export function createPhotoPicker(container, { onChange, cameras = false } = {}) {
+  let items = []; // { kind:'file'|'url', file?, url?, obj?, camera? }
   let dragFrom = null;
   const MAX = 40;
   container.classList.add('photo-picker');
@@ -1083,10 +1099,11 @@ export function createPhotoPicker(container, { onChange } = {}) {
   }
   function render() {
     const tiles = items.map((it, i) => `
-      <div class="pp-item ${i === 0 ? 'is-cover' : ''}" data-i="${i}" draggable="true" title="${i === 0 ? t('pp.isCover') : t('pp.makeCover')}">
+      <div class="pp-item ${i === 0 ? 'is-cover' : ''} ${cameras ? 'pp-item--cam' : ''}" data-i="${i}" draggable="true" title="${i === 0 ? t('pp.isCover') : t('pp.makeCover')}">
         <div class="pp-img" style="background-image:url('${it.kind === 'url' ? esc(img(thumb(it.url))) : it.obj}')"></div>
         ${i === 0 ? `<span class="pp-cover">${icon('star', 11)} ${t('pp.cover')}</span>` : `<span class="pp-hovercover">${t('pp.makeCoverShort')}</span>`}
         <button type="button" class="pp-del" title="${t('detail.delete')}">${icon('x', 12)}</button>
+        ${cameras ? `<input type="text" class="pp-cam" placeholder="${esc(t('pp.camera'))}" value="${esc(it.camera || '')}" />` : ''}
       </div>`).join('');
     const addTile = items.length < MAX
       ? `<label class="pp-add" title="${t('pp.add')}">${icon('plus', 20)}<input type="file" accept="image/*" multiple hidden></label>`
@@ -1099,7 +1116,13 @@ export function createPhotoPicker(container, { onChange } = {}) {
       const i = +el.dataset.i;
       el.querySelector('.pp-del').onclick = (e) => { e.stopPropagation(); items.splice(i, 1); render(); };
       el.addEventListener('click', () => move(i, 0)); // click a photo → make it the cover
-      el.addEventListener('dragstart', (e) => { dragFrom = i; el.classList.add('dragging'); e.dataTransfer.effectAllowed = 'move'; try { e.dataTransfer.setData('text/plain', String(i)); } catch { /* */ } });
+      // per-photo camera field: update state on input; don't let it trigger cover/drag
+      const camIn = el.querySelector('.pp-cam');
+      if (camIn) {
+        camIn.addEventListener('input', (e) => { items[i].camera = e.target.value; });
+        ['click', 'mousedown', 'pointerdown'].forEach((ev) => camIn.addEventListener(ev, (e) => e.stopPropagation()));
+      }
+      el.addEventListener('dragstart', (e) => { if (e.target.classList.contains('pp-cam')) { e.preventDefault(); return; } dragFrom = i; el.classList.add('dragging'); e.dataTransfer.effectAllowed = 'move'; try { e.dataTransfer.setData('text/plain', String(i)); } catch { /* */ } });
       el.addEventListener('dragend', () => { el.classList.remove('dragging'); dragFrom = null; });
       el.addEventListener('dragover', (e) => { if (dragFrom != null) { e.preventDefault(); el.classList.add('drop-target'); } });
       el.addEventListener('dragleave', () => el.classList.remove('drop-target'));
@@ -1111,14 +1134,15 @@ export function createPhotoPicker(container, { onChange } = {}) {
     for (const f of [...fileList]) { if (items.length >= MAX) break; if (!/^image\//.test(f.type)) continue; items.push({ kind: 'file', file: f, obj: URL.createObjectURL(f) }); }
     render();
   }
-  function addUrls(urls) {
-    for (const u of urls || []) { if (items.length >= MAX) break; if (!items.some((it) => it.kind === 'url' && it.url === u)) items.push({ kind: 'url', url: u }); }
+  function addUrls(urls, camByUrl = {}) {
+    for (const u of urls || []) { if (items.length >= MAX) break; if (!items.some((it) => it.kind === 'url' && it.url === u)) items.push({ kind: 'url', url: u, camera: camByUrl[u] || '' }); }
     render();
   }
   function getManifest() {
     return {
       manifest: items.map((it) => (it.kind === 'file' ? 'file' : `url:${it.url}`)),
       files: items.filter((it) => it.kind === 'file').map((it) => it.file),
+      cameras: items.map((it) => it.camera || ''),   // parallel to manifest (per-photo camera)
       count: items.length,
     };
   }

@@ -37,15 +37,16 @@ const upload = multer({
 
 const listStmt = db.prepare('SELECT id, name, name_en, lat, lng, photo_url, status, created_by FROM viewspots');
 const getStmt = db.prepare('SELECT * FROM viewspots WHERE id = ?');
-const photosMetaStmt = db.prepare(`SELECT vp.url, u.name AS uploader
+const photosMetaStmt = db.prepare(`SELECT vp.url, u.name AS uploader, vp.camera
   FROM viewspot_photos vp LEFT JOIN users u ON u.id = vp.created_by
   WHERE vp.viewspot_id = ? ORDER BY vp.ord`);
-const photoOwnersStmt = db.prepare('SELECT url, created_by FROM viewspot_photos WHERE viewspot_id = ?');
+const photoOwnersStmt = db.prepare('SELECT url, created_by, camera FROM viewspot_photos WHERE viewspot_id = ?');
 const userNameStmt = db.prepare('SELECT name FROM users WHERE id = ?');
-const insertSpot = db.prepare(`INSERT INTO viewspots (id, name, lat, lng, photo_url, created_by, status, region) VALUES (@id,@name,@lat,@lng,@photo_url,@created_by,@status,@region)`);
+const userCameraStmt = db.prepare('SELECT default_camera FROM users WHERE id = ?');
+const insertSpot = db.prepare(`INSERT INTO viewspots (id, name, lat, lng, photo_url, created_by, status, region, description) VALUES (@id,@name,@lat,@lng,@photo_url,@created_by,@status,@region,@description)`);
 const setVsApproved = db.prepare(`UPDATE viewspots SET status='approved' WHERE id=?`);
 const setVsRejected = db.prepare(`UPDATE viewspots SET status='rejected' WHERE id=?`);
-const insertPhoto = db.prepare('INSERT INTO viewspot_photos (id, viewspot_id, url, ord, created_by) VALUES (?,?,?,?,?)');
+const insertPhoto = db.prepare('INSERT INTO viewspot_photos (id, viewspot_id, url, ord, created_by, camera) VALUES (?,?,?,?,?,?)');
 const maxOrdStmt = db.prepare('SELECT COALESCE(MAX(ord), -1) AS m FROM viewspot_photos WHERE viewspot_id = ?');
 // a user can't create the same spot twice (same name + ~same place, ~55m). Blocks the
 // double-submit that made 5× 잠수교 when slow uploads got clicked repeatedly.
@@ -146,9 +147,12 @@ router.post('/', requireAuth, upload.array('photos', 30), async (req, res) => {
   const admin = isAdmin(req.user);
   const status = admin ? 'approved' : 'pending';
   const id = crypto.randomUUID();
+  const description = (b.description || '').trim() || null;
+  const cam = userCameraStmt.get(req.user.id)?.default_camera || null; // photographer's default camera
+  let camManifest = []; try { camManifest = JSON.parse(b.camera_manifest || '[]'); } catch { camManifest = []; }
   db.transaction(() => {
-    insertSpot.run({ id, name, lat, lng, photo_url: photos[0], created_by: req.user.id, status, region });
-    photos.forEach((url, i) => insertPhoto.run(crypto.randomUUID(), id, url, i, req.user.id));
+    insertSpot.run({ id, name, lat, lng, photo_url: photos[0], created_by: req.user.id, status, region, description });
+    photos.forEach((url, i) => insertPhoto.run(crypto.randomUUID(), id, url, i, req.user.id, (camManifest[i] || '').trim() || cam));
   })();
   if (!admin) {
     sendAdminAlert(
@@ -180,9 +184,14 @@ router.patch('/:id', requireAuth, upload.array('photos', 30), async (req, res) =
   let region = spot.region;
   if (moved) { try { region = await kakao.reverseRegion(lng, lat); } catch { /* keep old */ region = spot.region; } }
 
-  // keep each kept photo's original uploader; new photos are attributed to the editor
+  // one-line description (editable); keep the old value if the field isn't sent
+  const description = ('description' in b) ? ((b.description || '').trim() || null) : spot.description;
+  // keep each kept photo's original uploader + camera; new photos → editor + their default camera
   const currentRows = photoOwnersStmt.all(spot.id);
   const owners = new Map(currentRows.map((r) => [r.url, r.created_by]));
+  const cameras = new Map(currentRows.map((r) => [r.url, r.camera]));
+  const editorCam = userCameraStmt.get(req.user.id)?.default_camera || null;
+  let camManifest = []; try { camManifest = JSON.parse(b.camera_manifest || '[]'); } catch { camManifest = []; }
   db.transaction(() => {
     let finalPhotos = photos;
     if (photos) {
@@ -196,14 +205,22 @@ router.patch('/:id', requireAuth, upload.array('photos', 30), async (req, res) =
         .map((r) => r.url);
       finalPhotos = [...photos, ...protectedExtras];
     }
-    db.prepare('UPDATE viewspots SET name = ?, lat = ?, lng = ?, photo_url = ?, region = ? WHERE id = ?')
-      .run(name, lat, lng, photos ? photos[0] : spot.photo_url, region, spot.id);
+    db.prepare('UPDATE viewspots SET name = ?, lat = ?, lng = ?, photo_url = ?, region = ?, description = ? WHERE id = ?')
+      .run(name, lat, lng, photos ? photos[0] : spot.photo_url, region, description, spot.id);
     if (photos) {
       delPhotos.run(spot.id);
-      finalPhotos.forEach((url, i) => insertPhoto.run(crypto.randomUUID(), spot.id, url, i, owners.get(url) || req.user.id));
+      finalPhotos.forEach((url, i) => {
+        // manifest photos (i < photos.length) take the camera typed in the editor; anything
+        // left blank keeps its stored camera, then the editor's default. Protected extras
+        // (appended by other users, beyond the manifest) always keep their stored camera.
+        const typed = (i < photos.length ? (camManifest[i] || '') : '').trim();
+        const camera = typed || cameras.get(url) || (i < photos.length ? editorCam : null);
+        insertPhoto.run(crypto.randomUUID(), spot.id, url, i, owners.get(url) || req.user.id, camera);
+      });
     }
   })();
-  if (name !== spot.name || region !== spot.region) i18nContent.translateViewspot(spot.id).catch(() => {}); // re-translate name/region if changed
+  // re-translate name/region/description if any changed
+  if (name !== spot.name || region !== spot.region || description !== spot.description) i18nContent.translateViewspot(spot.id).catch(() => {});
   res.json(getStmt.get(spot.id));
 });
 
@@ -218,8 +235,9 @@ router.post('/:id/photos', requireAuth, upload.array('photos', 30), async (req, 
   const urls = files.map((f) => `/uploads/${f.filename}`);
   if (!urls.length) { cleanup(); return res.status(400).json({ error: '사진을 올려주세요.' }); }
   let ord = maxOrdStmt.get(spot.id).m + 1;
+  const cam = userCameraStmt.get(req.user.id)?.default_camera || null;
   db.transaction(() => {
-    urls.forEach((url) => insertPhoto.run(crypto.randomUUID(), spot.id, url, ord++, req.user.id));
+    urls.forEach((url) => insertPhoto.run(crypto.randomUUID(), spot.id, url, ord++, req.user.id, cam));
   })();
   res.json(getStmt.get(spot.id));
 });

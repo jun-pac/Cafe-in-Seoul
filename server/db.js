@@ -187,11 +187,24 @@ if (!userCols.has('password_hash')) {
 if (!userCols.has('is_admin')) {
   db.exec(`ALTER TABLE users ADD COLUMN is_admin INTEGER NOT NULL DEFAULT 0`);
 }
+// each photographer's default camera — used to fill in a photo's camera and inherited by
+// new uploads. Editable anytime; per-photo overrides live on viewspot_photos.camera.
+if (!userCols.has('default_camera')) {
+  db.exec(`ALTER TABLE users ADD COLUMN default_camera TEXT`);
+  db.prepare(`UPDATE users SET default_camera=? WHERE name=?`).run('Olympus OM10 24mm f2.8', 'sejun');
+  db.prepare(`UPDATE users SET default_camera=? WHERE name=?`).run('Nikon FM2 18mm f3.5', 'damhiya');
+}
 
 // per-photo uploader attribution for view-spot photos
 const vpCols = new Set(db.prepare(`PRAGMA table_info(viewspot_photos)`).all().map((c) => c.name));
 if (!vpCols.has('created_by')) {
   db.exec(`ALTER TABLE viewspot_photos ADD COLUMN created_by TEXT`);
+}
+// which camera each photo was shot on. One-time backfill from the uploader's default
+// camera (set just above); new uploads inherit it too. Editable per photo afterwards.
+if (!vpCols.has('camera')) {
+  db.exec(`ALTER TABLE viewspot_photos ADD COLUMN camera TEXT`);
+  db.exec(`UPDATE viewspot_photos SET camera=(SELECT default_camera FROM users WHERE users.id=viewspot_photos.created_by) WHERE camera IS NULL`);
 }
 // view-spots can be user-proposed (pending) awaiting admin approval
 const vsCols = new Set(db.prepare(`PRAGMA table_info(viewspots)`).all().map((c) => c.name));
@@ -202,6 +215,9 @@ if (!vsCols.has('name_en')) db.exec(`ALTER TABLE viewspots ADD COLUMN name_en TE
 // real location, reverse-geocoded from lat/lng at registration ("인천 제물포구") + its EN
 if (!vsCols.has('region')) db.exec(`ALTER TABLE viewspots ADD COLUMN region TEXT`);
 if (!vsCols.has('region_en')) db.exec(`ALTER TABLE viewspots ADD COLUMN region_en TEXT`);
+// one-line description of the spot (shown in the viewer + composed into the SEO text)
+if (!vsCols.has('description')) db.exec(`ALTER TABLE viewspots ADD COLUMN description TEXT`);
+if (!vsCols.has('description_en')) db.exec(`ALTER TABLE viewspots ADD COLUMN description_en TEXT`);
 // AI search-engine summary (see cafes above)
 if (!vsCols.has('ai_summary')) db.exec(`ALTER TABLE viewspots ADD COLUMN ai_summary TEXT`);
 if (!vsCols.has('ai_summary_en')) db.exec(`ALTER TABLE viewspots ADD COLUMN ai_summary_en TEXT`);

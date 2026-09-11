@@ -6,8 +6,9 @@ const db = require('./db');
 const ai = require('./ai');
 
 const CAFE_FIELDS = ['name', 'address', 'study_review', 'view_note', 'review_summary'];
+const VIEWSPOT_FIELDS = ['name', 'region', 'description'];
 // Which fields each table lets an admin correct by hand (must have a matching *_en column).
-const TRANSLATABLE = { cafes: CAFE_FIELDS, viewspots: ['name', 'region'] };
+const TRANSLATABLE = { cafes: CAFE_FIELDS, viewspots: VIEWSPOT_FIELDS };
 
 // Deterministic English for regions the model romanizes wrong — e.g. brand-new
 // admin districts it hasn't seen (인천 제물포구, created 2026, → hallucinated "Jeongneung-dong").
@@ -37,7 +38,7 @@ async function translateRow(table, id, fields) {
 }
 
 const translateCafe = (id) => translateRow('cafes', id, CAFE_FIELDS);
-const translateViewspot = (id) => translateRow('viewspots', id, ['name', 'region']);
+const translateViewspot = (id) => translateRow('viewspots', id, VIEWSPOT_FIELDS);
 const translateReview = (id) => translateRow('reviews', id, ['body']);
 const translateComment = (id) => translateRow('viewspot_comments', id, ['body']);
 
@@ -58,7 +59,8 @@ async function retranslateMissing() {
     const cafeWhere = CAFE_FIELDS.map((f) => missing(f, `${f}_en`)).join(' OR ');
     const cafes = db.prepare(`SELECT id FROM cafes WHERE status!='rejected' AND (${cafeWhere})`).all();
     for (const c of cafes) await translateCafe(c.id);
-    const vs = db.prepare(`SELECT id FROM viewspots WHERE status!='rejected' AND (${missing('name', 'name_en')} OR ${missing('region', 'region_en')})`).all();
+    const vsWhere = VIEWSPOT_FIELDS.map((f) => missing(f, `${f}_en`)).join(' OR ');
+    const vs = db.prepare(`SELECT id FROM viewspots WHERE status!='rejected' AND (${vsWhere})`).all();
     for (const v of vs) await translateViewspot(v.id);
     if (cafes.length || vs.length) console.log(`[i18n] re-translated ${cafes.length} cafe(s), ${vs.length} view-spot(s) that were missing English`);
   } catch { /* best-effort, never throw into a timer/boot */ }
