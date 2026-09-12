@@ -125,12 +125,13 @@ const DEPTH = { filter: 1, search: 1, locate: 1, lang: 1, open_cafe: 2, open_vie
 const DEPTH_KEYS = ['bounce', 'browse', 'open', 'act'];
 const isMobileUA = (ua) => /Mobi|Android|iPhone|iPad|iPod/i.test(ua || '');
 
-// THE definition of "visitors on a day" — distinct real people who loaded the page, on the KST
-// calendar day. /api/stats (the counter on the map) and the admin panel both read this, so they
-// cannot drift apart. Derived from events, so it is retroactively correct: the old daily_visits
-// per-day rows were tallied live under a UTC day boundary and can't be recomputed.
+// THE definition of "visitors on a day" — distinct real people who viewed the map home OR a
+// collection/SEO hub page, on the KST calendar day (total reach). /api/stats (the map counter)
+// and the admin panel both read this, so they cannot drift apart. How many of these actually
+// reached the interactive map vs. only read a list is the collection→map flow breakdown.
+// Derived from events, so retroactively correct within the events history.
 const visitorsOn = (day) => one(`SELECT COUNT(DISTINCT session_id) AS n
-  FROM events WHERE ${KDAY}=? AND type='pageview' AND ${HUMAN}`, day).n;
+  FROM events WHERE ${KDAY}=? AND type IN ('pageview','collection') AND ${HUMAN}`, day).n;
 
 function analytics(day = kstToday()) {
   // Build each visitor's journey (ordered actions) so you can see what a real person did —
@@ -143,11 +144,12 @@ function analytics(day = kstToday()) {
   const smap = new Map();
   for (const e of humanEvents) {
     let s = smap.get(e.session_id);
-    if (!s) { s = { session_id: e.session_id, ip: e.ip, country: e.country, ua: e.ua, user_id: e.user_id, first_seen: e.ts, last_seen: e.ts, events: 0, pageviews: 0, actions: 0, depth: 0, trail: [], source: 'Direct' }; smap.set(e.session_id, s); }
+    if (!s) { s = { session_id: e.session_id, ip: e.ip, country: e.country, ua: e.ua, user_id: e.user_id, first_seen: e.ts, last_seen: e.ts, events: 0, pageviews: 0, actions: 0, depth: 0, trail: [], source: 'Direct', sawCollection: false }; smap.set(e.session_id, s); }
     s.last_seen = e.ts; s.events++;
     // the session's source is the first non-Direct one seen — the real entry point,
     // not a later same-site reload (which classifies as Direct)
     if (s.source === 'Direct' && e.source && e.source !== 'Direct') s.source = e.source;
+    if (e.type === 'collection') s.sawCollection = true;
     if (e.type === 'pageview') s.pageviews++;
     else {
       s.actions++;
@@ -168,12 +170,12 @@ function analytics(day = kstToday()) {
   // most recent activity first; cap high enough to show every visitor on a normal day
   const sessions = all.slice().sort((a, b) => (a.last_seen < b.last_seen ? 1 : a.last_seen > b.last_seen ? -1 : 0)).slice(0, 200);
 
-  // A VISITOR is a session that loaded the page on this day — the same thing the public
-  // "오늘 방문자" counter shows, so the two numbers can never disagree. A session can also be
-  // active without a page load (a tab left open since yesterday still fires action beacons);
-  // those are counted as `active`, not as visitors, and every per-visitor rate below is over
-  // the visitor set so the buckets add up to it.
-  const visitorSet = all.filter((s) => s.pageviews > 0);
+  // A VISITOR = a session that viewed the map home OR a collection/SEO page this day (total
+  // reach) — the same thing the public "오늘 방문자" counter shows, so the two never disagree.
+  // How many reached the interactive map vs only read a list is the collection→map flow below.
+  // A session can also be active without any page view (a tab left open still fires action
+  // beacons); those count as `active`, not visitors.
+  const visitorSet = all.filter((s) => s.pageviews > 0 || s.sawCollection);
   const visitors = visitorSet.length;
   const depth = DEPTH_KEYS.map((key, i) => ({ key, n: visitorSet.filter((s) => s.depth === i).length }));
   const engaged = visitorSet.filter((s) => s.depth >= 2).length;

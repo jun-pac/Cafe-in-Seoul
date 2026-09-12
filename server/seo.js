@@ -21,7 +21,9 @@ const express = require('express');
 const db = require('./db');
 const { decorate } = require('./cafeModel');
 const { opensLate } = require('./score');
-const { recordEvent, isBotUA } = require('./analytics');
+const { recordEvent, isBotUA, kstToday } = require('./analytics');
+const { isAdmin } = require('./auth');
+const bumpVisitTally = db.prepare(`INSERT INTO daily_visits (day, n) VALUES (?, 1) ON CONFLICT(day) DO UPDATE SET n = n + 1`);
 
 const BASE = (process.env.BASE_URL || 'https://cafe-in-seoul.com').replace(/\/$/, '');
 const CARTO_KEY = process.env.CARTO_API_KEY || ''; // for the static map-preview tiles on SEO pages
@@ -933,7 +935,17 @@ const html = (res, s, code = 200, cache = 'public, max-age=300') => res.status(c
 function trackVisit(req, ev) {
   recordEvent(req, ev);
   const human = !isBotUA(req.get('user-agent') || '');
-  try { if (human && req.session && !req.session.seen) req.session.seen = 1; } catch { /* ignore */ }
+  try {
+    if (human && req.session) {
+      if (!req.session.seen) req.session.seen = 1;
+      // count toward the public visitor tally once per session per KST day — same dedup as the
+      // homepage — so collection-only visitors are included in the counter's running total.
+      if (!isAdmin(req.user)) {
+        const today = kstToday();
+        if (req.session.visitDay !== today) { req.session.visitDay = today; bumpVisitTally.run(today); }
+      }
+    }
+  } catch { /* ignore */ }
   return human;
 }
 const collCache = (human) => (human ? 'private, no-store' : 'public, max-age=300');
