@@ -567,7 +567,7 @@ async function openInsightsModal() {
     const k = a.kpi;
     const trendMax = Math.max(1, ...a.trend.map((x) => x.visitors));
     const hourMax = Math.max(1, ...a.hours.map((x) => x.events));
-    const depthLabel = { bounce: L('그냥 나감 (페이지만)', 'Bounced (page only)'), browse: L('둘러봄 (필터·검색)', 'Browsed (filter/search)'), open: L('장소 열어봄', 'Opened a place'), act: L('참여 (따봉·제안)', 'Engaged (like/propose)') };
+    const depthLabel = { bounce: L('보기만 하고 이탈 (행동 없음)', 'Viewed, then left (no action)'), browse: L('둘러봄 (필터·검색)', 'Browsed (filter/search)'), open: L('장소 열어봄', 'Opened a place'), act: L('참여 (따봉·제안)', 'Engaged (like/propose)') };
     return `
       <div class="in-stats">
         ${stat(k.visitors, L('방문자', 'Visitors'), L('지도 홈 또는 모음 페이지를 본 고유 세션(총 도달, 봇·관리자 제외). 지도 화면의 "오늘" 숫자와 같은 값입니다. 이 중 지도까지 온 비율은 아래 흐름 참고.', 'Unique human sessions that viewed the map home or a collection page (total reach). Same number the map counter shows; how many reached the map is in the flow below.'))}

@@ -177,6 +177,13 @@ setInterval(() => { retranslateMissing(); }, 6 * 60 * 60 * 1000).unref();
 const { backfillMissing: backfillSeoSummaries } = require('./seoSummary');
 setTimeout(() => { backfillSeoSummaries(); }, 45_000);
 setInterval(() => { backfillSeoSummaries(); }, 6 * 60 * 60 * 1000).unref();
+// One-off full regeneration of every AI summary, run IN-SERVER (single better-sqlite3
+// connection → no cross-process write hazard). Enable with REGEN_SUMMARIES=1 + recreate,
+// then unset. Used after changing the summary prompt.
+if (process.env.REGEN_SUMMARIES === '1') {
+  const { regenerateAll } = require('./seoSummary');
+  setTimeout(() => { console.log('[seo] regenerating ALL summaries…'); regenerateAll().then(() => console.log('[seo] regen complete')).catch((e) => console.error('[seo] regen failed', e)); }, 8_000);
+}
 
 // Graceful shutdown: flush the WAL into app.db and close cleanly before exit. A
 // container restart that kills the process with an un-checkpointed WAL has corrupted
