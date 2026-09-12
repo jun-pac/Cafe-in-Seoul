@@ -165,7 +165,8 @@ function analytics(day = kstToday()) {
   const all = [...smap.values()];
   // most recent activity first — reads chronologically like the raw log, newest at the top.
   // (depth still shows per-row via the action trail; it just isn't the sort key.)
-  const sessions = all.slice().sort((a, b) => (a.last_seen < b.last_seen ? 1 : a.last_seen > b.last_seen ? -1 : 0)).slice(0, 40);
+  // most recent activity first; cap high enough to show every visitor on a normal day
+  const sessions = all.slice().sort((a, b) => (a.last_seen < b.last_seen ? 1 : a.last_seen > b.last_seen ? -1 : 0)).slice(0, 200);
 
   // A VISITOR is a session that loaded the page on this day — the same thing the public
   // "오늘 방문자" counter shows, so the two numbers can never disagree. A session can also be
