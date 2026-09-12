@@ -201,17 +201,17 @@ function analytics(day = kstToday()) {
   const topDay = (type) => many(topSql(`${KDAY}=?`), day, type);
   const topWeek = (type) => many(topSql(RANGE), day, day, type);
 
-  // ---- exploration flow (collection → map), last 7 days, real people --------
+  // ---- exploration flow (collection → map) for THIS day, real people --------
   // Do people who land on a collection/hub page also reach the interactive map, or do they
   // read the list and leave? (Only meaningful since collection visits now persist a session.)
-  const coll7 = `SELECT DISTINCT session_id FROM events WHERE type='collection' AND ${HUMAN} AND ${RANGE} AND session_id IS NOT NULL`;
-  const flowN = (where) => one(`SELECT COUNT(*) AS n FROM (${coll7}) c ${where}`, day, day).n;
+  const collDay = `SELECT DISTINCT session_id FROM events WHERE type='collection' AND ${HUMAN} AND ${KDAY}=? AND session_id IS NOT NULL`;
+  const flowN = (extra, extraParams = []) => one(`SELECT COUNT(*) AS n FROM (${collDay}) c ${extra}`, day, ...extraParams).n;
   const flow = {
-    from: one(`SELECT date(?, '-6 days') AS d`, day).d, to: day,
-    visits: one(`SELECT COUNT(*) AS n FROM events WHERE type='collection' AND ${HUMAN} AND ${RANGE}`, day, day).n, // total collection pageviews
+    day,
+    visits: one(`SELECT COUNT(*) AS n FROM events WHERE type='collection' AND ${HUMAN} AND ${KDAY}=?`, day).n, // total collection page views that day
     visitors: flowN(''),                                                                              // distinct people who saw a collection page
-    toMap: flowN(`WHERE EXISTS (SELECT 1 FROM events e WHERE e.session_id=c.session_id AND e.type='pageview')`),          // ...who also loaded the map
-    toAction: flowN(`WHERE EXISTS (SELECT 1 FROM events e WHERE e.session_id=c.session_id AND e.type IN('open_cafe','open_view','filter','search','like'))`), // ...who opened/searched
+    toMap: flowN(`WHERE EXISTS (SELECT 1 FROM events e WHERE e.session_id=c.session_id AND e.type='pageview' AND date(e.ts,'+9 hours')=?)`, [day]),          // ...who also loaded the map that day
+    toAction: flowN(`WHERE EXISTS (SELECT 1 FROM events e WHERE e.session_id=c.session_id AND e.type IN('open_cafe','open_view','filter','search','like') AND date(e.ts,'+9 hours')=?)`, [day]), // ...who opened/searched
   };
   flow.collOnly = Math.max(0, flow.visitors - flow.toMap);   // saw a list, never reached the map
 

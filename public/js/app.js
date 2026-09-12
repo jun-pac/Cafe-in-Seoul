@@ -598,7 +598,7 @@ async function openInsightsModal() {
 
       ${a.week.topViews.length ? `<h4 class="in-h4">${L('많이 본 명소', 'Top views')} <small class="muted">${L('최근 7일', 'last 7 days')}</small></h4>${bars(a.week.topViews.map((x) => ({ label: x.label || '?', n: x.n })))}` : ''}
       ${a.week.topSearches.length ? `<h4 class="in-h4">${L('검색어', 'Searches')} <small class="muted">${L('최근 7일', 'last 7 days')}</small></h4>${bars(a.week.topSearches.map((x) => ({ label: x.label || '?', n: x.n })))}` : ''}
-      ${a.flow ? `<h4 class="in-h4">${L('카페 모음 → 지도 흐름', 'Collections → map flow')} <small class="muted">${L('최근 7일 · 사람', 'last 7 days · people')}</small></h4>
+      ${a.flow ? `<h4 class="in-h4">${L('카페 모음 → 지도 흐름', 'Collections → map flow')} <small class="muted">${L('이 날 · 사람', 'this day · people')}</small></h4>
       <div class="in-stats">
         ${stat(a.flow.visits, L('모음 방문', 'List views'), L('조건·지역별 모음/허브 페이지를 사람이 연 총 횟수', 'Times people opened a collection/hub page'))}
         ${stat(a.flow.visitors, L('방문자', 'Visitors'), L('모음 페이지를 본 고유 방문자', 'Distinct people who saw a collection page'))}
