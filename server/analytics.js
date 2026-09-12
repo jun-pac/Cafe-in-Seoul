@@ -200,6 +200,20 @@ function analytics(day = kstToday()) {
   const topDay = (type) => many(topSql(`${KDAY}=?`), day, type);
   const topWeek = (type) => many(topSql(RANGE), day, day, type);
 
+  // ---- exploration flow (collection → map), last 7 days, real people --------
+  // Do people who land on a collection/hub page also reach the interactive map, or do they
+  // read the list and leave? (Only meaningful since collection visits now persist a session.)
+  const coll7 = `SELECT DISTINCT session_id FROM events WHERE type='collection' AND ${HUMAN} AND ${RANGE} AND session_id IS NOT NULL`;
+  const flowN = (where) => one(`SELECT COUNT(*) AS n FROM (${coll7}) c ${where}`, day, day).n;
+  const flow = {
+    from: one(`SELECT date(?, '-6 days') AS d`, day).d, to: day,
+    visits: one(`SELECT COUNT(*) AS n FROM events WHERE type='collection' AND ${HUMAN} AND ${RANGE}`, day, day).n, // total collection pageviews
+    visitors: flowN(''),                                                                              // distinct people who saw a collection page
+    toMap: flowN(`WHERE EXISTS (SELECT 1 FROM events e WHERE e.session_id=c.session_id AND e.type='pageview')`),          // ...who also loaded the map
+    toAction: flowN(`WHERE EXISTS (SELECT 1 FROM events e WHERE e.session_id=c.session_id AND e.type IN('open_cafe','open_view','filter','search','like'))`), // ...who opened/searched
+  };
+  flow.collOnly = Math.max(0, flow.visitors - flow.toMap);   // saw a list, never reached the map
+
   // where the humans came from (this day), by distinct visitor. AI answer engines flagged.
   const srcMap = new Map();
   for (const s of visitorSet) srcMap.set(s.source, (srcMap.get(s.source) || 0) + 1);
@@ -250,6 +264,7 @@ function analytics(day = kstToday()) {
     topViews: topDay('open_view'),
     topSearches: topDay('search'),
     topCollections: topDay('collection'),
+    flow,   // collection → map exploration funnel (7-day)
     week: {
       from: one(`SELECT date(?, '-6 days') AS d`, day).d,
       to: day,

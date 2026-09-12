@@ -598,6 +598,14 @@ async function openInsightsModal() {
 
       ${a.week.topViews.length ? `<h4 class="in-h4">${L('많이 본 명소', 'Top views')} <small class="muted">${L('최근 7일', 'last 7 days')}</small></h4>${bars(a.week.topViews.map((x) => ({ label: x.label || '?', n: x.n })))}` : ''}
       ${a.week.topSearches.length ? `<h4 class="in-h4">${L('검색어', 'Searches')} <small class="muted">${L('최근 7일', 'last 7 days')}</small></h4>${bars(a.week.topSearches.map((x) => ({ label: x.label || '?', n: x.n })))}` : ''}
+      ${a.flow ? `<h4 class="in-h4">${L('카페 모음 → 지도 흐름', 'Collections → map flow')} <small class="muted">${L('최근 7일 · 사람', 'last 7 days · people')}</small></h4>
+      <div class="in-stats">
+        ${stat(a.flow.visits, L('모음 방문', 'List views'), L('조건·지역별 모음/허브 페이지를 사람이 연 총 횟수', 'Times people opened a collection/hub page'))}
+        ${stat(a.flow.visitors, L('방문자', 'Visitors'), L('모음 페이지를 본 고유 방문자', 'Distinct people who saw a collection page'))}
+        ${stat(a.flow.toMap, L('→ 지도 도달', 'Reached map'), L('모음을 보고 지도(홈)까지 온 사람', 'Collection visitors who then loaded the map'))}
+        ${stat(a.flow.collOnly, L('모음만 보고 이탈', 'List-only'), L('모음만 보고 지도로 안 온 사람', 'Saw a list, never reached the map'))}
+      </div>
+      <p class="in-note muted">${L('세션 지속을 켠 이후부터 정확합니다(그 전엔 모음↔지도 연결이 안 잡혀 "지도 도달"이 0에 가깝게 나옴).', 'Accurate from when collection sessions began persisting — before that the collection↔map link was not captured, so "Reached map" reads near zero.')}</p>` : ''}
       ${a.week.topCollections && a.week.topCollections.length ? `<h4 class="in-h4">${L('많이 본 카페 모음', 'Top collections')} <small class="muted">${L('최근 7일 · 사람만', 'last 7 days · people')}</small></h4>${bars(a.week.topCollections.map((x) => ({ label: x.label || '?', n: x.n })))}<p class="in-note muted">${L('조건·지역별 SEO 모음 페이지와 헤더의 "카페 모음"에 실제로 들어온 사람 수입니다(봇 제외).', 'People (not bots) who landed on a collection/combo SEO page or the header "Cafe guides" hub.')}</p>` : ''}
       ${a.countries.length ? `<h4 class="in-h4">${L('국가별 방문자', 'Visitors by country')}</h4>${bars(a.countries.map((c) => ({ label: c.country || '?', n: c.n })))}` : ''}
 

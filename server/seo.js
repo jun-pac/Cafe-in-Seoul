@@ -21,7 +21,7 @@ const express = require('express');
 const db = require('./db');
 const { decorate } = require('./cafeModel');
 const { opensLate } = require('./score');
-const { recordEvent } = require('./analytics');
+const { recordEvent, isBotUA } = require('./analytics');
 
 const BASE = (process.env.BASE_URL || 'https://cafe-in-seoul.com').replace(/\/$/, '');
 
@@ -731,7 +731,7 @@ function renderCollection(def, lang) {
     <p class="sub">${ko ? `직접 방문한 ${total}개 카페 중에서` : `From ${total} cafes visited in person`}</p>
     ${hero ? `<img class="seo-hero" src="${esc(imgPath(hero))}" alt="${esc(h1)}" loading="eager" />` : ''}
     <p class="seo-lead">${esc(lead)}</p>
-    <p><a class="seo-cta" href="${mapHome(ko)}">${ko ? '지도에서 둘러보기' : 'Explore on the map'} →</a></p>
+    <p><a class="seo-cta" href="${mapHome(ko)}">${ko ? '지도에서 사진으로 둘러보기' : 'Browse photos on the map'} →</a></p>
     <p class="seo-maphint">${ko ? '아래 각 카페의 <b>지도에서 보기</b>를 누르면 지도에서 그 카페가 바로 열립니다.' : 'Tap <b>On the map</b> on any cafe below to open it directly on the map.'}</p>
     ${n ? `<h2>${ko ? '비교표' : 'At a glance'}</h2>
     <div class="seo-cmp-wrap"><table class="seo-cmp"><thead><tr><th>${ko ? '카페' : 'Cafe'}</th><th>${ko ? '점수' : 'Score'}</th><th>${ko ? '아메리카노' : 'Americano'}</th><th>${ko ? '마감' : 'Closes'}</th><th>${ko ? '콘센트' : 'Outlets'}</th><th>${ko ? '조용함' : 'Quiet'}</th></tr></thead><tbody>${shown.map((c) => cmpRow(c, ko)).join('')}</tbody></table></div>
@@ -776,7 +776,7 @@ function renderCafeDirectory(lang) {
     <nav class="seo-top"><a href="${ko ? '/' : '/en/cafes'}">Cafe in Seoul</a> <span>›</span> <span>${ko ? '카페' : 'Cafes'}</span></nav>
     <h1>${ko ? '서울 카공 카페' : 'Study cafes in Seoul'}</h1>
     <p class="seo-lead">${ko ? `직접 방문한 카공 카페 ${rows.length}곳입니다. 각 카페의 조용함, 콘센트, 좌석, 아메리카노 가격, 영업시간을 확인했습니다.` : `${rows.length} study-friendly cafes we visited in person — checking quiet, outlets, seating, americano price and hours at each one.`}</p>
-    <p><a class="seo-cta" href="${mapHome(ko)}">${ko ? '지도에서 둘러보기' : 'Explore on the map'} →</a></p>
+    <p><a class="seo-cta" href="${mapHome(ko)}">${ko ? '지도에서 사진으로 둘러보기' : 'Browse photos on the map'} →</a></p>
     <p class="seo-links"><a href="${ko ? '/views' : '/en/views'}">${ko ? '사진 명소 모음 보기' : 'Browse scenic photo spots'} →</a></p>
     <h2>${ko ? '조건별 카페' : 'By what you need'}</h2>
     <div class="seo-links">${attrLinks}</div>
@@ -807,7 +807,7 @@ function renderViewDirectory(lang) {
     <nav class="seo-top"><a href="${ko ? '/' : '/en/views'}">Cafe in Seoul</a> <span>›</span> <span>${ko ? '명소' : 'View spots'}</span></nav>
     <h1>${ko ? '서울 사진 명소' : 'Scenic photo spots in Seoul'}</h1>
     <p class="seo-lead">${ko ? `직접 방문해 촬영한 서울 사진 명소 ${rows.length}곳입니다.` : `${rows.length} scenic spots in Seoul, each shot in person.`}</p>
-    <p><a class="seo-cta" href="${mapHome(ko)}">${ko ? '지도에서 둘러보기' : 'Explore on the map'} →</a></p>
+    <p><a class="seo-cta" href="${mapHome(ko)}">${ko ? '지도에서 사진으로 둘러보기' : 'Browse photos on the map'} →</a></p>
     <p class="seo-links"><a href="${ko ? '/cafes' : '/en/cafes'}">${ko ? '카공 카페 모음 보기' : 'Browse study cafes'} →</a></p>
     <ul class="seo-dir">${items}</ul>
     ${seoFooter(ko)}`;
@@ -858,15 +858,30 @@ Sitemap: ${BASE}/sitemap.xml
 
 // ---- router ----------------------------------------------------------------
 const router = express.Router();
-const html = (res, s, code = 200) => res.status(code).type('html').set('Cache-Control', 'public, max-age=300').send(s);
+const html = (res, s, code = 200, cache = 'public, max-age=300') => res.status(code).type('html').set('Cache-Control', cache).send(s);
+
+// Record a collection/hub visit AND, for real people, persist the session so their
+// collection→map journey links up (saveUninitialized:false won't set a cookie otherwise).
+// Bots are skipped (no session-store bloat, no cookie). Returns true if this is a human,
+// so the caller can serve a private/uncached response (a Set-Cookie must not be shared-cached).
+function trackVisit(req, ev) {
+  recordEvent(req, ev);
+  const human = !isBotUA(req.get('user-agent') || '');
+  try { if (human && req.session && !req.session.seen) req.session.seen = 1; } catch { /* ignore */ }
+  return human;
+}
+const collCache = (human) => (human ? 'private, no-store' : 'public, max-age=300');
 
 router.get('/robots.txt', (req, res) => res.type('text/plain').set('Cache-Control', 'public, max-age=3600').send(ROBOTS));
 router.get('/sitemap.xml', (req, res) => res.type('application/xml').set('Cache-Control', 'public, max-age=1800').send(sitemap()));
 
 // directories
-const trackDir = (req, _res, next) => { recordEvent(req, { type: 'collection', target: 'directory', label: '카페 모음 (전체 목록)' }); next(); };
-router.get('/cafes', trackDir, (req, res) => html(res, renderCafeDirectory('ko')));
-router.get('/en/cafes', trackDir, (req, res) => html(res, renderCafeDirectory('en')));
+const serveCafeDir = (lang) => (req, res) => {
+  const human = trackVisit(req, { type: 'collection', target: 'directory', label: '카페 모음 (전체 목록)' });
+  html(res, renderCafeDirectory(lang), 200, collCache(human));
+};
+router.get('/cafes', serveCafeDir('ko'));
+router.get('/en/cafes', serveCafeDir('en'));
 router.get('/views', (req, res) => html(res, renderViewDirectory('ko')));
 router.get('/en/views', (req, res) => html(res, renderViewDirectory('en')));
 
@@ -896,8 +911,8 @@ function serveCollection(lang) {
     const def = getCollection(req.params.slug);
     if (!def) return next();
     // canonical KST label = the Korean H1, so ko/en hits on the same page group together
-    recordEvent(req, { type: 'collection', target: def.key, label: def.h1.ko });
-    html(res, renderCollection(def, lang));
+    const human = trackVisit(req, { type: 'collection', target: def.key, label: def.h1.ko });
+    html(res, renderCollection(def, lang), 200, collCache(human));
   };
 }
 router.get('/cafes/:slug', serveCollection('ko'));
@@ -912,8 +927,8 @@ function serveCombo(lang) {
   return (req, res, next) => {
     const def = getCombo(req.params.hood, req.params.attr);
     if (!def) return next();
-    recordEvent(req, { type: 'collection', target: def.key, label: def.h1.ko });
-    html(res, renderCollection(def, lang));
+    const human = trackVisit(req, { type: 'collection', target: def.key, label: def.h1.ko });
+    html(res, renderCollection(def, lang), 200, collCache(human));
   };
 }
 router.get('/cafes/:hood/:attr', serveCombo('ko'));
