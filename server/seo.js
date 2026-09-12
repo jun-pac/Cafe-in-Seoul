@@ -674,8 +674,15 @@ const COLLECTION_CSS = `
     .seo-cmp { width: 100%; border-collapse: collapse; font-size: 13.5px; }
     .seo-cmp th, .seo-cmp td { text-align: left; padding: 9px 10px; border-bottom: 1px solid var(--hair); white-space: nowrap; }
     .seo-cmp th { font-size: 11px; text-transform: uppercase; letter-spacing: .3px; color: var(--mute); font-weight: 700; }
-    .seo-cmp td.c { white-space: normal; font-weight: 700; }
+    .seo-cmp td.c { font-weight: 700; }   /* name stays on one line (nowrap inherited) — no 1-char wraps */
     .seo-cmp td.c a { text-decoration: none; }
+    /* phones: shrink the table and drop the secondary columns (still shown per-cafe in the
+       ranked cards below) so 6 columns + long names don't wrap into vertical mush */
+    @media (max-width: 600px) {
+      .seo-cmp { font-size: 12.5px; }
+      .seo-cmp th, .seo-cmp td { padding: 8px 8px; }
+      .seo-cmp th:nth-child(n+4), .seo-cmp td:nth-child(n+4) { display: none; }
+    }
     .seo-rank { list-style: none; padding: 0; margin: 10px 0 0; display: grid; gap: 14px; }
     .seo-rank > li { display: flex; gap: 13px; padding-bottom: 14px; border-bottom: 1px solid var(--hair); }
     .seo-rank .thumb { flex: none; }
@@ -731,10 +738,8 @@ function renderCollection(def, lang) {
   const n = rows.length;
   const shown = rows.slice(0, DISPLAY);
   const hero = shown[0] ? shown[0].photo_url : null;
-  // map-preview pins: the shown cafes, centered on their midpoint, #1 surfaced (focus)
+  // map-preview pins: the shown cafes, centered on the #1 (top-score) cafe, which is surfaced
   const pvPins = shown.filter((c) => Number.isFinite(c.lat) && Number.isFinite(c.lng));
-  const pvLat = pvPins.length ? pvPins.reduce((a, c) => a + c.lat, 0) / pvPins.length : null;
-  const pvLng = pvPins.length ? pvPins.reduce((a, c) => a + c.lng, 0) / pvPins.length : null;
   const h1 = def.h1[ko ? 'ko' : 'en'];
   const lead = def.lead[ko ? 'ko' : 'en'];
   const crit = def.criteria[ko ? 'ko' : 'en'];
@@ -779,10 +784,9 @@ function renderCollection(def, lang) {
     <h1>${esc(ko ? `${h1} ${n}곳` : h1)}</h1>
     <p class="sub">${ko ? `직접 방문한 ${total}개 카페 중에서` : `From ${total} cafes visited in person`}</p>
     ${hero ? `<img class="seo-hero" src="${esc(imgPath(hero))}" alt="${esc(h1)}" loading="eager" />` : ''}
-    ${pvPins.length ? mapPreview({ center: { lat: pvLat, lng: pvLng }, z: 13, href: mapHome(ko), label: ko ? '카공지도 보러가기' : 'Open the cafe map', pins: pvPins.map((c, i) => ({ lat: c.lat, lng: c.lng, photo: c.photo_url, focus: i === 0 })) }) : ''}
+    ${pvPins.length ? mapPreview({ center: { lat: pvPins[0].lat, lng: pvPins[0].lng }, z: 13, href: mapHome(ko), label: ko ? '카공지도 보러가기' : 'Open the cafe map', pins: pvPins.map((c, i) => ({ lat: c.lat, lng: c.lng, photo: c.photo_url, focus: i === 0 })) }) : ''}
     <p class="seo-lead">${esc(lead)}</p>
-    <p><a class="seo-cta" href="${mapHome(ko)}">${ko ? '카공지도 보러가기' : 'Open the cafe map'} →</a></p>
-    <p class="seo-maphint">${ko ? '아래 각 카페의 <b>지도에서 보기</b>를 누르면 지도에서 그 카페가 바로 열립니다.' : 'Tap <b>On the map</b> on any cafe below to open it directly on the map.'}</p>
+    <p class="seo-maphint">${ko ? '위 지도를 누르면 지도에서 둘러볼 수 있고, 아래 각 카페의 <b>지도에서 보기</b>를 누르면 그 카페가 바로 열립니다.' : 'Tap the map above to explore it, or <b>On the map</b> on any cafe below to open it directly.'}</p>
     ${n ? `<h2>${ko ? '비교표' : 'At a glance'}</h2>
     <div class="seo-cmp-wrap"><table class="seo-cmp"><thead><tr><th>${ko ? '카페' : 'Cafe'}</th><th>${ko ? '점수' : 'Score'}</th><th>${ko ? '아메리카노' : 'Americano'}</th><th>${ko ? '마감' : 'Closes'}</th><th>${ko ? '콘센트' : 'Outlets'}</th><th>${ko ? '조용함' : 'Quiet'}</th></tr></thead><tbody>${shown.map((c) => cmpRow(c, ko)).join('')}</tbody></table></div>
     <h2>${ko ? '추천 카페' : 'The cafes'}</h2><ol class="seo-rank">${shown.map((c, i) => rankCard(c, i, def, ko)).join('')}</ol>` : `<p class="seo-lead">${ko ? '아직 조건에 맞는 카페가 없습니다.' : 'No cafes match this yet.'}</p>`}
@@ -830,7 +834,6 @@ function renderCafeDirectory(lang) {
     <h1>${ko ? '서울 카공 카페' : 'Study cafes in Seoul'}</h1>
     <p class="seo-lead">${ko ? `직접 방문한 카공 카페 ${rows.length}곳입니다. 각 카페의 조용함, 콘센트, 좌석, 아메리카노 가격, 영업시간을 확인했습니다.` : `${rows.length} study-friendly cafes we visited in person — checking quiet, outlets, seating, americano price and hours at each one.`}</p>
     ${pv.length ? mapPreview({ center: { lat: pvLat, lng: pvLng }, z: 11, href: mapHome(ko), label: ko ? '카공지도 보러가기' : 'Open the cafe map', pins: pv.slice(0, 18).map((c) => ({ lat: c.lat, lng: c.lng, photo: c.photo_url })) }) : ''}
-    <p><a class="seo-cta" href="${mapHome(ko)}">${ko ? '카공지도 보러가기' : 'Open the cafe map'} →</a></p>
     <p class="seo-links"><a href="${ko ? '/views' : '/en/views'}">${ko ? '사진 명소 모음 보기' : 'Browse scenic photo spots'} →</a></p>
     <h2>${ko ? '조건별 카페' : 'By what you need'}</h2>
     <div class="seo-links">${attrLinks}</div>
@@ -857,7 +860,11 @@ function renderViewDirectory(lang) {
   const title = ko ? `서울 사진 명소 전체 목록 (${rows.length}곳) | Cafe in Seoul` : `All scenic photo spots in Seoul (${rows.length}) | Cafe in Seoul`;
   const desc = ko ? '서울에서 사진 찍기 좋은 명소 전체 목록. 직접 방문해 촬영했습니다.' : 'Every scenic photo spot in Seoul on Cafe in Seoul, shot in person.';
   const canonical = `${BASE}${ko ? '' : '/en'}/views`;
-  const pv = rows.filter((v) => Number.isFinite(v.lat) && Number.isFinite(v.lng));
+  // Center on the Seoul cluster (where the density is), NOT the centroid of everything —
+  // Busan + Seoul points average out to an empty spot near Yongin. Non-Seoul spots just
+  // fall outside the preview frame; the panel is a "taste", not the full index.
+  const pvAll = rows.filter((v) => Number.isFinite(v.lat) && Number.isFinite(v.lng));
+  const pv = (pvAll.filter((v) => /^\s*서울/.test(v.region || '')) .length ? pvAll.filter((v) => /^\s*서울/.test(v.region || '')) : pvAll);
   const pvLat = pv.length ? pv.reduce((a, v) => a + v.lat, 0) / pv.length : null;
   const pvLng = pv.length ? pv.reduce((a, v) => a + v.lng, 0) / pv.length : null;
   const body = `
@@ -865,7 +872,6 @@ function renderViewDirectory(lang) {
     <h1>${ko ? '서울 사진 명소' : 'Scenic photo spots in Seoul'}</h1>
     <p class="seo-lead">${ko ? `직접 방문해 촬영한 서울 사진 명소 ${rows.length}곳입니다.` : `${rows.length} scenic spots in Seoul, each shot in person.`}</p>
     ${pv.length ? mapPreview({ center: { lat: pvLat, lng: pvLng }, z: 11, href: mapHome(ko), label: ko ? '지도에서 명소 보기' : 'Open the map', pins: pv.slice(0, 18).map((v) => ({ lat: v.lat, lng: v.lng, photo: v.photo_url })) }) : ''}
-    <p><a class="seo-cta" href="${mapHome(ko)}">${ko ? '지도에서 명소 보기' : 'Open the map'} →</a></p>
     <p class="seo-links"><a href="${ko ? '/cafes' : '/en/cafes'}">${ko ? '카공 카페 모음 보기' : 'Browse study cafes'} →</a></p>
     <ul class="seo-dir">${items}</ul>
     ${seoFooter(ko)}`;
