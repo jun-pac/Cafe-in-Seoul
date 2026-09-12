@@ -121,9 +121,12 @@ app.use(express.static(path.join(__dirname, '..', 'public'), {
   // revalidate code assets so a code update is never masked by a stale browser cache
   // (ETag → cheap 304 when unchanged); images/fonts still cache normally
   setHeaders: (res, filePath) => {
-    // no-store so Cloudflare/browsers never serve a stale build (a Browser-Cache-TTL
-    // override was masking code updates); images/fonts still cache via maxAge above
-    if (/\.(js|css|html)$/.test(filePath)) res.setHeader('Cache-Control', 'no-store');
+    // Third-party vendor bundles (MapLibre) never change without a filename change, so cache
+    // them hard — otherwise every return to the map re-downloaded ~800KB (the main reason
+    // coming back from an SEO page felt slow). Our own JS/CSS stays no-store so a code update
+    // is never masked by a stale build (a Cloudflare Browser-Cache-TTL override once did).
+    if (/[\\/]vendor[\\/]/.test(filePath)) res.setHeader('Cache-Control', 'public, max-age=604800');
+    else if (/\.(js|css|html)$/.test(filePath)) res.setHeader('Cache-Control', 'no-store');
   },
 }));
 

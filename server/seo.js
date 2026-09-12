@@ -192,7 +192,7 @@ function shell({ lang, title, desc, canonical, alternates, jsonLd, body, ogImage
     .seo-links { display: flex; flex-wrap: wrap; align-items: center; gap: 8px; }
     /* nowrap: a squeezed pill must wrap to the NEXT line as a whole, never break its own
        text into 2 lines (that made "서울 24시간 카페"/"서울 뷰 좋은 카페" taller than the rest) */
-    .seo-links a { text-decoration: none; white-space: nowrap; border: 1px solid var(--hair-strong); border-radius: var(--pill); padding: 6px 13px; font-size: 13px; }
+    .seo-links a { display: inline-flex; align-items: center; text-decoration: none; white-space: nowrap; border: 1px solid var(--hair-strong); border-radius: var(--pill); height: 32px; padding: 0 13px; font-size: 13px; line-height: 1; box-sizing: border-box; }
     .seo-dir { list-style: none; padding: 0; margin: 0; display: grid; grid-template-columns: repeat(auto-fill, minmax(220px, 1fr)); gap: 12px; }
     .seo-dir a { display: flex; gap: 11px; text-decoration: none; align-items: center; }
     .seo-dir img { width: 60px; height: 60px; object-fit: cover; border-radius: var(--r-sm); flex: none; background: var(--surface-2); }
@@ -324,8 +324,8 @@ function renderCafe(row, lang) {
   const nearby = nearbyCafes(row);
 
   const title = ko
-    ? `${name} — ${regKo ? regKo + ' ' : ''}카공 카페 (아메리카노 ${price}원, ${d.score}점) | Cafe in Seoul`
-    : `${name} — study cafe${regEn ? ' in ' + regEn : ''} (₩${price}, score ${d.score}) | Cafe in Seoul`;
+    ? `${name} · ${regKo ? regKo + ' ' : ''}카공 카페 (아메리카노 ${price}원, ${d.score}점) | Cafe in Seoul`
+    : `${name} · study cafe${regEn ? ' in ' + regEn : ''} (₩${price}, score ${d.score}) | Cafe in Seoul`;
   const desc = ko
     ? `직접 방문한 ${name} 카공 후기. 조용함·콘센트·좌석·아메리카노 가격·영업시간·화장실까지 정리했습니다.`
     : `A first-hand study-cafe review of ${name}: quiet, outlets, seating, americano price, hours and restrooms.`;
@@ -361,7 +361,7 @@ function renderCafe(row, lang) {
 
   const dirHref = ko ? '/cafes' : '/en/cafes';
   const body = `
-    <nav class="seo-top"><a href="${ko ? '/' : '/en/cafes'}">Cafe in Seoul</a> <span>›</span> <a href="${dirHref}">${ko ? '카페' : 'Cafes'}</a> <span>›</span> <span>${esc(name)}</span></nav>
+    <nav class="seo-top"><a href="${mapHome(ko)}">Cafe in Seoul</a> <span>›</span> <a href="${dirHref}">${ko ? '카페' : 'Cafes'}</a> <span>›</span> <span>${esc(name)}</span></nav>
     <h1>${esc(name)}</h1>
     <p class="sub">${esc(addr)}${gu ? '' : ''} · <span class="seo-badge">${d.score}<small>${ko ? '카공점수' : 'STUDY'}</small></span></p>
     ${hero ? `<img class="seo-hero" src="${esc(imgPath(hero))}" alt="${esc(name)} ${ko ? '카공 카페 대표 사진' : 'study cafe'}" loading="eager" />` : ''}
@@ -437,8 +437,8 @@ function renderView(row, lang) {
     : `${name} is a scenic photo spot${cityEn ? ` in ${cityEn}` : ''}. These are photos taken there in person.`;
   const lead = description || genericLead;    // [설명] first; fall back to the generic line
   const title = ko
-    ? `${name} — ${cityKo ? cityKo + ' ' : ''}사진 명소 | Cafe in Seoul`
-    : `${name} — scenic photo spot${cityEn ? ` in ${cityEn}` : ''} | Cafe in Seoul`;
+    ? `${name} · ${cityKo ? cityKo + ' ' : ''}사진 명소 | Cafe in Seoul`
+    : `${name} · scenic photo spot${cityEn ? ` in ${cityEn}` : ''} | Cafe in Seoul`;
   // search-bot text = [설명] [장소] [사람, 카메라], concatenated (no LLM needed)
   const place = ko ? (cityKo ? `${cityKo}에 위치한 사진 명소.` : '사진 찍기 좋은 명소.')
                    : (cityEn ? `A scenic photo spot in ${cityEn}.` : 'A scenic photo spot.');
@@ -458,7 +458,7 @@ function renderView(row, lang) {
   };
   const dirHref = ko ? '/views' : '/en/views';
   const body = `
-    <nav class="seo-top"><a href="${ko ? '/' : '/en/views'}">Cafe in Seoul</a> <span>›</span> <a href="${dirHref}">${ko ? '명소' : 'View spots'}</a> <span>›</span> <span>${esc(name)}</span></nav>
+    <nav class="seo-top"><a href="${mapHome(ko)}">Cafe in Seoul</a> <span>›</span> <a href="${dirHref}">${ko ? '명소' : 'View spots'}</a> <span>›</span> <span>${esc(name)}</span></nav>
     <h1>${esc(name)}</h1>
     <p class="sub">${ko ? `${cityKo ? cityKo + ' ' : ''}사진 명소` : `Scenic photo spot${cityEn ? ` · ${cityEn}` : ''}`}</p>
     ${hero ? `<img class="seo-hero" src="${esc(imgPath(hero))}" alt="${esc(name)} ${ko ? '사진 명소' : 'scenic spot'}" loading="eager" />` : ''}
@@ -486,7 +486,7 @@ const DISPLAY = 20; // cap on how many cafes a collection shows
 
 const toMin = (s) => { const m = /^(\d{1,2}):(\d{2})$/.exec(s || ''); return m ? (+m[1]) * 60 + +m[2] : null; };
 const is24h = (c) => { const o = toMin(c.open_time), cl = toMin(c.close_time); return o != null && cl != null && o === cl; };
-const closesLabel = (c, ko) => (is24h(c) ? (ko ? '24시간' : '24h') : (c.close_time || '—'));
+const closesLabel = (c, ko) => (is24h(c) ? (ko ? '24시간' : '24h') : (c.close_time || '-'));
 // small thumbnail for cards/tables (matches the frontend thumb convention); external CDN stays full
 const thumbPath = (u) => { const p = imgPath(u); return p && p.startsWith('/uploads/') ? p.replace(/\.[a-zA-Z]+$/, '_thumb.jpg') : p; };
 // first ~2 sentences of a review, for the ranked-card blurb
@@ -531,7 +531,7 @@ const ATTR_COLLECTIONS = [
     query: { ko: '서울 카공하기 좋은 카페', en: 'Best cafes to work in Seoul' },
     h1: { ko: '서울 카공하기 좋은 카페', en: 'Best cafes to work in Seoul' },
     lead: { ko: '직접 방문한 서울 카페 중 카공 적합도가 가장 높은 곳을 골랐습니다. 콘센트, 조용함, 좌석 크기, 아메리카노 가격, 영업시간을 같은 기준으로 평가해 점수를 매겼습니다.',
-      en: 'The most laptop-friendly cafes among the Seoul spots I visited in person — each rated on the same rubric: outlets, quiet, seating, americano price and hours.' },
+      en: 'The most laptop-friendly cafes among the Seoul spots I visited in person. Each rated on the same rubric: outlets, quiet, seating, americano price and hours.' },
     criteria: { ko: ['직접 방문한 카페만 포함', '카공 점수(가격·콘센트·좌석·조용함) 순 정렬', '조용함은 방문자 투표 반영'],
       en: ['Only cafes visited in person', 'Ranked by study score (price, outlets, seating, quiet)', 'Quiet reflects visitor votes'] } },
   { key: 'late-night', filter: (c) => opensLate(c.open_time, c.close_time), sort: byScore,
@@ -546,42 +546,42 @@ const ATTR_COLLECTIONS = [
     query: { ko: '서울 24시간 카페', en: '24-hour cafes in Seoul' },
     h1: { ko: '서울 24시간 카페', en: '24-hour cafes in Seoul' },
     lead: { ko: '24시간 영업하는 카페입니다. 밤샘 작업이나 새벽 공부에 좋은 곳을 직접 확인해 정리했습니다.',
-      en: 'Cafes open 24 hours — checked in person, good for all-nighters and early-morning study.' },
+      en: 'Cafes open 24 hours, checked in person, good for all-nighters and early-morning study.' },
     criteria: { ko: ['24시간 영업', '직접 방문 확인', '콘센트·좌석 비교'], en: ['Open 24 hours', 'Verified in person', 'Compared on outlets and seating'] },
     blurb: (c, ko) => (ko ? '24시간 영업합니다.' : 'Open 24 hours.') },
   { key: 'great-view', filter: (c) => c.has_view, sort: byScore,
     query: { ko: '서울 뷰 좋은 카페', en: 'Cafes with great views in Seoul' },
     h1: { ko: '서울 뷰 좋은 카페', en: 'Cafes with a great view in Seoul' },
-    lead: { ko: '창밖 뷰가 좋아 작업하며 기분 전환하기 좋은 카페입니다. 직접 방문해 뷰를 확인했습니다.',
-      en: 'Cafes with a genuinely good view from the window — checked in person.' },
+    lead: { ko: '창밖 뷰가 좋아 작업하며 기분 전환하기 좋은 카페입니다. 직접 방문해 확인했습니다.',
+      en: 'Cafes with a genuinely good view from the window, checked in person.' },
     criteria: { ko: ['창밖/전망 뷰 있음', '직접 방문 확인', '카공 적합도 함께 평가'], en: ['Has a real window/skyline view', 'Verified in person', 'Also rated for studying'] },
     blurb: (c, ko) => { const vn = ko ? (c.view_note || '') : (c.view_note_en || c.view_note || ''); return vn || (ko ? '창밖 뷰가 좋습니다.' : 'Good view from the window.'); } },
   { key: 'power-outlets', filter: (c) => c.outlets === 'many', sort: byScore,
     query: { ko: '서울 콘센트 많은 카페', en: 'Cafes with power outlets in Seoul' },
     h1: { ko: '서울 콘센트 많은 카페', en: 'Cafes with plenty of outlets in Seoul' },
     lead: { ko: '자리마다 콘센트가 넉넉해 노트북·태블릿 충전 걱정 없이 오래 작업할 수 있는 카페입니다.',
-      en: 'Cafes with outlets at most seats — plug in and work for hours without hunting for a socket.' },
+      en: 'Cafes with outlets at most seats, plug in and work for hours without hunting for a socket.' },
     criteria: { ko: ['콘센트 많음(대부분 좌석)', '직접 방문 확인', '좌석·조용함 비교'], en: ['Outlets at most seats', 'Verified in person', 'Compared on seating and quiet'] },
     blurb: (c, ko) => (ko ? '콘센트가 넉넉합니다.' : 'Plenty of power outlets.') },
   { key: 'quiet', filter: (c) => quietOf(c) >= 4, sort: byScore,
     query: { ko: '서울 조용한 카페', en: 'Quiet cafes in Seoul' },
     h1: { ko: '서울 조용한 카공 카페', en: 'Quiet cafes to study in Seoul' },
     lead: { ko: '방문자 투표에서 조용함 4점 이상을 받은 카페입니다. 대화 소음이 적어 집중하기 좋습니다.',
-      en: 'Cafes that scored 4+ on quiet in visitor votes — low chatter, easy to focus.' },
+      en: 'Cafes that scored 4+ on quiet in visitor votes, low chatter, easy to focus.' },
     criteria: { ko: ['방문자 조용함 투표 4/5 이상', '집중 작업에 적합', '콘센트·좌석 함께 비교'], en: ['Visitor quiet score 4/5+', 'Good for focused work', 'Compared on outlets and seating'] },
     blurb: (c, ko) => { const q = quietOf(c); return q >= 0 ? (ko ? `조용함 ${q}/5.` : `Quiet ${q}/5.`) : ''; } },
   { key: 'affordable', filter: (c) => +c.iced_americano_price > 0 && +c.iced_americano_price <= 4500, sort: byScore,
     query: { ko: '서울 저렴한 카공 카페', en: 'Cheap cafes to work in Seoul' },
     h1: { ko: '서울 가성비 좋은 저렴한 카공 카페', en: 'Affordable cafes to work in Seoul' },
     lead: { ko: '아이스 아메리카노가 4,500원 이하로 오래 머물기 부담 없는 카페입니다. 가격은 조건일 뿐, 순위는 카공 점수(콘센트·조용함·좌석·가격)로 매겼습니다.',
-      en: 'Cafes where an iced americano is ₩4,500 or less — easy on the wallet for a long session. Price is the filter; the ranking is by study score (outlets, quiet, seating, price).' },
+      en: 'Cafes where an iced americano is ₩4,500 or less. Easy on the wallet for a long session. Price is the filter; the ranking is by study score (outlets, quiet, seating, price).' },
     criteria: { ko: ['아이스 아메리카노 4,500원 이하', '오래 머물기 부담 적음', '카공 적합도 함께 평가'], en: ['Iced americano ₩4,500 or under', 'Easy to linger', 'Also rated for studying'] },
     blurb: (c, ko) => (ko ? `아이스 아메리카노 ${won(c.iced_americano_price)}원.` : `Iced americano ₩${won(c.iced_americano_price)}.`) },
   { key: 'spacious', filter: (c) => c.size === 'large', sort: byScore,
     query: { ko: '서울 넓은 대형 카페', en: 'Spacious cafes in Seoul' },
     h1: { ko: '서울 넓은 대형 카공 카페', en: 'Spacious cafes to work in Seoul' },
     lead: { ko: '좌석이 넉넉한 넓은 카페입니다. 자리 잡기 쉽고 옆자리 간격이 여유로워 오래 작업하기 좋습니다.',
-      en: 'Large cafes with plenty of seating — easy to grab a spot, with room between tables for a long session.' },
+      en: 'Large cafes with plenty of seating, easy to grab a spot, with room between tables for a long session.' },
     criteria: { ko: ['좌석 규모 대형', '자리 간격 여유', '콘센트·조용함 비교'], en: ['Large seating capacity', 'Room between tables', 'Compared on outlets and quiet'] } },
 ];
 
@@ -602,7 +602,7 @@ function hoodDef(gu) {
     h1: { ko: `${gu} 카공하기 좋은 카페`, en: `Best cafes to work in ${info.en}` },
     lead: {
       ko: `${gu}에서 직접 방문한 카공 카페입니다. 콘센트, 조용함, 좌석, 아메리카노 가격, 영업시간을 같은 기준으로 비교했습니다.`,
-      en: `Study-friendly cafes in ${info.en}, Seoul that I visited in person — compared on outlets, quiet, seating, americano price and hours.`,
+      en: `Study-friendly cafes in ${info.en}, Seoul that I visited in person, compared on outlets, quiet, seating, americano price and hours.`,
     },
     criteria: {
       ko: [`${gu} 소재`, '직접 방문한 카페만 포함', '카공 점수 순 정렬'],
@@ -642,7 +642,7 @@ function comboDef(gu, attr) {
     sort: attr.sort, blurb: attr.blurb,
     query: { ko: subKo(attr.query.ko), en: subEn(attr.query.en) },
     h1: { ko: subKo(attr.h1.ko), en: subEn(attr.h1.en) },
-    lead: { ko: `${gu}에서 ${attr.lead.ko}`, en: `${info.en} — ${attr.lead.en}` },
+    lead: { ko: `${gu}에서 ${attr.lead.ko}`, en: `${info.en} · ${attr.lead.en}` },
     criteria: { ko: [`${gu} 소재`, ...attr.criteria.ko], en: [`Located in ${info.en}`, ...attr.criteria.en] },
   };
 }
@@ -713,7 +713,7 @@ function cmpRow(c, ko) {
   const href = `${ko ? '' : '/en'}/cafes/${cafeSlug(c)}`;
   return `<tr><td class="c"><a href="${href}">${esc(ko ? c.name : (c.name_en || c.name))}</a></td>`
     + `<td>${c.score}</td><td>${ko ? `${won(c.iced_americano_price)}원` : `₩${won(c.iced_americano_price)}`}</td><td>${esc(closesLabel(c, ko))}</td>`
-    + `<td>${(OUTLET_N[c.outlets] || OUTLET_N.some)[ko ? 0 : 1]}</td><td>${q >= 0 ? q + '/5' : '—'}</td></tr>`;
+    + `<td>${(OUTLET_N[c.outlets] || OUTLET_N.some)[ko ? 0 : 1]}</td><td>${q >= 0 ? q + '/5' : '-'}</td></tr>`;
 }
 function rankCard(c, i, def, ko) {
   const nm = ko ? c.name : (c.name_en || c.name);
@@ -782,7 +782,7 @@ function renderCollection(def, lang) {
   ];
 
   const body = `
-    <nav class="seo-top"><a href="${ko ? '/' : '/en/cafes'}">Cafe in Seoul</a> <span>›</span> <a href="${ko ? '/cafes' : '/en/cafes'}">${ko ? '카페' : 'Cafes'}</a> <span>›</span> <span>${esc(h1)}</span></nav>
+    <nav class="seo-top"><a href="${mapHome(ko)}">Cafe in Seoul</a> <span>›</span> <a href="${ko ? '/cafes' : '/en/cafes'}">${ko ? '카페' : 'Cafes'}</a> <span>›</span> <span>${esc(h1)}</span></nav>
     <h1>${esc(ko ? `${h1} ${n}곳` : h1)}</h1>
     <p class="sub">${ko ? `직접 방문한 ${total}개 카페 중에서` : `From ${total} cafes visited in person`}</p>
     ${hero ? `<img class="seo-hero" src="${esc(imgPath(hero))}" alt="${esc(h1)}" loading="eager" />` : ''}
@@ -805,7 +805,7 @@ function renderCollection(def, lang) {
 // ---- directories -----------------------------------------------------------
 function seoFooter(ko) {
   return `<footer class="seo-foot">
-    <a href="${ko ? '/' : '/en/cafes'}">${ko ? '지도 홈' : 'Map home'}</a>
+    <a href="${mapHome(ko)}">${ko ? '지도 홈' : 'Map home'}</a>
     <a href="${ko ? '/cafes' : '/en/cafes'}">${ko ? '카페 전체' : 'All cafes'}</a>
     <a href="${ko ? '/views' : '/en/views'}">${ko ? '명소 전체' : 'All view spots'}</a>
     <a href="${ko ? '/en/cafes' : '/cafes'}">${ko ? 'English' : '한국어'}</a>
@@ -831,14 +831,15 @@ function renderCafeDirectory(lang) {
   const pvLat = pv.length ? pv.reduce((a, c) => a + c.lat, 0) / pv.length : null;
   const pvLng = pv.length ? pv.reduce((a, c) => a + c.lng, 0) / pv.length : null;
   const body = `
-    <nav class="seo-top"><a href="${ko ? '/' : '/en/cafes'}">Cafe in Seoul</a> <span>›</span> <span>${ko ? '카페' : 'Cafes'}</span></nav>
+    <nav class="seo-top"><a href="${mapHome(ko)}">Cafe in Seoul</a> <span>›</span> <span>${ko ? '카페' : 'Cafes'}</span></nav>
     <h1>${ko ? '서울 카공 카페' : 'Study cafes in Seoul'}</h1>
-    <p class="seo-lead">${ko ? `직접 방문한 카공 카페 ${rows.length}곳입니다. 각 카페의 조용함, 콘센트, 좌석, 아메리카노 가격, 영업시간을 확인했습니다.` : `${rows.length} study-friendly cafes we visited in person — checking quiet, outlets, seating, americano price and hours at each one.`}</p>
+    <p class="seo-lead">${ko ? `직접 방문한 카공 카페 ${rows.length}곳입니다. 각 카페의 조용함, 콘센트, 좌석, 아메리카노 가격, 영업시간을 확인했습니다.` : `${rows.length} study-friendly cafes we visited in person, checking quiet, outlets, seating, americano price and hours at each one.`}</p>
     ${pv.length ? mapPreview({ center: { lat: pvLat, lng: pvLng }, z: 11, href: mapHome(ko), label: ko ? '카공지도 보러가기' : 'Open the cafe map', pins: pv.slice(0, 18).map((c) => ({ lat: c.lat, lng: c.lng, photo: c.photo_url })) }) : ''}
     <h2>${ko ? '조건별 카페' : 'By what you need'}</h2>
     <div class="seo-links">${attrLinks}</div>
     ${hoodLinks ? `<h2>${ko ? '지역별 카페' : 'By neighborhood'}</h2><div class="seo-links">${hoodLinks}</div>` : ''}
-    <p class="seo-links"><a href="${ko ? '/views' : '/en/views'}">${ko ? '사진 명소 모음 보기' : 'Browse scenic photo spots'} →</a></p>
+    <h2>${ko ? '사진 명소' : 'Scenic spots'}</h2>
+    <div class="seo-links"><a href="${ko ? '/views' : '/en/views'}">${ko ? '사진 명소 전체 보기' : 'Browse all scenic spots'} →</a></div>
     <h2>${ko ? '전체 목록' : 'Full list'}</h2>
     <ul class="seo-dir">${items}</ul>
     ${seoFooter(ko)}`;
@@ -869,7 +870,7 @@ function renderViewDirectory(lang) {
   const pvLat = pv.length ? pv.reduce((a, v) => a + v.lat, 0) / pv.length : null;
   const pvLng = pv.length ? pv.reduce((a, v) => a + v.lng, 0) / pv.length : null;
   const body = `
-    <nav class="seo-top"><a href="${ko ? '/' : '/en/views'}">Cafe in Seoul</a> <span>›</span> <span>${ko ? '명소' : 'View spots'}</span></nav>
+    <nav class="seo-top"><a href="${mapHome(ko)}">Cafe in Seoul</a> <span>›</span> <span>${ko ? '명소' : 'View spots'}</span></nav>
     <h1>${ko ? '서울 사진 명소' : 'Scenic photo spots in Seoul'}</h1>
     <p class="seo-lead">${ko ? `직접 방문해 촬영한 서울 사진 명소 ${rows.length}곳입니다.` : `${rows.length} scenic spots in Seoul, each shot in person.`}</p>
     ${pv.length ? mapPreview({ center: { lat: pvLat, lng: pvLng }, z: 11, href: mapHome(ko), label: ko ? '지도에서 명소 보기' : 'Open the map', pins: pv.slice(0, 18).map((v) => ({ lat: v.lat, lng: v.lng, photo: v.photo_url })) }) : ''}
