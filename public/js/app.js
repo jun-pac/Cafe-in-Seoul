@@ -532,7 +532,7 @@ async function openInsightsModal() {
   back.addEventListener('mousedown', (e) => { if (e.target === back) close(); });
 
   const body = back.querySelector('#inBody');
-  const A = { pageview: L('페이지뷰', 'Pageview'), open_cafe: L('카페 열람', 'Open cafe'), open_view: L('명소 열람', 'Open view'), filter: L('필터', 'Filter'), search: L('검색', 'Search'), like: L('따봉', 'Like'), add_cafe: L('카페 제안', 'Add cafe'), add_view: L('명소 제안', 'Add view'), lang: L('언어변경', 'Lang'), locate: L('내 위치', 'Locate'), install: L('앱설치', 'Install'), collection: L('카페 모음', 'Collection') };
+  const A = { pageview: L('지도 열람', 'Map view'), open_cafe: L('카페 열람', 'Open cafe'), open_view: L('명소 열람', 'Open view'), filter: L('필터', 'Filter'), search: L('검색', 'Search'), like: L('따봉', 'Like'), add_cafe: L('카페 제안', 'Add cafe'), add_view: L('명소 제안', 'Add view'), lang: L('언어변경', 'Lang'), locate: L('내 위치', 'Locate'), install: L('앱설치', 'Install'), collection: L('카페 모음', 'Collection') };
   const DOW = ko ? ['일', '월', '화', '수', '목', '금', '토'] : ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'];
   const stat = (n, label, hint) => `<div class="in-stat"${hint ? ` title="${esc(hint)}"` : ''}><b>${n}</b><span>${esc(label)}</span></div>`;
   const row = (label, n, sub) => `<div class="in-row">${esc(label)}${sub ? ` <span class="muted">${esc(sub)}</span>` : ''}<span class="in-when">${n}</span></div>`;
@@ -571,8 +571,9 @@ async function openInsightsModal() {
     return `
       <div class="in-stats">
         ${stat(k.visitors, L('방문자', 'Visitors'), L('지도 홈 또는 모음 페이지를 본 고유 세션(총 도달, 봇·관리자 제외). 지도 화면의 "오늘" 숫자와 같은 값입니다. 이 중 지도까지 온 비율은 아래 흐름 참고.', 'Unique human sessions that viewed the map home or a collection page (total reach). Same number the map counter shows; how many reached the map is in the flow below.'))}
-        ${stat(k.pageviews, L('페이지뷰', 'Pageviews'))}
-        ${stat(k.actions, L('행동', 'Actions'), L('페이지뷰를 뺀 실제 클릭 수', 'Clicks other than page loads'))}
+        ${stat(k.mapVisitors, L('지도 방문자', 'Map visitors'), L('지도 홈을 실제로 연 고유 사람 수. 방문자(총 도달) 중 지도까지 온 사람입니다.', 'Distinct people who actually opened the map home (of the total-reach visitors).'))}
+        ${stat(k.pageviews, L('지도 조회', 'Map views'), L('지도 홈이 열린 총 횟수(새로고침·재방문 포함). 사람 수가 아니라 로드 횟수이고, 모음 페이지는 제외입니다.', 'Times the map home was loaded (reloads/revisits included). A count of loads, not people; collection pages excluded.'))}
+        ${stat(k.actions, L('행동', 'Actions'), L('지도 조회를 뺀 실제 클릭 수', 'Clicks other than map loads'))}
         ${stat(k.engagedPct + '%', L('열람 전환', 'Open rate'), L('방문자 중 장소를 하나라도 열어본 비율', 'Share of visitors who opened a place'))}
         ${stat(k.returning, L('재방문', 'Returning'), L('이전 날에도 왔던 IP', 'IP seen on an earlier day'))}
         ${stat(k.mobilePct + '%', L('모바일', 'Mobile'))}
@@ -582,7 +583,7 @@ async function openInsightsModal() {
       </div>
 
       <h4 class="in-h4">${L('최근 14일 방문자', 'Visitors, last 14 days')} <small class="muted">${L('막대를 누르면 그 날로', 'tap a bar to jump')}</small></h4>
-      <div class="in-chart">${a.trend.map((x) => `<button class="in-col${x.day === day ? ' is-on' : ''}" data-day="${x.day}" title="${x.day} · ${x.visitors}${L('명', ' visitors')} / ${x.pageviews}pv / ${x.actions}${L('행동', ' actions')}"><i style="height:${Math.max(2, Math.round((x.visitors / trendMax) * 100))}%"></i><span>${x.day.slice(8)}</span></button>`).join('')}</div>
+      <div class="in-chart">${a.trend.map((x) => `<button class="in-col${x.day === day ? ' is-on' : ''}" data-day="${x.day}" title="${x.day} · ${L('방문', 'reach')} ${x.visitors} · ${L('지도조회', 'map views')} ${x.pageviews} · ${L('행동', 'actions')} ${x.actions}"><i style="height:${Math.max(2, Math.round((x.visitors / trendMax) * 100))}%"></i><span>${x.day.slice(8)}</span></button>`).join('')}</div>
 
       <h4 class="in-h4">${L('시간대별 활동', 'By hour of day')} <small class="muted">KST</small></h4>
       <div class="in-chart in-chart--hours">${a.hours.map((x) => `<button class="in-col" title="${String(x.h).padStart(2, '0')}:00 · ${x.visitors}${L('명', ' visitors')} / ${x.events}${L('건', ' events')}"><i style="height:${Math.max(2, Math.round((x.events / hourMax) * 100))}%"></i><span>${x.h % 6 === 0 ? x.h : ''}</span></button>`).join('')}</div>
@@ -628,7 +629,7 @@ async function openInsightsModal() {
       `<span class="in-tag">${s.mobile ? L('모바일', 'mobile') : L('데스크탑', 'desktop')}</span>`,
     ].join('');
     return `<p class="in-note">${L('최근 활동 순 (최신이 위). 봇·관리자·내부 테스트 트래픽은 제외.', 'Most recent activity first. Bots, admins and internal test traffic excluded.')}</p>
-      ${list(a.sessions.map((s) => `<div class="in-session"><div class="in-srow"><b>${esc(s.country || '?')} · ${esc(s.ip || '?')}</b>${badge(s)} <span class="muted">${s.pageviews}pv · ${s.actions}${L('행동', ' actions')}${s.minutes ? ` · ${s.minutes}${L('분', 'min')}` : ''}</span><span class="in-when">${hhmm(s.first_seen)}–${hhmm(s.last_seen)}</span></div>${s.trail && s.trail.length ? `<div class="in-trail">${s.trail.map((tr) => `<span class="in-step">${esc(A[tr.type] || tr.type)}${tr.label ? ` <i>${esc(tr.label)}</i>` : ''}</span>`).join('<b class="in-arrow">›</b>')}</div>` : `<div class="in-trail is-empty">${L('(둘러보기만)', '(just browsed)')}</div>`}</div>`))}`;
+      ${list(a.sessions.map((s) => `<div class="in-session"><div class="in-srow"><b>${esc(s.country || '?')} · ${esc(s.ip || '?')}</b>${badge(s)} <span class="muted">${L('지도', 'map')} ${s.pageviews} · ${s.actions}${L('행동', ' actions')}${s.minutes ? ` · ${s.minutes}${L('분', 'min')}` : ''}</span><span class="in-when">${hhmm(s.first_seen)}–${hhmm(s.last_seen)}</span></div>${s.trail && s.trail.length ? `<div class="in-trail">${s.trail.map((tr) => `<span class="in-step">${esc(A[tr.type] || tr.type)}${tr.label ? ` <i>${esc(tr.label)}</i>` : ''}</span>`).join('<b class="in-arrow">›</b>')}</div>` : `<div class="in-trail is-empty">${L('(둘러보기만)', '(just browsed)')}</div>`}</div>`))}`;
   }
 
   function sourcesTab() {

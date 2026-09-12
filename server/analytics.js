@@ -243,9 +243,10 @@ function analytics(day = kstToday()) {
     sessions, // per-visitor with action trail (see above)
     // headline numbers for the selected KST day
     kpi: {
-      visitors,                                 // sessions that loaded the page today (KST)
+      visitors,                                 // total reach: sessions that saw the map home OR a collection page
+      mapVisitors: visitorSet.filter((s) => s.pageviews > 0).length, // distinct people who loaded the map home
       active: all.length,                       // + sessions acting without a fresh page load
-      pageviews: all.reduce((a, s) => a + s.pageviews, 0),
+      pageviews: all.reduce((a, s) => a + s.pageviews, 0), // map-home loads (a count, reloads included)
       actions: all.reduce((a, s) => a + s.actions, 0),
       engaged,                                  // visitors who opened at least one place
       engagedPct: pct(engaged),
