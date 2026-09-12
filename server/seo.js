@@ -674,7 +674,7 @@ function listCombos() {
 const COLLECTION_CSS = `
     .seo-cmp-wrap { overflow-x: auto; margin: 8px 0 4px; }
     .seo-cmp { width: 100%; border-collapse: collapse; font-size: 13.5px; }
-    .seo-cmp th, .seo-cmp td { text-align: left; padding: 9px 10px; border-bottom: 1px solid var(--hair); white-space: nowrap; }
+    .seo-cmp th, .seo-cmp td { text-align: left; padding: 9px 10px; border-bottom: 1px solid var(--hair); white-space: nowrap; vertical-align: middle; font-variant-numeric: tabular-nums; }
     .seo-cmp th { font-size: 11px; text-transform: uppercase; letter-spacing: .3px; color: var(--mute); font-weight: 700; }
     .seo-cmp td.c { font-weight: 700; }   /* name stays on one line (nowrap inherited) — no 1-char wraps */
     .seo-cmp td.c a { text-decoration: none; }
@@ -712,7 +712,7 @@ function cmpRow(c, ko) {
   const q = quietOf(c);
   const href = `${ko ? '' : '/en'}/cafes/${cafeSlug(c)}`;
   return `<tr><td class="c"><a href="${href}">${esc(ko ? c.name : (c.name_en || c.name))}</a></td>`
-    + `<td>${c.score}</td><td>₩${won(c.iced_americano_price)}</td><td>${esc(closesLabel(c, ko))}</td>`
+    + `<td>${c.score}</td><td>${ko ? `${won(c.iced_americano_price)}원` : `₩${won(c.iced_americano_price)}`}</td><td>${esc(closesLabel(c, ko))}</td>`
     + `<td>${(OUTLET_N[c.outlets] || OUTLET_N.some)[ko ? 0 : 1]}</td><td>${q >= 0 ? q + '/5' : '—'}</td></tr>`;
 }
 function rankCard(c, i, def, ko) {
@@ -789,7 +789,7 @@ function renderCollection(def, lang) {
     ${pvPins.length ? mapPreview({ center: { lat: pvPins[0].lat, lng: pvPins[0].lng }, z: 13, href: mapHome(ko), label: ko ? '카공지도 보러가기' : 'Open the cafe map', pins: pvPins.map((c, i) => ({ lat: c.lat, lng: c.lng, photo: c.photo_url, focus: i === 0 })) }) : ''}
     <p class="seo-lead">${esc(lead)}</p>
     ${n ? `<h2>${ko ? '비교표' : 'At a glance'}</h2>
-    <div class="seo-cmp-wrap"><table class="seo-cmp"><thead><tr><th>${ko ? '카페' : 'Cafe'}</th><th>${ko ? '점수' : 'Score'}</th><th>${ko ? '아메리카노' : 'Americano'}</th><th>${ko ? '마감' : 'Closes'}</th><th>${ko ? '콘센트' : 'Outlets'}</th><th>${ko ? '조용함' : 'Quiet'}</th></tr></thead><tbody>${shown.map((c) => cmpRow(c, ko)).join('')}</tbody></table></div>
+    <div class="seo-cmp-wrap"><table class="seo-cmp"><thead><tr><th>${ko ? '카페' : 'Cafe'}</th><th>${ko ? '카공 스코어' : 'Study score'}</th><th>${ko ? '아메리카노' : 'Americano'}</th><th>${ko ? '마감' : 'Closes'}</th><th>${ko ? '콘센트' : 'Outlets'}</th><th>${ko ? '조용함' : 'Quiet'}</th></tr></thead><tbody>${shown.map((c) => cmpRow(c, ko)).join('')}</tbody></table></div>
     <h2>${ko ? '추천 카페' : 'The cafes'}</h2><ol class="seo-rank">${shown.map((c, i) => rankCard(c, i, def, ko)).join('')}</ol>` : `<p class="seo-lead">${ko ? '아직 조건에 맞는 카페가 없습니다.' : 'No cafes match this yet.'}</p>`}
     ${n > DISPLAY ? `<p class="seo-links"><a href="${ko ? '/cafes' : '/en/cafes'}">${ko ? `카페 전체 ${total}곳 보기` : `See all ${total} cafes`} →</a></p>` : ''}
     <h2>${ko ? '선정 기준' : 'How these were chosen'}</h2>
