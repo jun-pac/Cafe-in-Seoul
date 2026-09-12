@@ -23,7 +23,7 @@ function opensLate(open_time, close_time) {
   return c >= 22 * 60;                // closes 22:00 or later
 }
 
-// Iced-americano price → 0..18. Cheap is a big deal for study cafes, so this is
+// Iced-americano price → 0..18. Cheap is a big deal for laptop-friendly cafes, so this is
 // the single heaviest discrete factor. <=3,500won gets full marks, >=7,000 zero.
 const P_CHEAP = 3500, P_EXP = 7000, P_WEIGHT = 18;
 function priceScore(price) {

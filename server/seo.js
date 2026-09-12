@@ -296,7 +296,7 @@ function renderCafe(row, lang) {
       + (row.floors >= 2 ? `${row.floors}층 규모입니다. ` : '')
       + (hasView ? '창밖 뷰가 좋습니다. ' : '')
       + `Cafe in Seoul 카공 점수는 ${d.score}점입니다.`
-    : `A ${sizeTxt} study-friendly cafe${regEn ? ` in ${regEn}` : ''}. `
+    : `A ${sizeTxt} laptop-friendly cafe${regEn ? ` in ${regEn}` : ''}. `
       + `An iced americano is ₩${price}, and it's open ${row.open_time}–${row.close_time}. `
       + `There are ${OUTLET_EN[row.outlets] || OUTLET_EN.some}`
       + (row.floors >= 2 ? `, across ${row.floors} floors` : '')
@@ -325,10 +325,10 @@ function renderCafe(row, lang) {
 
   const title = ko
     ? `${name} · ${regKo ? regKo + ' ' : ''}카공 카페 (아메리카노 ${price}원, ${d.score}점) | Cafe in Seoul`
-    : `${name} · study cafe${regEn ? ' in ' + regEn : ''} (₩${price}, score ${d.score}) | Cafe in Seoul`;
+    : `${name} · laptop-friendly cafe${regEn ? ' in ' + regEn : ''} (₩${price}, score ${d.score}) | Cafe in Seoul`;
   const desc = ko
     ? `직접 방문한 ${name} 카공 후기. 조용함·콘센트·좌석·아메리카노 가격·영업시간·화장실까지 정리했습니다.`
-    : `A first-hand study-cafe review of ${name}: quiet, outlets, seating, americano price, hours and restrooms.`;
+    : `A first-hand laptop-friendly cafe review of ${name}: quiet, outlets, seating, americano price, hours and restrooms.`;
   const canonical = `${BASE}${ko ? '' : '/en'}/cafes/${cafeSlug(row)}`;
   const alternates = [
     { hreflang: 'ko', href: `${BASE}/cafes/${cafeSlug(row)}` },
@@ -364,7 +364,7 @@ function renderCafe(row, lang) {
     <nav class="seo-top"><a href="${mapHome(ko)}">Cafe in Seoul</a> <span>›</span> <a href="${dirHref}">${ko ? '카페' : 'Cafes'}</a> <span>›</span> <span>${esc(name)}</span></nav>
     <h1>${esc(name)}</h1>
     <p class="sub">${esc(addr)}${gu ? '' : ''} · <span class="seo-badge">${d.score}<small>${ko ? '카공점수' : 'STUDY'}</small></span></p>
-    ${hero ? `<img class="seo-hero" src="${esc(imgPath(hero))}" alt="${esc(name)} ${ko ? '카공 카페 대표 사진' : 'study cafe'}" loading="eager" />` : ''}
+    ${hero ? `<img class="seo-hero" src="${esc(imgPath(hero))}" alt="${esc(name)} ${ko ? '카공 카페 대표 사진' : 'laptop-friendly cafe'}" loading="eager" />` : ''}
     ${mapPreview({ center: { lat: row.lat, lng: row.lng }, z: 15, href: mapCafe(ko, row.id), label: ko ? '카공지도 보러가기' : 'Open the cafe map', pins: [{ lat: row.lat, lng: row.lng, photo: hero, focus: true }, ...nearby.map((c) => ({ lat: c.lat, lng: c.lng, photo: c.photo_url }))] })}
     <p class="seo-lead">${esc(aiSum || lead)}</p>
     ${review ? `<h2>${ko ? '카공 총평' : 'Study verdict'}</h2><p class="seo-lead" style="margin-top:0">${esc(review)}</p>` : ''}
@@ -527,7 +527,7 @@ const isSeoul = (c) => /^\s*서울/.test(c.address || '');
 
 // attribute collections (array order = hub display order)
 const ATTR_COLLECTIONS = [
-  { key: 'best-study-cafes-seoul', filter: () => true, sort: byScore,
+  { key: 'best-cafes-seoul', filter: () => true, sort: byScore,
     query: { ko: '서울 카공하기 좋은 카페', en: 'Best cafes to work in Seoul' },
     h1: { ko: '서울 카공하기 좋은 카페', en: 'Best cafes to work in Seoul' },
     lead: { ko: '직접 방문한 서울 카페 중 카공 적합도가 가장 높은 곳을 골랐습니다. 콘센트, 조용함, 좌석 크기, 아메리카노 가격, 영업시간을 같은 기준으로 평가해 점수를 매겼습니다.',
@@ -602,7 +602,7 @@ function hoodDef(gu) {
     h1: { ko: `${gu} 카공하기 좋은 카페`, en: `Best cafes to work in ${info.en}` },
     lead: {
       ko: `${gu}에서 직접 방문한 카공 카페입니다. 콘센트, 조용함, 좌석, 아메리카노 가격, 영업시간을 같은 기준으로 비교했습니다.`,
-      en: `Study-friendly cafes in ${info.en}, Seoul that I visited in person, compared on outlets, quiet, seating, americano price and hours.`,
+      en: `Laptop-friendly cafes in ${info.en}, Seoul that I visited in person, compared on outlets, quiet, seating, americano price and hours.`,
     },
     criteria: {
       ko: [`${gu} 소재`, '직접 방문한 카페만 포함', '카공 점수 순 정렬'],
@@ -629,7 +629,7 @@ function listCollections() {
 // Only generated when at least COMBO_MIN cafes match (no thin pages); reachable via
 // cross-links + sitemap, not the top-level hub. URL: /cafes/<hood-slug>/<attr-key>.
 const COMBO_MIN = 3;
-// 'best-study-cafes-seoul' is excluded — crossed with a hood it just == the hood page.
+// 'best-cafes-seoul' is excluded — crossed with a hood it just == the hood page.
 const COMBO_ATTR_KEYS = ['late-night', '24-hour', 'great-view', 'power-outlets', 'quiet', 'affordable', 'spacious'];
 
 function comboDef(gu, attr) {
@@ -820,8 +820,8 @@ function renderCafeDirectory(lang) {
     const nm = ko ? c.name : (c.name_en || c.name);
     return `<li><a href="${ko ? '' : '/en'}/cafes/${cafeSlug(c)}"><img src="${esc(imgPath(c.photo_url))}" alt="${esc(nm)}" loading="lazy" /><span><span class="n">${esc(nm)}</span><br><span class="m">${esc(guOf(c, ko) || regionCity(c, ko) || '')} · ${d.score}${ko ? '점' : ''}</span></span></a></li>`;
   }).join('');
-  const title = ko ? `서울 카공 카페 전체 목록 (${rows.length}곳) | Cafe in Seoul` : `All study cafes in Seoul (${rows.length}) | Cafe in Seoul`;
-  const desc = ko ? '직접 방문한 서울 카공 카페 전체 목록. 조용함·콘센트·좌석·가격 기준으로 정리했습니다.' : 'Every study-friendly cafe in Seoul we visited in person, ranked on quiet, outlets, seating and price.';
+  const title = ko ? `카페 전체 목록 (${rows.length}곳) | Cafe in Seoul` : `All cafes in Seoul (${rows.length}) | Cafe in Seoul`;
+  const desc = ko ? '직접 방문한 서울 카공 카페 전체 목록. 조용함·콘센트·좌석·가격 기준으로 정리했습니다.' : 'Every laptop-friendly cafe in Seoul we visited in person, ranked on quiet, outlets, seating and price.';
   const canonical = `${BASE}${ko ? '' : '/en'}/cafes`;
   const { attrs, hoods } = listCollections();
   const link = (d) => `<a href="${ko ? '' : '/en'}/cafes/${d.key}">${esc(d.query[ko ? 'ko' : 'en'])}</a>`;
@@ -832,8 +832,8 @@ function renderCafeDirectory(lang) {
   const pvLng = pv.length ? pv.reduce((a, c) => a + c.lng, 0) / pv.length : null;
   const body = `
     <nav class="seo-top"><a href="${mapHome(ko)}">Cafe in Seoul</a> <span>›</span> <span>${ko ? '카페' : 'Cafes'}</span></nav>
-    <h1>${ko ? '서울 카공 카페' : 'Study cafes in Seoul'}</h1>
-    <p class="seo-lead">${ko ? `직접 방문한 카공 카페 ${rows.length}곳입니다. 각 카페의 조용함, 콘센트, 좌석, 아메리카노 가격, 영업시간을 확인했습니다.` : `${rows.length} study-friendly cafes we visited in person, checking quiet, outlets, seating, americano price and hours at each one.`}</p>
+    <h1>Cafe in Seoul</h1>
+    <p class="seo-lead">${ko ? `직접 방문한 카공 카페 ${rows.length}곳입니다. 각 카페의 조용함, 콘센트, 좌석, 아메리카노 가격, 영업시간을 확인했습니다.` : `${rows.length} laptop-friendly cafes we visited in person, checking quiet, outlets, seating, americano price and hours at each one.`}</p>
     ${pv.length ? mapPreview({ center: { lat: pvLat, lng: pvLng }, z: 11, href: mapHome(ko), label: ko ? '카공지도 보러가기' : 'Open the cafe map', pins: pv.slice(0, 18).map((c) => ({ lat: c.lat, lng: c.lng, photo: c.photo_url })) }) : ''}
     <h2>${ko ? '조건별 카페' : 'By what you need'}</h2>
     <div class="seo-links">${attrLinks}</div>
@@ -874,7 +874,7 @@ function renderViewDirectory(lang) {
     <h1>${ko ? '서울 사진 명소' : 'Scenic photo spots in Seoul'}</h1>
     <p class="seo-lead">${ko ? `직접 방문해 촬영한 서울 사진 명소 ${rows.length}곳입니다.` : `${rows.length} scenic spots in Seoul, each shot in person.`}</p>
     ${pv.length ? mapPreview({ center: { lat: pvLat, lng: pvLng }, z: 11, href: mapHome(ko), label: ko ? '지도에서 명소 보기' : 'Open the map', pins: pv.slice(0, 18).map((v) => ({ lat: v.lat, lng: v.lng, photo: v.photo_url })) }) : ''}
-    <p class="seo-links"><a href="${ko ? '/cafes' : '/en/cafes'}">${ko ? '카공 카페 모음 보기' : 'Browse study cafes'} →</a></p>
+    <p class="seo-links"><a href="${ko ? '/cafes' : '/en/cafes'}">${ko ? '카공 카페 모음 보기' : 'Browse laptop-friendly cafes'} →</a></p>
     <ul class="seo-dir">${items}</ul>
     ${seoFooter(ko)}`;
   return shell({
@@ -974,6 +974,8 @@ function serveView(lang) {
 // first and fall through to the cafe-detail handler when the slug isn't a collection.
 function serveCollection(lang) {
   return (req, res, next) => {
+    // renamed slug: keep the old indexed URL alive with a 301 (dropped "study cafes")
+    if (req.params.slug === 'best-study-cafes-seoul') return res.redirect(301, `${lang === 'en' ? '/en' : ''}/cafes/best-cafes-seoul`);
     const def = getCollection(req.params.slug);
     if (!def) return next();
     // canonical KST label = the Korean H1, so ko/en hits on the same page group together

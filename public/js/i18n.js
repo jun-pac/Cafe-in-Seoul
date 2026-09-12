@@ -105,7 +105,7 @@ const DICT = {
     'score.tip': '카공 종합점수 (0-100): 가격·다층·콘센트·면적·뷰·영업시간 + 집단지성 투표',
   },
   en: {
-    'brand.sub': 'Study-friendly cafes in Seoul',
+    'brand.sub': 'Laptop-friendly cafes in Seoul',
     'nav.addCafe': 'Add Cafe', 'nav.addView': 'Add View',
     'nav.collections': 'Cafe guides',
     'detail.aiSummary': 'Summary',
@@ -170,7 +170,7 @@ const DICT = {
     'modal.hours': 'Hours (per day)', 'modal.hoursHint': 'Check closed days; 24h = 00:00-00:00',
     'modal.aiSummary': 'AI review summary', 'modal.editable': 'editable',
     'modal.studyReview': 'Study verdict', 'modal.aiDraft': 'AI draft', 'modal.aiDrafting': 'Drafting…',
-    'modal.studyReviewHint': 'The #1 virtue of a study cafe is "not feeling watched". Be sure to mention whether you feel monitored (how many seats are hidden from the counter, whether you can come and go freely, how open the space is). Also add anything the fields do not capture, e.g. weak Wi-Fi.',
+    'modal.studyReviewHint': 'The #1 virtue of a laptop-friendly cafe is "not feeling watched". Be sure to mention whether you feel monitored (how many seats are hidden from the counter, whether you can come and go freely, how open the space is). Also add anything the fields do not capture, e.g. weak Wi-Fi.',
     'modal.studyReviewAiHint': 'Let AI draft it, then edit.',
     'modal.studyReviewPlaceholder': 'e.g. Most seats are in direct view of the counter, so it feels a bit watched. But there are two entrances, so you can come and go freely. The space is very open, which may not suit those who like cozy corners.',
     'modal.judge': 'Your judgment (key for studying)', 'modal.floors': 'Floors', 'modal.area': 'Size', 'modal.outlet': 'Outlets',

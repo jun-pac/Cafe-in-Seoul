@@ -1,6 +1,6 @@
 'use strict';
 
-// Summarizes external (Kakao/blog) reviews into a short, study-cafe-focused blurb.
+// Summarizes external (Kakao/blog) reviews into a short, laptop-friendly cafe-focused blurb.
 // Intentionally does NOT guess the discrete fields (floors/size/outlets/view) —
 // those are entered by a human. Reviews are noisy; we only summarize what's said.
 // No-ops (returns null) when OPENAI_API_KEY is absent.
@@ -109,7 +109,7 @@ async function moderate(cafe) {
 }
 
 // Drafts a concise "카공 총평" (study-friendliness verdict) an admin then edits.
-// The #1 virtue of a study cafe is "감시받지 않는 기분" (not feeling watched), so
+// The #1 virtue of a laptop-friendly cafe is "감시받지 않는 기분" (not feeling watched), so
 // the draft must speak to that. Numeric fields are shown separately, so don't list them.
 const STUDY_SYSTEM = `너는 "카공(카페에서 오래 공부/작업)" 관점에서 카페 총평 초안을 쓰는 도우미다.
 카공의 제1 덕목은 "감시받지 않는 기분"이다. 아래 정보를 바탕으로 오래 머물며 공부하기에 어떤지 간결하게(2~3문장, 한국어) 초안을 써라.
