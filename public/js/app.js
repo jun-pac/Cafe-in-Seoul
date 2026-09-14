@@ -574,8 +574,7 @@ async function openInsightsModal() {
         ${stat(k.mapVisitors, L('지도 방문자', 'Map visitors'), L('지도 홈을 실제로 연 고유 사람 수. 방문자(총 도달) 중 지도까지 온 사람입니다.', 'Distinct people who actually opened the map home (of the total-reach visitors).'))}
         ${stat(k.pageviews, L('지도 조회', 'Map views'), L('지도 홈이 열린 총 횟수(새로고침·재방문 포함). 사람 수가 아니라 로드 횟수이고, 모음 페이지는 제외입니다.', 'Times the map home was loaded (reloads/revisits included). A count of loads, not people; collection pages excluded.'))}
         ${stat(k.actions, L('행동', 'Actions'), L('지도 조회를 뺀 실제 클릭 수', 'Clicks other than map loads'))}
-        ${stat(k.engagedPct + '%', L('열람 전환', 'Open rate'), L('방문자 중 장소를 하나라도 열어본 비율', 'Share of visitors who opened a place'))}
-        ${stat(k.returning, L('재방문', 'Returning'), L('이전 날에도 왔던 IP', 'IP seen on an earlier day'))}
+        ${stat(k.returning, L('재방문', 'Returning'), L('이전 날짜에도 접속한 적 있는 IP의 세션. IP 기반이라 공용 와이파이·모바일 통신사(여러 명이 같은 IP 공유)로 실제보다 부풀 수 있어 참고용입니다.', 'Sessions from an IP also seen on an earlier day. IP-based, so shared wifi / mobile carriers (many users behind one IP) inflate it — a rough hint only.'))}
         ${stat(k.mobilePct + '%', L('모바일', 'Mobile'))}
         ${stat(k.botPageviews, L('봇 조회', 'Bot views'))}
         ${stat(k.aiCrawls || 0, L('AI 크롤', 'AI crawls'), L('AI 크롤러(ChatGPT 등)의 페이지 조회. 자세히는 유입·AI 탭.', 'AI crawler fetches (ChatGPT etc). See the Traffic & AI tab.'))}
