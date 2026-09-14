@@ -67,8 +67,27 @@ const kstToday = () => new Date(Date.now() + 9 * 3600 * 1000).toISOString().slic
 
 // store ts as UTC explicitly (container TZ is UTC); analytics queries convert to KST (+9h)
 const insertEvent = db.prepare(`INSERT INTO events
-  (ts, day, session_id, user_id, type, target, label, ip, country, ua, is_bot, is_admin, referer, source)
-  VALUES (datetime('now'),@day,@session_id,@user_id,@type,@target,@label,@ip,@country,@ua,@is_bot,@is_admin,@referer,@source)`);
+  (ts, day, session_id, user_id, type, target, label, ip, country, ua, is_bot, is_admin, referer, source, visitor_id)
+  VALUES (datetime('now'),@day,@session_id,@user_id,@type,@target,@label,@ip,@country,@ua,@is_bot,@is_admin,@referer,@source,@visitor_id)`);
+
+const crypto = require('crypto');
+// Anonymous first-party visitor id, from a long-lived `vid` cookie. Read here; SET (when
+// missing) only in the human request paths that have `res` — see ensureVisitorId().
+function readVid(req) {
+  const m = /(?:^|;\s*)vid=([^;]+)/.exec(req.headers.cookie || '');
+  return m ? m[1].slice(0, 40) : null;
+}
+// Ensure the browser has a `vid`. Generates + sets a 400-day cookie when absent. Caller
+// should gate on "real person" so bots (which drop cookies) don't churn ids.
+function ensureVisitorId(req, res) {
+  let vid = req._vid || readVid(req);
+  if (!vid) {
+    vid = crypto.randomUUID();
+    try { res.cookie('vid', vid, { httpOnly: true, sameSite: 'lax', secure: 'auto', maxAge: 1000 * 60 * 60 * 24 * 400 }); } catch { /* ignore */ }
+  }
+  req._vid = vid;
+  return vid;
+}
 
 // Record one event from an Express request. type is required; target/label optional.
 function recordEvent(req, { type, target = null, label = null }) {
@@ -93,6 +112,7 @@ function recordEvent(req, { type, target = null, label = null }) {
       is_admin: isAdmin(req.user) ? 1 : 0, // email-allowlist admins included, not just DB flag
       referer: referer ? String(referer).slice(0, 300) : null,
       source: classifySource(referer, utm),
+      visitor_id: req._vid || readVid(req),
     });
   } catch { /* analytics must never break a request */ }
 }
@@ -136,15 +156,17 @@ const visitorsOn = (day) => one(`SELECT COUNT(DISTINCT session_id) AS n
 function analytics(day = kstToday()) {
   // Build each visitor's journey (ordered actions) so you can see what a real person did —
   // a real user has a varied trail (open cafe → filter → open view …), a bot has just pageviews.
-  const humanEvents = many(`SELECT session_id, user_id, type, label, ip, country, ua, source, ${KTS} AS ts
+  const humanEvents = many(`SELECT session_id, user_id, type, label, ip, country, ua, source, visitor_id, ${KTS} AS ts
     FROM events WHERE ${KDAY}=? AND ${HUMAN} ORDER BY id`, day);
-  // ips seen on any EARLIER day → this session is a returning visitor, not a first-timer
-  const seenBefore = new Set(many(`SELECT DISTINCT ip FROM events WHERE ${KDAY}<? AND ip IS NOT NULL AND ${HUMAN}`, day).map((r) => r.ip));
+  // visitor ids (first-party cookie) seen on any EARLIER day → a returning browser. IP-based
+  // matching over-counted (shared/mobile-NAT IPs); accurate from when vid tracking shipped.
+  const seenBefore = new Set(many(`SELECT DISTINCT visitor_id FROM events WHERE ${KDAY}<? AND visitor_id IS NOT NULL AND ${HUMAN}`, day).map((r) => r.visitor_id));
 
   const smap = new Map();
   for (const e of humanEvents) {
     let s = smap.get(e.session_id);
-    if (!s) { s = { session_id: e.session_id, ip: e.ip, country: e.country, ua: e.ua, user_id: e.user_id, first_seen: e.ts, last_seen: e.ts, events: 0, pageviews: 0, actions: 0, depth: 0, trail: [], source: 'Direct', sawCollection: false }; smap.set(e.session_id, s); }
+    if (!s) { s = { session_id: e.session_id, visitor_id: e.visitor_id, ip: e.ip, country: e.country, ua: e.ua, user_id: e.user_id, first_seen: e.ts, last_seen: e.ts, events: 0, pageviews: 0, actions: 0, depth: 0, trail: [], source: 'Direct', sawCollection: false }; smap.set(e.session_id, s); }
+    if (!s.visitor_id && e.visitor_id) s.visitor_id = e.visitor_id;
     s.last_seen = e.ts; s.events++;
     // the session's source is the first non-Direct one seen — the real entry point,
     // not a later same-site reload (which classifies as Direct)
@@ -161,7 +183,7 @@ function analytics(day = kstToday()) {
   }
   for (const s of smap.values()) {
     s.mobile = isMobileUA(s.ua) ? 1 : 0;
-    s.returning = seenBefore.has(s.ip) ? 1 : 0;
+    s.returning = (s.visitor_id && seenBefore.has(s.visitor_id)) ? 1 : 0;
     s.minutes = Math.round((Date.parse(s.last_seen + 'Z') - Date.parse(s.first_seen + 'Z')) / 60000) || 0;
   }
   const all = [...smap.values()];
@@ -286,4 +308,4 @@ function analytics(day = kstToday()) {
   };
 }
 
-module.exports = { recordEvent, analytics, isBotUA, BOT_UA, kstToday, visitorsOn, classifySource, classifyCrawler };
+module.exports = { recordEvent, ensureVisitorId, analytics, isBotUA, BOT_UA, kstToday, visitorsOn, classifySource, classifyCrawler };

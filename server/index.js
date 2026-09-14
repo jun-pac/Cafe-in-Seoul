@@ -63,7 +63,7 @@ app.use('/api', (req, res, next) => { res.setHeader('Cache-Control', 'no-store')
 const db = require('./db');
 // days are KST calendar days everywhere — with UTC days the public "오늘 방문자" counter
 // reset at 09:00 KST, in the middle of the Korean morning.
-const { recordEvent, isBotUA, kstToday, visitorsOn } = require('./analytics');
+const { recordEvent, ensureVisitorId, isBotUA, kstToday, visitorsOn } = require('./analytics');
 const bumpVisit = db.prepare(`INSERT INTO daily_visits (day, n) VALUES (?, 1) ON CONFLICT(day) DO UPDATE SET n = n + 1`);
 app.use((req, res, next) => {
   try {
@@ -76,6 +76,8 @@ app.use((req, res, next) => {
         : isBot ? 'bot'
         : (req.session && req.session.visitDay === today) ? 'dupe'
         : 'counted';
+      // give real people a first-party visitor id (for accurate "returning"); skip bots
+      if (!isBot && reason !== 'admin') ensureVisitorId(req, res);
       // record EVERY homepage load as a pageview event (session id distinguishes visitors;
       // is_bot/is_admin flags let analysis exclude noise). Console line stays for tailing.
       recordEvent(req, { type: 'pageview', label: reason });
@@ -96,7 +98,7 @@ app.use((req, res, next) => {
 const TRACK_TYPES = new Set(['open_cafe', 'open_view', 'filter', 'search', 'like', 'add_cafe', 'add_view', 'lang', 'install', 'locate']);
 app.post('/api/track', express.json({ limit: '4kb' }), (req, res) => {
   const { type, target, label } = req.body || {};
-  if (TRACK_TYPES.has(type)) recordEvent(req, { type, target, label });
+  if (TRACK_TYPES.has(type)) { if (!isBotUA(req.get('user-agent') || '')) ensureVisitorId(req, res); recordEvent(req, { type, target, label }); }
   res.json({ ok: true });
 });
 

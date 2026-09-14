@@ -270,6 +270,10 @@ db.exec(`CREATE INDEX IF NOT EXISTS idx_events_session ON events(session_id)`);
 const evCols = new Set(db.prepare(`PRAGMA table_info(events)`).all().map((c) => c.name));
 if (!evCols.has('referer')) db.exec(`ALTER TABLE events ADD COLUMN referer TEXT`);
 if (!evCols.has('source')) db.exec(`ALTER TABLE events ADD COLUMN source TEXT`);
+// anonymous first-party visitor id (a long-lived `vid` cookie) — the correct basis for
+// "returning" (a browser that came back), instead of IP which shared/NAT addresses inflate.
+if (!evCols.has('visitor_id')) db.exec(`ALTER TABLE events ADD COLUMN visitor_id TEXT`);
+db.exec(`CREATE INDEX IF NOT EXISTS idx_events_visitor ON events(visitor_id)`);
 
 // 따봉(likes) on view-spots — the count decides which survives when cards overlap
 db.exec(`CREATE TABLE IF NOT EXISTS viewspot_likes (

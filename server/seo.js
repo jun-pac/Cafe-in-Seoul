@@ -21,7 +21,7 @@ const express = require('express');
 const db = require('./db');
 const { decorate } = require('./cafeModel');
 const { opensLate } = require('./score');
-const { recordEvent, isBotUA, kstToday } = require('./analytics');
+const { recordEvent, ensureVisitorId, isBotUA, kstToday } = require('./analytics');
 const { isAdmin } = require('./auth');
 const bumpVisitTally = db.prepare(`INSERT INTO daily_visits (day, n) VALUES (?, 1) ON CONFLICT(day) DO UPDATE SET n = n + 1`);
 
@@ -932,9 +932,10 @@ const html = (res, s, code = 200, cache = 'public, max-age=300') => res.status(c
 // collection→map journey links up (saveUninitialized:false won't set a cookie otherwise).
 // Bots are skipped (no session-store bloat, no cookie). Returns true if this is a human,
 // so the caller can serve a private/uncached response (a Set-Cookie must not be shared-cached).
-function trackVisit(req, ev) {
-  recordEvent(req, ev);
+function trackVisit(req, res, ev) {
   const human = !isBotUA(req.get('user-agent') || '');
+  if (human) { try { ensureVisitorId(req, res); } catch { /* ignore */ } } // first-party visitor id (safe: human collection pages are private/no-store)
+  recordEvent(req, ev);
   try {
     if (human && req.session) {
       if (!req.session.seen) req.session.seen = 1;
@@ -955,7 +956,7 @@ router.get('/sitemap.xml', (req, res) => res.type('application/xml').set('Cache-
 
 // directories
 const serveCafeDir = (lang) => (req, res) => {
-  const human = trackVisit(req, { type: 'collection', target: 'directory', label: '카페 모음 (전체 목록)' });
+  const human = trackVisit(req, res, { type: 'collection', target: 'directory', label: '카페 모음 (전체 목록)' });
   html(res, renderCafeDirectory(lang), 200, collCache(human));
 };
 router.get('/cafes', serveCafeDir('ko'));
@@ -991,7 +992,7 @@ function serveCollection(lang) {
     const def = getCollection(req.params.slug);
     if (!def) return next();
     // canonical KST label = the Korean H1, so ko/en hits on the same page group together
-    const human = trackVisit(req, { type: 'collection', target: def.key, label: def.h1.ko });
+    const human = trackVisit(req, res, { type: 'collection', target: def.key, label: def.h1.ko });
     html(res, renderCollection(def, lang), 200, collCache(human));
   };
 }
@@ -1007,7 +1008,7 @@ function serveCombo(lang) {
   return (req, res, next) => {
     const def = getCombo(req.params.hood, req.params.attr);
     if (!def) return next();
-    const human = trackVisit(req, { type: 'collection', target: def.key, label: def.h1.ko });
+    const human = trackVisit(req, res, { type: 'collection', target: def.key, label: def.h1.ko });
     html(res, renderCollection(def, lang), 200, collCache(human));
   };
 }
