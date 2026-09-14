@@ -165,7 +165,7 @@ function analytics(day = kstToday()) {
   const smap = new Map();
   for (const e of humanEvents) {
     let s = smap.get(e.session_id);
-    if (!s) { s = { session_id: e.session_id, visitor_id: e.visitor_id, ip: e.ip, country: e.country, ua: e.ua, user_id: e.user_id, first_seen: e.ts, last_seen: e.ts, events: 0, pageviews: 0, actions: 0, depth: 0, trail: [], source: 'Direct', sawCollection: false }; smap.set(e.session_id, s); }
+    if (!s) { s = { session_id: e.session_id, visitor_id: e.visitor_id, ip: e.ip, country: e.country, ua: e.ua, user_id: e.user_id, first_seen: e.ts, last_seen: e.ts, events: 0, pageviews: 0, actions: 0, depth: 0, trail: [], source: 'Direct', sawCollection: false, browsed: false, opened: false, acted: false }; smap.set(e.session_id, s); }
     if (!s.visitor_id && e.visitor_id) s.visitor_id = e.visitor_id;
     s.last_seen = e.ts; s.events++;
     // the session's source is the first non-Direct one seen — the real entry point,
@@ -175,7 +175,10 @@ function analytics(day = kstToday()) {
     if (e.type === 'pageview') s.pageviews++;
     else {
       s.actions++;
-      s.depth = Math.max(s.depth, DEPTH[e.type] || 0);
+      const d = DEPTH[e.type] || 0;
+      s.depth = Math.max(s.depth, d);
+      // engagement categories — a visitor can be in several (filtered AND opened a place).
+      if (d === 1) s.browsed = true; else if (d === 2) s.opened = true; else if (d >= 3) s.acted = true;
       if (s.trail.length < 40) s.trail.push({ type: e.type, label: e.label, ts: e.ts });
     }
     if (e.user_id) s.user_id = e.user_id;
@@ -199,8 +202,16 @@ function analytics(day = kstToday()) {
   // beacons); those count as `active`, not visitors.
   const visitorSet = all.filter((s) => s.pageviews > 0 || s.sawCollection);
   const visitors = visitorSet.length;
-  const depth = DEPTH_KEYS.map((key, i) => ({ key, n: visitorSet.filter((s) => s.depth === i).length }));
-  const engaged = visitorSet.filter((s) => s.depth >= 2).length;
+  // engagement breakdown — each action category counts every visitor who did it (overlapping,
+  // NOT a deepest-only funnel), since filter/search isn't a prerequisite for opening a place.
+  // Only "none" is exclusive (visitors who took no action at all).
+  const depth = [
+    { key: 'none', n: visitorSet.filter((s) => !s.browsed && !s.opened && !s.acted).length },
+    { key: 'browse', n: visitorSet.filter((s) => s.browsed).length },
+    { key: 'open', n: visitorSet.filter((s) => s.opened).length },
+    { key: 'act', n: visitorSet.filter((s) => s.acted).length },
+  ];
+  const engaged = visitorSet.filter((s) => s.opened || s.acted).length;
   const pct = (n) => (visitors ? Math.round((n / visitors) * 100) : 0);
 
   // Last 14 KST days, oldest → newest, so the UI can draw a trend and let you pick a day.

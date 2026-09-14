@@ -567,7 +567,7 @@ async function openInsightsModal() {
     const k = a.kpi;
     const trendMax = Math.max(1, ...a.trend.map((x) => x.visitors));
     const hourMax = Math.max(1, ...a.hours.map((x) => x.events));
-    const depthLabel = { bounce: L('둘러봄 (행동 없음)', 'Browsed (no action)'), browse: L('필터·검색 사용', 'Filtered / searched'), open: L('장소 열어봄', 'Opened a place'), act: L('참여 (따봉·제안)', 'Engaged (like/propose)') };
+    const depthLabel = { none: L('둘러봄만 (행동 없음)', 'Just browsed (no action)'), browse: L('필터·검색', 'Filtered / searched'), open: L('장소 열어봄', 'Opened a place'), act: L('참여 (따봉·제안)', 'Engaged (like/propose)') };
     return `
       <div class="in-stats">
         ${stat(k.visitors, L('방문자', 'Visitors'), L('지도 홈 또는 모음 페이지를 본 고유 세션(총 도달, 봇·관리자 제외). 지도 화면의 "오늘" 숫자와 같은 값입니다. 이 중 지도까지 온 비율은 아래 흐름 참고.', 'Unique human sessions that viewed the map home or a collection page (total reach). Same number the map counter shows; how many reached the map is in the flow below.'))}
@@ -589,7 +589,7 @@ async function openInsightsModal() {
 
       <h4 class="in-h4">${L('방문자가 어디까지 갔나', 'How far visitors got')}</h4>
       ${bars(a.depth.map((x) => ({ label: depthLabel[x.key] || x.key, n: x.n })))}
-      <p class="in-note muted">${L('방문자를 <b>가장 깊은 행동</b> 하나로만 분류합니다(합계 = 방문자 수, 중복 없음). 그래서 아래 "행동 내역"의 개별 건수와 다릅니다 — 예: 필터 후 카페를 열면 "필터·검색"이 아니라 "장소 열어봄"에 집계됩니다.', 'Each visitor is bucketed by their <b>deepest</b> action only (buckets sum to visitors, no double-count), so these differ from the raw counts in "Actions" below — e.g. someone who filters and then opens a cafe lands in "Opened a place", not "Filtered".')}</p>
+      <p class="in-note muted">${L('"둘러봄만"은 아무 행동도 안 한 방문자, 나머지는 그 행동을 <b>한 번이라도 한</b> 방문자 수입니다(<b>중복 집계</b> — 필터도 하고 카페도 연 사람은 양쪽에 다 잡힘). 아래 "행동 내역"은 사람이 아니라 <b>행동 건수</b>라 숫자가 다를 수 있어요.', '"Just browsed" = visitors who took no action; the rest count visitors who did that action <b>at least once</b> (<b>overlapping</b> — someone who filtered and opened a cafe is in both). "Actions" below counts events, not people, so numbers differ.')}</p>
 
       <h4 class="in-h4">${L('행동 내역', 'Actions')}</h4>
       ${a.actionTypes.length ? bars(a.actionTypes.map((x) => ({ label: A[x.type] || x.type, n: x.n }))) : `<p class="muted">${L('아직 없음', 'none yet')}</p>`}
